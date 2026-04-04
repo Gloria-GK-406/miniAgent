@@ -1,0 +1,193 @@
+import type Anthropic from "@anthropic-ai/sdk";
+import type {
+  Message,
+  ToolCallMessage,
+  ToolResultMessage,
+  Tool,
+} from "../../core/types.js";
+import type { ModelConfig } from "../../core/config.js";
+import type {
+  AssistMessage as AssistMessageType,
+  ToolCallMessage as ToolCallMessageType,
+} from "../../core/types.js";
+import type {
+  MessageParam,
+  ContentBlockParam,
+  Tool as AnthropicTool,
+} from "@anthropic-ai/sdk/resources/messages/messages.js";
+import { MessageType } from "../../core/types.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+interface ConvertedInput {
+  system?: string;
+  messages: MessageParam[];
+}
+
+export function convertMessages(messages: Message[]): ConvertedInput {
+  const systemParts: string[] = [];
+  const params: MessageParam[] = [];
+
+  for (const msg of messages) {
+    switch (msg.type) {
+      case MessageType.System:
+        systemParts.push(msg.content);
+        break;
+      case MessageType.User:
+        params.push({ role: "user", content: msg.content });
+        break;
+      case MessageType.Assist:
+        params.push({
+          role: "assistant",
+          content: [{ type: "text", text: msg.content }],
+        });
+        break;
+      case MessageType.ToolCall:
+        params.push(convertToolCallMessage(msg));
+        break;
+      case MessageType.ToolResult:
+        params.push(convertToolResultMessage(msg));
+        break;
+    }
+  }
+
+  const merged = mergeToolResults(params);
+
+  const result: ConvertedInput = { messages: merged };
+  if (systemParts.length > 0) {
+    result.system = systemParts.join("\n\n");
+  }
+  return result;
+}
+
+function convertToolCallMessage(msg: ToolCallMessage): MessageParam {
+  return {
+    role: "assistant",
+    content: [
+      ...(msg.content
+        ? [{ type: "text" as const, text: msg.content }]
+        : []),
+      {
+        type: "tool_use" as const,
+        id: msg.toolCallId,
+        name: msg.toolName,
+        input: msg.arguments as Record<string, unknown>,
+      },
+    ],
+  };
+}
+
+function convertToolResultMessage(msg: ToolResultMessage): MessageParam {
+  return {
+    role: "user",
+    content: [
+      {
+        type: "tool_result" as const,
+        tool_use_id: msg.toolCallId,
+        content: msg.content,
+      },
+    ],
+  };
+}
+
+function mergeToolResults(messages: MessageParam[]): MessageParam[] {
+  const result: MessageParam[] = [];
+
+  for (const msg of messages) {
+    const last = result[result.length - 1];
+    if (
+      last &&
+      last.role === "user" &&
+      msg.role === "user" &&
+      Array.isArray(last.content) &&
+      Array.isArray(msg.content)
+    ) {
+      (last.content as ContentBlockParam[]).push(
+        ...(msg.content as ContentBlockParam[]),
+      );
+      continue;
+    }
+    result.push(msg);
+  }
+
+  return result;
+}
+
+export function convertTools(tools: Tool[]): AnthropicTool[] {
+  if (tools.length === 0) return [];
+
+  return tools.map((tool): AnthropicTool => {
+    const jsonSchema = zodToJsonSchema(tool.parameters);
+    const { $schema: _, ...schema } = jsonSchema as Record<string, unknown>;
+    return {
+      name: tool.name,
+      description: tool.description,
+      input_schema: {
+        type: "object",
+        ...(schema["properties"] !== undefined && {
+          properties: schema["properties"],
+        }),
+        ...(schema["required"] !== undefined && {
+          required: schema["required"] as string[],
+        }),
+      },
+    };
+  });
+}
+
+export function buildCreateParams(
+  messages: Message[],
+  config: ModelConfig,
+  tools: Tool[],
+): Anthropic.MessageCreateParamsNonStreaming {
+  const { system, messages: convertedMessages } = convertMessages(messages);
+
+  return {
+    model: config.model,
+    max_tokens: config.maxTokens ?? config.maxOutputTokens ?? 4096,
+    ...(system !== undefined && { system }),
+    messages: convertedMessages,
+    ...(convertTools(tools).length > 0 && { tools: convertTools(tools) }),
+    ...(config.temperature !== undefined && {
+      temperature: config.temperature,
+    }),
+    ...(config.topP !== undefined && { top_p: config.topP }),
+  };
+}
+
+export function convertResponse(
+  response: Anthropic.Message,
+): AssistMessageType | ToolCallMessageType {
+  const textParts: string[] = [];
+  let toolUse: {
+    id: string;
+    name: string;
+    input: unknown;
+  } | null = null;
+
+  for (const block of response.content) {
+    if (block.type === "text") {
+      textParts.push(block.text);
+    } else if (block.type === "tool_use") {
+      if (toolUse === null) {
+        toolUse = { id: block.id, name: block.name, input: block.input };
+      }
+    }
+  }
+
+  if (toolUse !== null) {
+    return {
+      id: crypto.randomUUID(),
+      type: MessageType.ToolCall,
+      content: textParts.join(""),
+      toolCallId: toolUse.id,
+      toolName: toolUse.name,
+      arguments: (toolUse.input as Record<string, unknown>) ?? {},
+    };
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    type: MessageType.Assist,
+    content: textParts.join(""),
+  };
+}
