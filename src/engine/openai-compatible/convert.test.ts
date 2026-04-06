@@ -267,14 +267,15 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    expect(!Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      expect(result.type).toBe(MessageType.Assist);
       expect(result.content).toBe("Hello!");
       expect(result.id).toBeTruthy();
     }
   });
 
-  it("converts tool call response to ToolCallMessage", () => {
+  it("converts tool call response to ToolCallMessage array", () => {
     const response = {
       id: "chatcmpl-2",
       choices: [
@@ -303,12 +304,59 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.ToolCall);
-    if (result.type === MessageType.ToolCall) {
-      expect(result.toolCallId).toBe("call_xyz");
-      expect(result.toolName).toBe("search");
-      expect(result.arguments).toEqual({ query: "test" });
-    }
+    expect(Array.isArray(result)).toBe(true);
+    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
+    expect(toolCalls[0]!.toolCallId).toBe("call_xyz");
+    expect(toolCalls[0]!.toolName).toBe("search");
+    expect(toolCalls[0]!.arguments).toEqual({ query: "test" });
+  });
+
+  it("converts multiple tool calls response to ToolCallMessage array", () => {
+    const response = {
+      id: "chatcmpl-4",
+      choices: [
+        {
+          message: {
+            role: "assistant" as const,
+            content: null,
+            tool_calls: [
+              {
+                id: "call_a",
+                type: "function" as const,
+                function: {
+                  name: "search",
+                  arguments: '{"query":"first"}',
+                },
+              },
+              {
+                id: "call_b",
+                type: "function" as const,
+                function: {
+                  name: "search",
+                  arguments: '{"query":"second"}',
+                },
+              },
+            ],
+          },
+          finish_reason: "tool_calls",
+          index: 0,
+        },
+      ],
+      created: 0,
+      model: "gpt-4o",
+      object: "chat.completion" as const,
+    };
+
+    const result = convertResponse(response as never);
+    expect(Array.isArray(result)).toBe(true);
+    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls[0]!.toolCallId).toBe("call_a");
+    expect(toolCalls[0]!.arguments).toEqual({ query: "first" });
+    expect(toolCalls[1]!.toolCallId).toBe("call_b");
+    expect(toolCalls[1]!.arguments).toEqual({ query: "second" });
   });
 
   it("throws when choices is empty", () => {

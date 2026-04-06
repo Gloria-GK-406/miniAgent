@@ -10,8 +10,7 @@ import type { ModelConfig } from "../../core/config.js";
 import type {
   AssistMessage as AssistMessageType,
   ToolCallMessage as ToolCallMessageType,
-} from "../../core/types.js";
-import type {
+} from "../../core/types.js";import type {
   MessageParam,
   ContentBlockParam,
   Tool as AnthropicTool,
@@ -187,33 +186,32 @@ export function buildCreateParams(
 
 export function convertResponse(
   response: Anthropic.Message,
-): AssistMessageType | ToolCallMessageType {
+): AssistMessageType | ToolCallMessageType[] {
   const textParts: string[] = [];
-  let toolUse: {
+  const toolUses: {
     id: string;
     name: string;
     input: unknown;
-  } | null = null;
+  }[] = [];
 
   for (const block of response.content) {
     if (block.type === "text") {
       textParts.push(block.text);
     } else if (block.type === "tool_use") {
-      if (toolUse === null) {
-        toolUse = { id: block.id, name: block.name, input: block.input };
-      }
+      toolUses.push({ id: block.id, name: block.name, input: block.input });
     }
   }
 
-  if (toolUse !== null) {
-    return {
+  if (toolUses.length > 0) {
+    const text = textParts.join("");
+    return toolUses.map((tu) => ({
       id: crypto.randomUUID(),
       type: MessageType.ToolCall,
-      content: textParts.join(""),
-      toolCallId: toolUse.id,
-      toolName: toolUse.name,
-      arguments: (toolUse.input as Record<string, unknown>) ?? {},
-    };
+      content: text,
+      toolCallId: tu.id,
+      toolName: tu.name,
+      arguments: (tu.input as Record<string, unknown>) ?? {},
+    }));
   }
 
   return {

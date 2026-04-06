@@ -92,7 +92,7 @@ export type { Tool } from "../tool/types.js";
 export const LLMRequestSchema = z.object({
   invoke: z.function(
     z.tuple([z.array(MessageSchema), ModelConfigSchema, z.array(ToolSchema)]),
-    z.promise(z.union([AssistMessageSchema, ToolCallMessageSchema])),
+    z.promise(z.union([AssistMessageSchema, z.array(ToolCallMessageSchema)])),
   ),
 });
 

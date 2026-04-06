@@ -30,7 +30,7 @@ export function createOpenAICompatibleEngine(): LLMEngine {
       messages: Message[],
       config: ModelConfig,
       tools: Tool[],
-    ): Promise<AssistMessage | ToolCallMessage> => {
+    ): Promise<AssistMessage | ToolCallMessage[]> => {
       const client = getClient(config);
       const params = buildCreateParams(messages, config, tools);
       const response = await client.chat.completions.create(params);

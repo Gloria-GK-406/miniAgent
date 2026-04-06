@@ -293,13 +293,14 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    expect(!Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      expect(result.type).toBe(MessageType.Assist);
       expect(result.content).toBe("Hello!");
     }
   });
 
-  it("converts tool_use response to ToolCallMessage", () => {
+  it("converts tool_use response to ToolCallMessage array", () => {
     const response = {
       id: "msg_2",
       type: "message" as const,
@@ -331,13 +332,62 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.ToolCall);
-    if (result.type === MessageType.ToolCall) {
-      expect(result.content).toBe("Let me check.");
-      expect(result.toolCallId).toBe("toolu_xyz");
-      expect(result.toolName).toBe("search");
-      expect(result.arguments).toEqual({ query: "test" });
-    }
+    expect(Array.isArray(result)).toBe(true);
+    const toolCalls = result as Array<{ type: MessageType; content: string; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
+    expect(toolCalls[0]!.content).toBe("Let me check.");
+    expect(toolCalls[0]!.toolCallId).toBe("toolu_xyz");
+    expect(toolCalls[0]!.toolName).toBe("search");
+    expect(toolCalls[0]!.arguments).toEqual({ query: "test" });
+  });
+
+  it("converts multiple tool_use response to ToolCallMessage array", () => {
+    const response = {
+      id: "msg_4",
+      type: "message" as const,
+      role: "assistant" as const,
+      content: [
+        { type: "text" as const, text: "I'll search both.", citations: null },
+        {
+          type: "tool_use" as const,
+          id: "toolu_a",
+          name: "search",
+          input: { query: "first" },
+          caller: { type: "direct" as const },
+        },
+        {
+          type: "tool_use" as const,
+          id: "toolu_b",
+          name: "search",
+          input: { query: "second" },
+          caller: { type: "direct" as const },
+        },
+      ],
+      model: "claude-sonnet-4-5-20250929",
+      stop_reason: "tool_use",
+      stop_sequence: null,
+      usage: {
+        input_tokens: 10,
+        output_tokens: 20,
+        cache_creation_input_tokens: null,
+        cache_read_input_tokens: null,
+        cache_creation: null,
+        inference_geo: null,
+        server_tool_use: null,
+      },
+      container: null,
+      stop_details: null,
+    };
+
+    const result = convertResponse(response as never);
+    expect(Array.isArray(result)).toBe(true);
+    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls[0]!.toolCallId).toBe("toolu_a");
+    expect(toolCalls[0]!.arguments).toEqual({ query: "first" });
+    expect(toolCalls[1]!.toolCallId).toBe("toolu_b");
+    expect(toolCalls[1]!.arguments).toEqual({ query: "second" });
   });
 
   it("converts tool_use without text to ToolCallMessage with empty content", () => {
@@ -371,10 +421,11 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.ToolCall);
-    if (result.type === MessageType.ToolCall) {
-      expect(result.content).toBe("");
-      expect(result.toolCallId).toBe("toolu_123");
-    }
+    expect(Array.isArray(result)).toBe(true);
+    const toolCalls = result as Array<{ type: MessageType; content: string; toolCallId: string }>;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
+    expect(toolCalls[0]!.content).toBe("");
+    expect(toolCalls[0]!.toolCallId).toBe("toolu_123");
   });
 });

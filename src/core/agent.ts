@@ -183,21 +183,39 @@ export class MiniAgent implements ToolRegistry, ContextProviderRegistry, Context
             try {
                 const context = await this.buildContext();
                 const tools = [...this.tools.values()];
-                const message = await this.llm.invoke(context, this.config.model, tools);
-                await this.notify(message);
-                this.messageSource.add(message);
+                const response = await this.llm.invoke(context, this.config.model, tools);
 
-                if (message.type !== MessageType.ToolCall) {
+                if (!Array.isArray(response)) {
+                    await this.notify(response);
+                    this.messageSource.add(response);
                     break;
                 }
 
-                const result = await this.execute(message as ToolCallMessage);
-                if (result.type === MessageType.Finish) {
-                    break;
+                const toolCalls = response;
+                for (const tc of toolCalls) {
+                    await this.notify(tc);
                 }
 
-                await this.notify(result);
-                this.messageSource.add(result);
+                const results = await Promise.all(
+                    toolCalls.map(async (tc) => {
+                        const result = await this.execute(tc);
+                        return { tc, result };
+                    }),
+                );
+
+                let shouldBreak = false;
+                for (const { tc, result } of results) {
+                    this.messageSource.add(tc);
+                    if (result.type === MessageType.Finish) {
+                        shouldBreak = true;
+                        break;
+                    }
+                    await this.notify(result);
+                    this.messageSource.add(result);
+                }
+                if (shouldBreak) {
+                    break;
+                }
             } catch (e: unknown) {
                 const candidates = this.errorHandlers
                     .filter((h) => h.canHandle(e))

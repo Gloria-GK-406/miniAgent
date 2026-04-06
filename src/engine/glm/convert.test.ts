@@ -5,7 +5,7 @@ import {
   buildCreateParams,
   convertResponse,
 } from "./convert.js";
-import type { Message, AssistMessage, ToolCallMessage } from "../../core/types.js";
+import type { Message } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 
 function sysMsg(content: string): Message {
@@ -161,10 +161,12 @@ describe("GLM convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.Assist);
-    const assist = result as AssistMessage;
-    expect(assist.content).toBe("The answer is 42");
-    expect(assist.reasoningContent).toBe("Let me analyze this step by step...");
+    expect(!Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      expect(result.type).toBe(MessageType.Assist);
+      expect(result.content).toBe("The answer is 42");
+      expect(result.reasoningContent).toBe("Let me analyze this step by step...");
+    }
   });
 
   it("extracts reasoning_content on ToolCallMessage", () => {
@@ -197,10 +199,12 @@ describe("GLM convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.ToolCall);
-    const tc = result as ToolCallMessage;
-    expect(tc.toolCallId).toBe("call_xyz");
-    expect(tc.reasoningContent).toBe("I should call a tool");
+    expect(Array.isArray(result)).toBe(true);
+    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; reasoningContent?: string }>;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
+    expect(toolCalls[0]!.toolCallId).toBe("call_xyz");
+    expect(toolCalls[0]!.reasoningContent).toBe("I should call a tool");
   });
 
   it("handles response without reasoning_content", () => {
@@ -222,9 +226,11 @@ describe("GLM convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(result.type).toBe(MessageType.Assist);
-    const assist = result as AssistMessage;
-    expect(assist.content).toBe("Hello!");
-    expect(assist.reasoningContent).toBeUndefined();
+    expect(!Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      expect(result.type).toBe(MessageType.Assist);
+      expect(result.content).toBe("Hello!");
+      expect(result.reasoningContent).toBeUndefined();
+    }
   });
 });

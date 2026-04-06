@@ -145,7 +145,7 @@ export function buildCreateParams(
 
 export function convertResponse(
   response: ChatCompletion,
-): AssistMessage | ToolCallMessage {
+): AssistMessage | ToolCallMessage[] {
   const choice = response.choices[0];
   if (!choice) {
     throw new Error("No choices in GLM response");
@@ -154,22 +154,23 @@ export function convertResponse(
   const reasoningContent = extractReasoningContent(message);
   const toolCalls = message.tool_calls;
   if (toolCalls && toolCalls.length > 0) {
-    const tc = toolCalls[0]!;
-    if (tc.type === "function") {
-      const args = JSON.parse(tc.function.arguments) as Record<
-        string,
-        unknown
-      >;
-      return {
-        id: crypto.randomUUID(),
-        type: MessageType.ToolCall,
-        content: message.content ?? "",
-        toolCallId: tc.id,
-        toolName: tc.function.name,
-        arguments: args,
-        ...(reasoningContent !== undefined && { reasoningContent }),
-      };
-    }
+    return toolCalls
+      .filter((tc) => tc.type === "function")
+      .map((tc) => {
+        const args = JSON.parse(tc.function.arguments) as Record<
+          string,
+          unknown
+        >;
+        return {
+          id: crypto.randomUUID(),
+          type: MessageType.ToolCall,
+          content: message.content ?? "",
+          toolCallId: tc.id,
+          toolName: tc.function.name,
+          arguments: args,
+          ...(reasoningContent !== undefined && { reasoningContent }),
+        };
+      });
   }
   return {
     type: MessageType.Assist,

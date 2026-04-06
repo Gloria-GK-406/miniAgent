@@ -13,7 +13,7 @@ export function createOpenAIEngine(): LLMEngine {
       messages: Message[],
       config: ModelConfig,
       tools: Tool[],
-    ): Promise<AssistMessage | ToolCallMessage> =>
+    ): Promise<AssistMessage | ToolCallMessage[]> =>
       base.generate(messages, { ...config, baseUrl: "" }, tools),
   });
 }
