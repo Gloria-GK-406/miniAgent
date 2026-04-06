@@ -4,6 +4,7 @@ import type {
   ToolCallMessage,
   ToolResultMessage,
   Tool,
+  ImageContent,
 } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 import type {
@@ -23,6 +24,12 @@ interface ConvertedInput {
   messages: MessageParam[];
 }
 
+function extractText(content: Message["content"]): string {
+  if (typeof content === "string") return content;
+  if (content.type === "text") return content.text;
+  return "";
+}
+
 export function convertMessages(messages: Message[]): ConvertedInput {
   const systemParts: string[] = [];
   const params: MessageParam[] = [];
@@ -30,15 +37,15 @@ export function convertMessages(messages: Message[]): ConvertedInput {
   for (const msg of messages) {
     switch (msg.type) {
       case MessageType.System:
-        systemParts.push(msg.content);
+        systemParts.push(extractText(msg.content));
         break;
       case MessageType.User:
-        params.push({ role: "user", content: msg.content });
+        params.push(convertUserMessage(msg.content));
         break;
       case MessageType.Assist:
         params.push({
           role: "assistant",
-          content: [{ type: "text", text: msg.content }],
+          content: [{ type: "text", text: extractText(msg.content) }],
         });
         break;
       case MessageType.ToolCall:
@@ -59,13 +66,37 @@ export function convertMessages(messages: Message[]): ConvertedInput {
   return result;
 }
 
+function convertUserMessage(content: Message["content"]): MessageParam {
+  if (typeof content !== "string" && content.type === "image") {
+    const img = content as ImageContent;
+    return {
+      role: "user",
+      content: [
+        {
+          type: "image" as const,
+          source: {
+            type: "base64" as const,
+            media_type:
+              img.mediaType as
+                | "image/jpeg"
+                | "image/png"
+                | "image/gif"
+                | "image/webp",
+            data: img.data,
+          },
+        },
+      ],
+    };
+  }
+  return { role: "user", content: extractText(content) };
+}
+
 function convertToolCallMessage(msg: ToolCallMessage): MessageParam {
+  const text = extractText(msg.content);
   return {
     role: "assistant",
     content: [
-      ...(msg.content
-        ? [{ type: "text" as const, text: msg.content }]
-        : []),
+      ...(text ? [{ type: "text" as const, text }] : []),
       {
         type: "tool_use" as const,
         id: msg.toolCallId,
@@ -83,7 +114,7 @@ function convertToolResultMessage(msg: ToolResultMessage): MessageParam {
       {
         type: "tool_result" as const,
         tool_use_id: msg.toolCallId,
-        content: msg.content,
+        content: extractText(msg.content),
       },
     ],
   };

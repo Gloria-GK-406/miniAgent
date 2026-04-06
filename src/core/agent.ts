@@ -16,8 +16,9 @@ import type {
     AfterTurnProcessorRegistry,
     ToolCallMessage,
     ToolResultMessage,
+    FinishMessage,
 } from "./types.js";
-import { ActionType, MessageType, ToolResultMessageSchema } from "./types.js";
+import { ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema } from "./types.js";
 import { MessageSource } from "./message-source.js";
 import type { AgentConfig } from "./config.js";
 
@@ -145,11 +146,19 @@ export class MiniAgent implements ToolRegistry, ContextProviderRegistry, Context
         return [...addFirst, ...mirror, ...addLast];
     }
 
-    async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage> {
+    async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage | FinishMessage> {
         const tool = this.tools.get(toolCall.toolName);
         const content = tool
             ? await tool.execute(toolCall.arguments as Record<string, unknown>)
             : `tool not found: ${toolCall.toolName}`;
+
+        if (content === "stop") {
+            return FinishMessageSchema.parse({
+                id: crypto.randomUUID(),
+                type: MessageType.Finish,
+                content: "",
+            });
+        }
 
         return ToolResultMessageSchema.parse({
             id: crypto.randomUUID(),
@@ -183,7 +192,7 @@ export class MiniAgent implements ToolRegistry, ContextProviderRegistry, Context
                 }
 
                 const result = await this.execute(message as ToolCallMessage);
-                if (result.content === "stop") {
+                if (result.type === MessageType.Finish) {
                     break;
                 }
 

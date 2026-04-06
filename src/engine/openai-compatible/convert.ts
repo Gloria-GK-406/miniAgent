@@ -1,26 +1,32 @@
 import type {
   Message,
   SystemMessage,
-  UserMessage,
   AssistMessage,
   ToolCallMessage,
   ToolResultMessage,
   Tool,
+  ImageContent,
 } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionFunctionTool,
-  ChatCompletion,
+  ChatCompletion
 } from "openai/resources/chat/completions/completions.js";
 import { MessageType } from "../../core/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
+function extractText(content: Message["content"]): string {
+  if (typeof content === "string") return content;
+  if (content.type === "text") return content.text;
+  return "";
+}
+
 export function convertMessages(
   messages: Message[],
 ): ChatCompletionMessageParam[] {
-  return messages.map((msg) => {
+  return messages.map((msg): ChatCompletionMessageParam => {
     switch (msg.type) {
       case MessageType.System:
         return convertSystemMessage(msg);
@@ -32,6 +38,8 @@ export function convertMessages(
         return convertToolCallMessage(msg);
       case MessageType.ToolResult:
         return convertToolResultMessage(msg);
+      default:
+        throw new Error("Unknown message type: " + msg.type);
     }
   });
 }
@@ -39,23 +47,34 @@ export function convertMessages(
 function convertSystemMessage(
   msg: SystemMessage,
 ): ChatCompletionMessageParam {
-  return { role: "system", content: msg.content };
+  return { role: "system", content: extractText(msg.content) };
 }
-
-function convertUserMessage(msg: UserMessage): ChatCompletionMessageParam {
-  return { role: "user", content: msg.content };
+function convertUserMessage(msg: { content: Message["content"] }): ChatCompletionMessageParam {
+  if (typeof msg.content !== "string" && msg.content.type === "image") {
+    const img = msg.content as ImageContent;
+    return {
+      role: "user",
+      content: [
+        {
+          type: "image_url",
+          image_url: {
+            url: "data:" + img.mediaType + ";base64," + img.data,
+          },
+        },
+      ],
+    };
+  }
+  return { role: "user", content: extractText(msg.content) };
 }
-
 function convertAssistMessage(msg: AssistMessage): ChatCompletionMessageParam {
-  return { role: "assistant", content: msg.content };
+  return { role: "assistant", content: extractText(msg.content) };
 }
-
 function convertToolCallMessage(
   msg: ToolCallMessage,
 ): ChatCompletionMessageParam {
   return {
     role: "assistant",
-    content: msg.content || null,
+    content: extractText(msg.content) || null,
     tool_calls: [
       {
         id: msg.toolCallId,
@@ -68,20 +87,17 @@ function convertToolCallMessage(
     ],
   };
 }
-
 function convertToolResultMessage(
   msg: ToolResultMessage,
 ): ChatCompletionMessageParam {
   return {
     role: "tool",
     tool_call_id: msg.toolCallId,
-    content: msg.content,
+    content: extractText(msg.content),
   };
 }
-
 export function convertTools(tools: Tool[]): ChatCompletionTool[] {
   if (tools.length === 0) return [];
-
   return tools.map((tool): ChatCompletionFunctionTool => {
     const jsonSchema = zodToJsonSchema(tool.parameters);
     const { $schema: _, ...parameters } = jsonSchema as Record<string, unknown>;
@@ -95,7 +111,6 @@ export function convertTools(tools: Tool[]): ChatCompletionTool[] {
     };
   });
 }
-
 export function buildCreateParams(
   messages: Message[],
   config: ModelConfig,
@@ -115,18 +130,15 @@ export function buildCreateParams(
     ...(config.topP !== undefined && { top_p: config.topP }),
   };
 }
-
 export function convertResponse(
-  response: ChatCompletion,
+  response: ChatCompletion
 ): AssistMessage | ToolCallMessage {
   const choice = response.choices[0];
   if (!choice) {
     throw new Error("No choices in OpenAI response");
   }
-
   const message = choice.message;
   const toolCalls = message.tool_calls;
-
   if (toolCalls && toolCalls.length > 0) {
     const tc = toolCalls[0]!;
     if (tc.type === "function") {
@@ -141,7 +153,6 @@ export function convertResponse(
       };
     }
   }
-
   return {
     type: MessageType.Assist,
     id: crypto.randomUUID(),

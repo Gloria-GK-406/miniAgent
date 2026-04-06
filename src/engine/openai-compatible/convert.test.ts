@@ -7,7 +7,7 @@ import {
   buildCreateParams,
   convertResponse,
 } from "./convert.js";
-import type { Message, Tool } from "../../core/types.js";
+import type { Message, Tool, ImageContent } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 
 function sysMsg(content: string): Message {
@@ -16,6 +16,20 @@ function sysMsg(content: string): Message {
 
 function userMsg(content: string): Message {
   return { id: "user-1", type: MessageType.User, content };
+}
+
+function userImageMsg(
+  overrides: Partial<{ mediaType: string; data: string }> = {},
+): Message {
+  return {
+    id: "user-img-1",
+    type: MessageType.User,
+    content: {
+      type: "image",
+      mediaType: overrides.mediaType ?? "image/png",
+      data: overrides.data ?? "iVBORw0KGgo=",
+    } satisfies ImageContent,
+  };
 }
 
 function assistMsg(content: string): Message {
@@ -49,7 +63,7 @@ function toolResultMsg(
   return {
     id: "tr-1",
     type: MessageType.ToolResult,
-    content: overrides.content ?? "sunny, 25°C",
+    content: overrides.content ?? "sunny, 25\u00B0C",
     toolCallId: overrides.toolCallId ?? "call_abc",
   };
 }
@@ -85,6 +99,28 @@ describe("convertMessages", () => {
     expect(result).toEqual([{ role: "user", content: "Hello" }]);
   });
 
+  it("converts UserMessage with image content to image_url content block", () => {
+    const result = convertMessages([userImageMsg()]);
+    expect(result).toHaveLength(1);
+    const msg = result[0]!;
+    expect(msg.role).toBe("user");
+    const content = (msg as { content: Array<{ type: string; image_url: { url: string } }> }).content;
+    expect(content).toHaveLength(1);
+    expect(content[0]).toEqual({
+      type: "image_url",
+      image_url: {
+        url: "data:image/png;base64,iVBORw0KGgo=",
+      },
+    });
+  });
+
+  it("converts UserMessage with image and custom mediaType", () => {
+    const result = convertMessages([userImageMsg({ mediaType: "image/jpeg" })]);
+    const msg = result[0]!;
+    const content = (msg as { content: Array<{ image_url: { url: string } }> }).content;
+    expect(content[0]!.image_url.url).toBe("data:image/jpeg;base64,iVBORw0KGgo=");
+  });
+
   it("converts AssistMessage to assistant role", () => {
     const result = convertMessages([assistMsg("Hi there")]);
     expect(result).toEqual([{ role: "assistant", content: "Hi there" }]);
@@ -117,7 +153,7 @@ describe("convertMessages", () => {
       {
         role: "tool",
         tool_call_id: "call_abc",
-        content: "sunny, 25°C",
+        content: "sunny, 25\u00B0C",
       },
     ]);
   });

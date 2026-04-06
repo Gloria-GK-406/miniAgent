@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ModelConfigSchema } from "./config.js";
+import { ToolSchema } from "../tool/types.js";
 
 export enum MessageType {
   System = "system",
@@ -7,12 +8,30 @@ export enum MessageType {
   Assist = "assist",
   ToolCall = "toolcall",
   ToolResult = "toolresult",
+  Finish = "finish",
 }
+
+export const TextContentSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+});
+
+export const ImageContentSchema = z.object({
+  type: z.literal("image"),
+  mediaType: z.string(),
+  data: z.string(),
+});
+
+export const MessageContentSchema = z.union([
+  z.string(),
+  TextContentSchema,
+  ImageContentSchema,
+]);
 
 export const BaseMessageSchema = z.object({
   id: z.string(),
   type: z.nativeEnum(MessageType),
-  content: z.string(),
+  content: MessageContentSchema,
 });
 
 export const SystemMessageSchema = BaseMessageSchema.extend({
@@ -39,35 +58,34 @@ export const ToolResultMessageSchema = BaseMessageSchema.extend({
   toolCallId: z.string(),
 });
 
+export const FinishMessageSchema = BaseMessageSchema.extend({
+  type: z.literal(MessageType.Finish),
+});
+
 export const MessageSchema = z.union([
   SystemMessageSchema,
   UserMessageSchema,
   AssistMessageSchema,
   ToolCallMessageSchema,
   ToolResultMessageSchema,
+  FinishMessageSchema,
 ]);
 
 export type BaseMessage = z.infer<typeof BaseMessageSchema>;
+export type TextContent = z.infer<typeof TextContentSchema>;
+export type ImageContent = z.infer<typeof ImageContentSchema>;
+export type MessageContent = z.infer<typeof MessageContentSchema>;
 export type SystemMessage = z.infer<typeof SystemMessageSchema>;
 export type UserMessage = z.infer<typeof UserMessageSchema>;
 export type AssistMessage = z.infer<typeof AssistMessageSchema>;
 export type ToolCallMessage = z.infer<typeof ToolCallMessageSchema>;
 export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
+export type FinishMessage = z.infer<typeof FinishMessageSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 
 export type { ModelConfig } from "./config.js";
 
-export const ToolSchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  parameters: z.instanceof(z.ZodType),
-  execute: z.function(
-    z.tuple([z.record(z.unknown())]),
-    z.promise(z.string()),
-  ),
-});
-
-export type Tool = z.infer<typeof ToolSchema>;
+export type { Tool } from "../tool/types.js";
 
 export const LLMRequestSchema = z.object({
   invoke: z.function(
@@ -85,7 +103,7 @@ export const ToolRegistrySchema = z.object({
   ),
   execute: z.function(
     z.tuple([ToolCallMessageSchema]),
-    z.promise(ToolResultMessageSchema),
+    z.promise(z.union([ToolResultMessageSchema, FinishMessageSchema])),
   ),
 });
 

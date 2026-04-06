@@ -7,7 +7,7 @@ import {
   buildCreateParams,
   convertResponse,
 } from "./convert.js";
-import type { Message, Tool } from "../../core/types.js";
+import type { Message, Tool, ImageContent } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 
 function sysMsg(content: string): Message {
@@ -16,6 +16,20 @@ function sysMsg(content: string): Message {
 
 function userMsg(content: string): Message {
   return { id: "user-1", type: MessageType.User, content };
+}
+
+function userImageMsg(
+  overrides: Partial<{ mediaType: string; data: string }> = {},
+): Message {
+  return {
+    id: "user-img-1",
+    type: MessageType.User,
+    content: {
+      type: "image",
+      mediaType: overrides.mediaType ?? "image/png",
+      data: overrides.data ?? "iVBORw0KGgo=",
+    } satisfies ImageContent,
+  };
 }
 
 function assistMsg(content: string): Message {
@@ -49,7 +63,7 @@ function toolResultMsg(
   return {
     id: "tr-1",
     type: MessageType.ToolResult,
-    content: overrides.content ?? "sunny, 25°C",
+    content: overrides.content ?? "sunny, 25\u00B0C",
     toolCallId: overrides.toolCallId ?? "toolu_abc",
   };
 }
@@ -96,6 +110,30 @@ describe("convertMessages", () => {
     expect(result.messages).toEqual([{ role: "user", content: "Hello" }]);
   });
 
+  it("converts UserMessage with image content to user role with image block", () => {
+    const result = convertMessages([userImageMsg()]);
+    expect(result.messages).toHaveLength(1);
+    const msg = result.messages[0]!;
+    expect(msg.role).toBe("user");
+    const content = msg.content as Array<{ type: string; source: { type: string; media_type: string; data: string } }>;
+    expect(content).toHaveLength(1);
+    expect(content[0]).toEqual({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: "image/png",
+        data: "iVBORw0KGgo=",
+      },
+    });
+  });
+
+  it("converts UserMessage with image and custom mediaType", () => {
+    const result = convertMessages([userImageMsg({ mediaType: "image/jpeg" })]);
+    const msg = result.messages[0]!;
+    const content = msg.content as Array<{ type: string; source: { media_type: string } }>;
+    expect(content[0]!.source.media_type).toBe("image/jpeg");
+  });
+
   it("converts AssistMessage to assistant role with text block", () => {
     const result = convertMessages([assistMsg("Hi there")]);
     expect(result.messages).toEqual([
@@ -130,7 +168,7 @@ describe("convertMessages", () => {
     expect(content[0]).toMatchObject({
       type: "tool_result",
       tool_use_id: "toolu_abc",
-      content: "sunny, 25°C",
+      content: "sunny, 25\u00B0C",
     });
   });
 

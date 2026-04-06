@@ -3,12 +3,12 @@ import {
   MessageSchema,
   AssistMessageSchema,
   ToolCallMessageSchema,
-  ToolSchema,
   LLMRequestSchema,
 } from "./types.js";
 import {
   ModelConfigSchema,
 } from "./config.js";
+import { ToolSchema } from "../tool/types.js";
 import type {
   Message,
   Tool,
