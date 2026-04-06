@@ -44,6 +44,7 @@ export const UserMessageSchema = BaseMessageSchema.extend({
 
 export const AssistMessageSchema = BaseMessageSchema.extend({
   type: z.literal(MessageType.Assist),
+  reasoningContent: z.string().optional(),
 });
 
 export const ToolCallMessageSchema = BaseMessageSchema.extend({
@@ -51,6 +52,7 @@ export const ToolCallMessageSchema = BaseMessageSchema.extend({
   toolCallId: z.string(),
   toolName: z.string(),
   arguments: z.record(z.unknown()),
+  reasoningContent: z.string().optional(),
 });
 
 export const ToolResultMessageSchema = BaseMessageSchema.extend({

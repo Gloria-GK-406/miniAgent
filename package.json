@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --exclude 'test/smoketest/**'",
+    "test:watch": "vitest --exclude 'test/smoketest/**'",
+    "smoketest": "vitest run --config vitest.config.ts test/smoketest/"
   },
   "keywords": [],
   "author": "",
