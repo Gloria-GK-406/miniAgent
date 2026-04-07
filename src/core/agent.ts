@@ -30,6 +30,8 @@ import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider, ToolProviderRegister } from "../tool/types.js";
 import { MessageSource } from "./message-source.js";
 import type { AgentConfig } from "./config.js";
+import { EventEmitter } from "eventemitter3";
+import type { AgentEventMap } from "./events.js";
 
 export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextProviderRegistry, ContextProcessorRegistry, MessageNotifierRegistry, ErrorHandlerRegistry, AfterTurnProcessorRegistry, ConfigNotifierRegistry {
     private messageSource = new MessageSource();
@@ -42,10 +44,31 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     private errorHandlers: ErrorHandler[] = [];
     private afterTurnProcessors: AfterTurnProcessor[] = [];
     private configNotifiers: ConfigNotifier[] = [];
+    private emitter = new EventEmitter();
 
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
         this.config = config;
+    }
+
+    on<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
+        this.emitter.on(event, listener);
+        return this;
+    }
+
+    once<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
+        this.emitter.once(event, listener);
+        return this;
+    }
+
+    off<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
+        this.emitter.off(event, listener);
+        return this;
+    }
+
+    removeAllListeners<K extends keyof AgentEventMap>(event?: K): this {
+        this.emitter.removeAllListeners(event);
+        return this;
     }
 
     setConfig(config: AgentConfig): void {
@@ -117,6 +140,7 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     }
 
     private async notify(message: Message): Promise<void> {
+        this.emitter.emit("message:notify", { message });
         for (const notifier of this.notifiers) {
             await notifier.notify(message);
         }
@@ -178,25 +202,30 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     }
 
     async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage | FinishMessage> {
+        this.emitter.emit("tool:execute", { toolCall });
         const tool = this.tools.get(toolCall.toolName);
         const content = tool
             ? await tool.execute(toolCall.arguments as Record<string, unknown>)
             : `tool not found: ${toolCall.toolName}`;
 
         if (content === "stop") {
-            return FinishMessageSchema.parse({
+            const result = FinishMessageSchema.parse({
                 id: crypto.randomUUID(),
                 type: MessageType.Finish,
                 content: "",
             });
+            this.emitter.emit("tool:result", { toolCall, result });
+            return result;
         }
 
-        return ToolResultMessageSchema.parse({
+        const result = ToolResultMessageSchema.parse({
             id: crypto.randomUUID(),
             type: MessageType.ToolResult,
             toolCallId: toolCall.toolCallId,
             content,
         });
+        this.emitter.emit("tool:result", { toolCall, result });
+        return result;
     }
 
     private async runAfterTurnProcessors(input: Message): Promise<void> {
@@ -207,18 +236,25 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     }
 
     async run(input: Message): Promise<Message[]> {
+        this.emitter.emit("run:start", { input });
         await this.notify(input);
         this.messageSource.add(input);
 
+        let turn = 0;
         while (true) {
+            turn++;
+            this.emitter.emit("turn:start", { turn });
             try {
                 const context = await this.buildContext();
                 const tools = [...this.tools.values()];
+                this.emitter.emit("llm:request", { context, tools });
                 const response = await this.llm.invoke(context, this.config.model, tools);
+                this.emitter.emit("llm:response", { response });
 
                 if (!Array.isArray(response)) {
                     await this.notify(response);
                     this.messageSource.add(response);
+                    this.emitter.emit("turn:end", { turn });
                     break;
                 }
 
@@ -244,10 +280,13 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
                     await this.notify(result);
                     this.messageSource.add(result);
                 }
+                this.emitter.emit("turn:end", { turn });
                 if (shouldBreak) {
                     break;
                 }
             } catch (e: unknown) {
+                this.emitter.emit("run:error", { error: e, turn });
+
                 const candidates = this.errorHandlers
                     .filter((h) => h.canHandle(e))
                     .sort((a, b) => a.priority - b.priority);
@@ -264,6 +303,8 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
         }
 
         await this.runAfterTurnProcessors(input);
-        return this.messageSource.getAll();
+        const messages = this.messageSource.getAll();
+        this.emitter.emit("run:complete", { messages });
+        return messages;
     }
 }

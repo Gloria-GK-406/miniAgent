@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "eventemitter3": "^5.0.4",
     "openai": "^6.33.0",
     "zod": "^3.25.0-beta.20250519T094321",
     "zod-to-json-schema": "^3.25.2"
