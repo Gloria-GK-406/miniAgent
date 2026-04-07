@@ -102,11 +102,7 @@ export const ToolRegistrySchema = z.object({
   register: z.function(
     z.tuple([ToolSchema]),
     z.void(),
-  ),
-  execute: z.function(
-    z.tuple([ToolCallMessageSchema]),
-    z.promise(z.union([ToolResultMessageSchema, FinishMessageSchema])),
-  ),
+  )
 });
 
 export type ToolRegistry = z.infer<typeof ToolRegistrySchema>;

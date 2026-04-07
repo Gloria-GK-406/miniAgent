@@ -23,11 +23,12 @@ import {
     ContextProviderSchema, ContextProcessorSchema,
     MessageNotifierSchema, ErrorHandlerSchema,
 } from "./types.js";
-import { ToolSchema } from "../tool/types.js";
+import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
+import type { ToolProvider, ToolProviderRegister } from "../tool/types.js";
 import { MessageSource } from "./message-source.js";
 import type { AgentConfig } from "./config.js";
 
-export class MiniAgent implements ToolRegistry, ContextProviderRegistry, ContextProcessorRegistry, MessageNotifierRegistry, ErrorHandlerRegistry, AfterTurnProcessorRegistry {
+export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextProviderRegistry, ContextProcessorRegistry, MessageNotifierRegistry, ErrorHandlerRegistry, AfterTurnProcessorRegistry {
     private messageSource = new MessageSource();
     private llm: LLMRequest;
     private config: AgentConfig;
@@ -52,12 +53,24 @@ export class MiniAgent implements ToolRegistry, ContextProviderRegistry, Context
     }
 
     register(tool: Tool): void;
+    register(toolProvider: ToolProvider): void;
     register(provider: ContextProvider): void;
     register(processor: ContextProcessor): void;
     register(notifier: MessageNotifier): void;
     register(errorHandler: ErrorHandler): void;
     register(afterTurnProcessor: AfterTurnProcessor): void;
-    register(item: Tool | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor): void {
+    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor): void {
+        if (ToolProviderSchema.safeParse(item).success) {
+            const provider = item as ToolProvider;
+            const tools = provider.getTools();
+            const resolved = tools instanceof Promise ? tools : Promise.resolve(tools);
+            resolved.then((ts) => {
+                for (const t of ts) {
+                    this.tools.set(t.name, t);
+                }
+            });
+        }
+        
         if (ToolSchema.safeParse(item).success) {
             this.tools.set((item as Tool).name, item as Tool);
         }
