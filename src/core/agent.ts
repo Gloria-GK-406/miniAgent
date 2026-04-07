@@ -21,7 +21,7 @@ import type {
 import {
     ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema,
     ContextProviderSchema, ContextProcessorSchema,
-    MessageNotifierSchema, ErrorHandlerSchema,
+    MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider, ToolProviderRegister } from "../tool/types.js";
@@ -79,16 +79,14 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
                 this.providers.push(item as ContextProvider);
             }
         }
+        if (AfterTurnProcessorSchema.safeParse(item).success) {
+            if (!this.afterTurnProcessors.includes(item as AfterTurnProcessor)) {
+                this.afterTurnProcessors.push(item as AfterTurnProcessor);
+            }
+        }
         if (ContextProcessorSchema.safeParse(item).success) {
-            const fn = (item as { process: (...args: unknown[]) => unknown }).process;
-            if (fn.length >= 2) {
-                if (!this.afterTurnProcessors.includes(item as AfterTurnProcessor)) {
-                    this.afterTurnProcessors.push(item as AfterTurnProcessor);
-                }
-            } else {
-                if (!this.processors.includes(item as ContextProcessor)) {
-                    this.processors.push(item as ContextProcessor);
-                }
+            if (!this.processors.includes(item as ContextProcessor)) {
+                this.processors.push(item as ContextProcessor);
             }
         }
         if (MessageNotifierSchema.safeParse(item).success) {
