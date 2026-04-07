@@ -18,7 +18,12 @@ import type {
     ToolResultMessage,
     FinishMessage,
 } from "./types.js";
-import { ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema } from "./types.js";
+import {
+    ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema,
+    ContextProviderSchema, ContextProcessorSchema,
+    MessageNotifierSchema, ErrorHandlerSchema,
+} from "./types.js";
+import { ToolSchema } from "../tool/types.js";
 import { MessageSource } from "./message-source.js";
 import type { AgentConfig } from "./config.js";
 
@@ -53,15 +58,15 @@ export class MiniAgent implements ToolRegistry, ContextProviderRegistry, Context
     register(errorHandler: ErrorHandler): void;
     register(afterTurnProcessor: AfterTurnProcessor): void;
     register(item: Tool | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor): void {
-        if ("execute" in item && "name" in item) {
+        if (ToolSchema.safeParse(item).success) {
             this.tools.set((item as Tool).name, item as Tool);
         }
-        if ("collect" in item) {
+        if (ContextProviderSchema.safeParse(item).success) {
             if (!this.providers.includes(item as ContextProvider)) {
                 this.providers.push(item as ContextProvider);
             }
         }
-        if ("process" in item && "priority" in item) {
+        if (ContextProcessorSchema.safeParse(item).success) {
             const fn = (item as { process: (...args: unknown[]) => unknown }).process;
             if (fn.length >= 2) {
                 if (!this.afterTurnProcessors.includes(item as AfterTurnProcessor)) {
@@ -73,12 +78,12 @@ export class MiniAgent implements ToolRegistry, ContextProviderRegistry, Context
                 }
             }
         }
-        if ("notify" in item) {
+        if (MessageNotifierSchema.safeParse(item).success) {
             if (!this.notifiers.includes(item as MessageNotifier)) {
                 this.notifiers.push(item as MessageNotifier);
             }
         }
-        if ("canHandle" in item && "handle" in item) {
+        if (ErrorHandlerSchema.safeParse(item).success) {
             if (!this.errorHandlers.includes(item as ErrorHandler)) {
                 this.errorHandlers.push(item as ErrorHandler);
             }
