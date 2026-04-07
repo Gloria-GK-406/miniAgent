@@ -1,1 +1,1 @@
-export { createOpenAICompatibleEngine } from "./engine.js";
+export { OpenAICompatibleEngine } from "./engine.js";

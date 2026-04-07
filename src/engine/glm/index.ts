@@ -1,1 +1,1 @@
-export { createGLMEngine } from "./engine.js";
+export { GLMEngine } from "./engine.js";

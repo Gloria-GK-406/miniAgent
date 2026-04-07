@@ -1,1 +1,1 @@
-export { createOpenAIEngine } from "./engine.js";
+export { OpenAIEngine } from "./engine.js";

@@ -1,1 +1,1 @@
-export { createAnthropicEngine } from "./engine.js";
+export { AnthropicEngine } from "./engine.js";
