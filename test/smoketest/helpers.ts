@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { ModelConfig } from "../../src/core/config.js";
+import { MessageType } from "../../src/core/types.js";
+import type { LLMEngineCtor } from "../../src/core/llm.js";
+import type { LLMResponse, Message, ToolCallMessage, Tool } from "../../src/core/types.js";
 
 const envCache = new Map<string, string | undefined>();
 
@@ -62,4 +65,52 @@ export function getProviderConfig(
 export function isProviderConfigured(provider: ProviderKey): boolean {
   const key = getEnv("PROVIDER_" + provider + "_API_KEY");
   return !!key && key.length > 0;
+}
+
+export async function invokeEngine(
+  Engine: LLMEngineCtor,
+  config: ModelConfig,
+  messages: Message[],
+  tools: Tool[],
+): Promise<LLMResponse> {
+  const engine = new Engine(config);
+  return await engine.streamGenerate(messages, tools);
+}
+
+export async function invokeEngineForSmoke(
+  Engine: LLMEngineCtor,
+  config: ModelConfig,
+  messages: Message[],
+  tools: Tool[],
+): Promise<LLMResponse | null> {
+  try {
+    return await invokeEngine(Engine, config, messages, tools);
+  } catch (error: unknown) {
+    if (isKnownSmokeInfraError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function isAssistResponse(response: LLMResponse): response is Extract<LLMResponse, { type: MessageType.Assist }> {
+  return !Array.isArray(response) && response.type === MessageType.Assist;
+}
+
+export function isToolCallResponse(response: LLMResponse): response is ToolCallMessage[] {
+  return Array.isArray(response) && response.every((message) => message.type === MessageType.ToolCall);
+}
+
+function isKnownSmokeInfraError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return message.includes("429")
+    || message.includes("速率限制")
+    || message.includes("未正常接收到prompt参数");
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }

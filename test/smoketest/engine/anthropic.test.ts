@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { z } from "zod";
-import { createAnthropicEngine } from "../../../src/engine/anthropic/index.js";
+import { AnthropicEngine } from "../../../src/engine/anthropic/index.js";
 import { MessageType } from "../../../src/core/types.js";
 import type { Message, Tool } from "../../../src/core/types.js";
 import type { ModelConfig } from "../../../src/core/config.js";
 import {
   getProviderConfig,
   isProviderConfigured,
+  invokeEngine,
+  isAssistResponse,
+  isToolCallResponse,
 } from "../helpers.js";
 import { getTestImageBase64 } from "../image.js";
 
@@ -14,7 +17,6 @@ const PROVIDER = "ANTHROPIC" as const;
 
 describe.skipIf(!isProviderConfigured(PROVIDER))("Anthropic Engine", () => {
   let config: ModelConfig;
-  const engine = createAnthropicEngine();
 
   beforeAll(() => {
     config = getProviderConfig(PROVIDER, "anthropic");
@@ -24,9 +26,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("Anthropic Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "Reply with exactly: pong" },
     ];
-    const result = await engine.generate(messages, config, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngine(AnthropicEngine, config, messages, []);
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
     }
   });
@@ -49,9 +51,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("Anthropic Engine", () => {
         content: "Describe this image in one short sentence.",
       },
     ];
-    const result = await engine.generate(messages, config, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngine(AnthropicEngine, config, messages, []);
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
     }
   });
@@ -68,11 +70,12 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("Anthropic Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is the weather in Beijing?" },
     ];
-    const result = await engine.generate(messages, config, [tool]);
-    expect(result.type).toBe(MessageType.ToolCall);
-    if (result.type === MessageType.ToolCall) {
-      expect(result.toolName).toBe("get_weather");
-      expect(result.arguments).toHaveProperty("city");
+    const result = await invokeEngine(AnthropicEngine, config, messages, [tool]);
+    expect(isToolCallResponse(result)).toBe(true);
+    if (isToolCallResponse(result)) {
+      expect(result).toHaveLength(1);
+      expect(result[0]!.toolName).toBe("get_weather");
+      expect(result[0]!.arguments).toHaveProperty("city");
     }
   });
 
@@ -81,9 +84,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("Anthropic Engine", () => {
       { id: "1", type: MessageType.User, content: "What is 2+2? Reply with just the number." },
     ];
     const thinkConfig = { ...config, thinking: true };
-    const result = await engine.generate(messages, thinkConfig, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngine(AnthropicEngine, thinkConfig, messages, []);
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
     }
   });
@@ -93,9 +96,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("Anthropic Engine", () => {
       { id: "1", type: MessageType.User, content: "What is 3+3? Reply with just the number." },
     ];
     const noThinkConfig = { ...config, thinking: false };
-    const result = await engine.generate(messages, noThinkConfig, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngine(AnthropicEngine, noThinkConfig, messages, []);
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
     }
   });

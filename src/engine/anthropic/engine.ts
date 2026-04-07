@@ -1,12 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { Message, Tool } from "../../core/types.js";
-import type { AssistMessage, ToolCallMessage } from "../../core/types.js";
+import type { Message, Tool, LLMResponse, LLMStreamHandle } from "../../core/types.js";
 import type { LLMEngine, LLMEngineCtor } from "../../core/llm.js";
+import { createLLMStreamHandle } from "../../core/llm.js";
 import type { ModelConfig } from "../../core/config.js";
 import {
   buildCreateParams,
-  convertResponse,
 } from "./convert.js";
+import { consumeAnthropicStream } from "./stream.js";
 
 export const AnthropicEngine: LLMEngineCtor = class implements LLMEngine {
   private client: Anthropic;
@@ -17,12 +17,28 @@ export const AnthropicEngine: LLMEngineCtor = class implements LLMEngine {
     this.client = new Anthropic({ apiKey: config.apiKey });
   }
 
-  async generate(
+  streamGenerate(
     messages: Message[],
     tools: Tool[],
-  ): Promise<AssistMessage | ToolCallMessage[]> {
+  ): LLMStreamHandle<LLMResponse> {
     const params = buildCreateParams(messages, this.config, tools);
-    const response = await this.client.messages.create(params);
-    return convertResponse(response);
+    const controller = createLLMStreamHandle<LLMResponse>();
+    void (async () => {
+      try {
+        const stream = await this.client.messages.create({
+          ...params,
+          stream: true,
+        });
+        const response = await consumeAnthropicStream(stream, {
+          emitChunk: (chunk) => {
+            controller.emitChunk(chunk);
+          },
+        });
+        controller.resolve(response);
+      } catch (error: unknown) {
+        controller.reject(error);
+      }
+    })();
+    return controller.handle;
   }
 };

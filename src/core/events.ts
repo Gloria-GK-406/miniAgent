@@ -1,4 +1,11 @@
-import type { Message, AssistMessage, ToolCallMessage, ToolResultMessage, FinishMessage } from "./types.js";
+import type {
+    Message,
+    ToolCallMessage,
+    ToolResultMessage,
+    FinishMessage,
+    LLMResponse,
+    LLMStreamChunk,
+} from "./types.js";
 import type { Tool } from "../tool/types.js";
 
 export interface AgentEventMap {
@@ -8,7 +15,8 @@ export interface AgentEventMap {
     "turn:start": (payload: { turn: number }) => void;
     "turn:end": (payload: { turn: number }) => void;
     "llm:request": (payload: { context: Message[]; tools: Tool[] }) => void;
-    "llm:response": (payload: { response: AssistMessage | ToolCallMessage[] }) => void;
+    "llm:chunk": (payload: { chunk: LLMStreamChunk }) => void;
+    "llm:response": (payload: { response: LLMResponse }) => void;
     "tool:execute": (payload: { toolCall: ToolCallMessage }) => void;
     "tool:result": (payload: { toolCall: ToolCallMessage; result: ToolResultMessage | FinishMessage }) => void;
     "message:notify": (payload: { message: Message }) => void;

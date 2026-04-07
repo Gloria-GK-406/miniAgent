@@ -2,8 +2,9 @@ import type {
   Message,
   Tool,
   LLMRequest,
-  AssistMessage,
-  ToolCallMessage,
+  LLMResponse,
+  LLMStreamChunk,
+  LLMStreamHandle,
 } from "./types.js";
 import type {
   ModelConfig,
@@ -11,13 +12,78 @@ import type {
 import { LRUCache } from "lru-cache";
 
 export interface LLMEngine {
-  generate(
+  streamGenerate(
     messages: Message[],
     tools: Tool[],
-  ): Promise<AssistMessage | ToolCallMessage[]>;
+  ): LLMStreamHandle<LLMResponse>;
 }
 
 export type LLMEngineCtor = new (config: ModelConfig) => LLMEngine;
+
+class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
+  private listeners = new Set<(chunk: LLMStreamChunk) => void>();
+  private promise: Promise<T>;
+  private resolvePromise!: (value: T) => void;
+  private rejectPromise!: (reason?: unknown) => void;
+
+  constructor() {
+    this.promise = new Promise<T>((resolve, reject) => {
+      this.resolvePromise = resolve;
+      this.rejectPromise = reject;
+    });
+  }
+
+  onChunk(listener: (chunk: LLMStreamChunk) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  emitChunk(chunk: LLMStreamChunk): void {
+    for (const listener of this.listeners) {
+      listener(chunk);
+    }
+  }
+
+  resolve(value: T): void {
+    this.resolvePromise(value);
+  }
+
+  reject(reason?: unknown): void {
+    this.rejectPromise(reason);
+  }
+
+  then<TResult1 = T, TResult2 = never>(
+    onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    return this.promise.then(onfulfilled, onrejected);
+  }
+}
+
+export interface LLMStreamController<T> {
+  handle: LLMStreamHandle<T>;
+  emitChunk(chunk: LLMStreamChunk): void;
+  resolve(value: T): void;
+  reject(reason?: unknown): void;
+}
+
+export function createLLMStreamHandle<T>(): LLMStreamController<T> {
+  const handle = new DeferredLLMStreamHandle<T>();
+  return {
+    handle,
+    emitChunk(chunk: LLMStreamChunk): void {
+      handle.emitChunk(chunk);
+    },
+    resolve(value: T): void {
+      handle.resolve(value);
+    },
+    reject(reason?: unknown): void {
+      handle.reject(reason);
+    },
+  };
+}
 
 export class LLMEngineManager implements LLMRequest {
   private ctors = new Map<string, LLMEngineCtor>();
@@ -41,12 +107,12 @@ export class LLMEngineManager implements LLMRequest {
     return engine;
   }
 
-  async invoke(
+  streamInvoke(
     messages: Message[],
     config: ModelConfig,
     tools: Tool[],
-  ): Promise<AssistMessage | ToolCallMessage[]> {
+  ): LLMStreamHandle<LLMResponse> {
     const engine = this.get(config);
-    return engine.generate(messages, tools);
+    return engine.streamGenerate(messages, tools);
   }
 }

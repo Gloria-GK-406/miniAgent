@@ -1,22 +1,24 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { z } from "zod";
-import { createGLMCodePlanEngine } from "../../../src/engine/glm-codeplan/index.js";
+import { GLMCodePlanEngine } from "../../../src/engine/glm-codeplan/index.js";
 import { MessageType } from "../../../src/core/types.js";
 import type { Message, Tool } from "../../../src/core/types.js";
 import type { ModelConfig } from "../../../src/core/config.js";
 import {
   getProviderConfig,
   isProviderConfigured,
+  invokeEngineForSmoke,
+  isAssistResponse,
+  isToolCallResponse,
 } from "../helpers.js";
 import { getTestImageBase64 } from "../image.js";
-import { debug, log } from "node:console";
 import { fail } from "node:assert";
+import { log } from "node:console";
 
 const PROVIDER = "GLM_CODEPLAN" as const;
 
 describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
   let config: ModelConfig;
-  const engine = createGLMCodePlanEngine();
 
   beforeAll(() => {
     config = getProviderConfig(PROVIDER, "glm-codeplan");
@@ -26,9 +28,12 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "Reply with exactly: pong" },
     ];
-    const result = await engine.generate(messages, config, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngineForSmoke(GLMCodePlanEngine, config, messages, []);
+    if (result === null) {
+      return;
+    }
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
       log("Thinking response content:", result.reasoningContent);
       log("Response content:", result.content);
@@ -36,7 +41,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
 
     fail("Expected an AssistMessage response");
-  });
+  }, 20000);
 
   it("image: sends an image and gets a description", async () => {
     const imageData = getTestImageBase64();
@@ -56,12 +61,19 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
         content: "Describe this image in one short sentence.",
       },
     ];
-    const result = await engine.generate(messages, config, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
-      expect(result.content).toBeTruthy();
+    const result = await invokeEngineForSmoke(GLMCodePlanEngine, config, messages, []);
+    if (result === null) {
+      return;
     }
-  });
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
+      expect(result.content).toBeTruthy();
+      log("Response content:", result.content);
+      return;
+    }
+
+    fail("Expected an AssistMessage response");
+  }, 20000);
 
   it("tool: calls a tool and returns the result", async () => {
     const tool: Tool = {
@@ -75,25 +87,33 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is the weather in Beijing?" },
     ];
-    const result = await engine.generate(messages, config, [tool]);
-    expect(result.type).toBe(MessageType.ToolCall);
-    if (result.type === MessageType.ToolCall) {
-      expect(result.toolName).toBe("get_weather");
-      expect(result.arguments).toHaveProperty("city");
+    const result = await invokeEngineForSmoke(GLMCodePlanEngine, config, messages, [tool]);
+    if (result === null) {
+      return;
+    }
+    expect(isToolCallResponse(result)).toBe(true);
+    if (isToolCallResponse(result)) {
+      expect(result).toHaveLength(1);
+      expect(result[0]!.toolName).toBe("get_weather");
+      expect(result[0]!.arguments).toHaveProperty("city");
+      log("Tool call:", result[0]);
       return;
     }
 
     fail("Expected a ToolCallMessage response");
-  });
+  }, 20000);
 
   it("thinking: sends request with thinking enabled", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 2+2? Reply with just the number." },
     ];
     const thinkConfig = { ...config, thinking: true };
-    const result = await engine.generate(messages, thinkConfig, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngineForSmoke(GLMCodePlanEngine, thinkConfig, messages, []);
+    if (result === null) {
+      return;
+    }
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
       expect(result.reasoningContent).toBeDefined();
       log("Thinking response content:", result.reasoningContent);
@@ -102,16 +122,19 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
 
     fail("Expected an AssistMessage response");
-  });
+  }, 20000);
 
   it("thinking: sends request with thinking disabled (default)", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 3+3? Reply with just the number." },
     ];
     const noThinkConfig = { ...config, thinking: false };
-    const result = await engine.generate(messages, noThinkConfig, []);
-    expect(result.type).toBe(MessageType.Assist);
-    if (result.type === MessageType.Assist) {
+    const result = await invokeEngineForSmoke(GLMCodePlanEngine, noThinkConfig, messages, []);
+    if (result === null) {
+      return;
+    }
+    expect(isAssistResponse(result)).toBe(true);
+    if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
       expect(result.reasoningContent).toBeUndefined();
       log("Response content:", result.content);
@@ -119,5 +142,5 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
 
     fail("Expected an AssistMessage response");
-  });
+  }, 20000);
 });

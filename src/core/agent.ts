@@ -248,7 +248,16 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
                 const context = await this.buildContext();
                 const tools = [...this.tools.values()];
                 this.emitter.emit("llm:request", { context, tools });
-                const response = await this.llm.invoke(context, this.config.model, tools);
+                const stream = this.llm.streamInvoke(context, this.config.model, tools);
+                const unsubscribe = stream.onChunk((chunk) => {
+                    this.emitter.emit("llm:chunk", { chunk });
+                });
+                let response;
+                try {
+                    response = await stream;
+                } finally {
+                    unsubscribe();
+                }
                 this.emitter.emit("llm:response", { response });
 
                 if (!Array.isArray(response)) {

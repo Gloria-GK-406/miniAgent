@@ -1,14 +1,25 @@
 import OpenAI from "openai";
-import type { Message, Tool } from "../../core/types.js";
-import type { AssistMessage, ToolCallMessage } from "../../core/types.js";
+import type { Message, Tool, LLMResponse, LLMStreamHandle } from "../../core/types.js";
 import type { LLMEngine, LLMEngineCtor } from "../../core/llm.js";
+import { createLLMStreamHandle } from "../../core/llm.js";
 import type { ModelConfig } from "../../core/config.js";
+import type {
+  ChatCompletionChunk,
+} from "openai/resources/chat/completions/completions.js";
 import {
   buildCreateParams,
-  convertResponse,
 } from "../glm/convert.js";
+import { consumeOpenAIStream } from "../openai-compatible/stream.js";
 
 const GLM_CODEPLAN_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4";
+
+function extractReasoningDelta(chunk: ChatCompletionChunk): string | undefined {
+  const choice = chunk.choices[0];
+  if (!choice) {
+    return undefined;
+  }
+  return (choice.delta as { reasoning_content?: string }).reasoning_content;
+}
 
 export const GLMCodePlanEngine: LLMEngineCtor = class implements LLMEngine {
   private client: OpenAI;
@@ -22,15 +33,29 @@ export const GLMCodePlanEngine: LLMEngineCtor = class implements LLMEngine {
     });
   }
 
-  async generate(
+  streamGenerate(
     messages: Message[],
     tools: Tool[],
-  ): Promise<AssistMessage | ToolCallMessage[]> {
+  ): LLMStreamHandle<LLMResponse> {
     const params = buildCreateParams(messages, this.config, tools);
-    const response = await this.client.chat.completions.create({
-      ...params,
-      stream: false,
-    });
-    return convertResponse(response);
+    const controller = createLLMStreamHandle<LLMResponse>();
+    void (async () => {
+      try {
+        const stream = await this.client.chat.completions.create({
+          ...params,
+          stream: true,
+        });
+        const response = await consumeOpenAIStream(stream, {
+          emitChunk: (chunk) => {
+            controller.emitChunk(chunk);
+          },
+          extractReasoningDelta,
+        });
+        controller.resolve(response);
+      } catch (error: unknown) {
+        controller.reject(error);
+      }
+    })();
+    return controller.handle;
   }
 };

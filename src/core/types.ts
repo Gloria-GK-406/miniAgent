@@ -85,14 +85,62 @@ export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
 export type FinishMessage = z.infer<typeof FinishMessageSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 
+export const LLMResponseSchema = z.union([
+  AssistMessageSchema,
+  z.array(ToolCallMessageSchema),
+]);
+
+export type LLMResponse = z.infer<typeof LLMResponseSchema>;
+
 export type { ModelConfig } from "./config.js";
 
 export type { Tool } from "../tool/types.js";
 
+export enum LLMStreamChunkType {
+  TextDelta = "text-delta",
+  ReasoningDelta = "reasoning-delta",
+  ToolCallArgumentsDelta = "tool-call-arguments-delta",
+}
+
+export const TextDeltaChunkSchema = z.object({
+  type: z.literal(LLMStreamChunkType.TextDelta),
+  text: z.string(),
+});
+
+export const ReasoningDeltaChunkSchema = z.object({
+  type: z.literal(LLMStreamChunkType.ReasoningDelta),
+  text: z.string(),
+});
+
+export const ToolCallArgumentsDeltaChunkSchema = z.object({
+  type: z.literal(LLMStreamChunkType.ToolCallArgumentsDelta),
+  index: z.number().int().nonnegative(),
+  argsText: z.string(),
+  toolCallId: z.string().optional(),
+  toolName: z.string().optional(),
+});
+
+export const LLMStreamChunkSchema = z.union([
+  TextDeltaChunkSchema,
+  ReasoningDeltaChunkSchema,
+  ToolCallArgumentsDeltaChunkSchema,
+]);
+
+export type TextDeltaChunk = z.infer<typeof TextDeltaChunkSchema>;
+export type ReasoningDeltaChunk = z.infer<typeof ReasoningDeltaChunkSchema>;
+export type ToolCallArgumentsDeltaChunk = z.infer<typeof ToolCallArgumentsDeltaChunkSchema>;
+export type LLMStreamChunk = z.infer<typeof LLMStreamChunkSchema>;
+
+export interface LLMStreamHandle<T> extends PromiseLike<T> {
+  onChunk(listener: (chunk: LLMStreamChunk) => void): () => void;
+}
+
+export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();
+
 export const LLMRequestSchema = z.object({
-  invoke: z.function(
+  streamInvoke: z.function(
     z.tuple([z.array(MessageSchema), ModelConfigSchema, z.array(ToolSchema)]),
-    z.promise(z.union([AssistMessageSchema, z.array(ToolCallMessageSchema)])),
+    LLMStreamHandleSchema,
   ),
 });
 
