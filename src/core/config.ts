@@ -16,7 +16,6 @@ export const ModelConfigSchema = z.object({
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
 export const PathConfigSchema = z.object({
-    basedir: z.string(),
     basepersistdir: z.string(),
 });
 

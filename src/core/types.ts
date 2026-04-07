@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ModelConfigSchema } from "./config.js";
+import { AgentConfigSchema, ModelConfigSchema } from "./config.js";
 import { ToolSchema } from "../tool/types.js";
 
 export enum MessageType {
@@ -241,3 +241,21 @@ export const AfterTurnProcessorRegistrySchema = z.object({
 });
 
 export type AfterTurnProcessorRegistry = z.infer<typeof AfterTurnProcessorRegistrySchema>;
+
+export const ConfigNotifierSchema = z.object({
+  setConfig: z.function(
+    z.tuple([AgentConfigSchema]),
+    z.promise(z.void()),
+  ),
+});
+
+export type ConfigNotifier = z.infer<typeof ConfigNotifierSchema>;
+
+export const ConfigNotifierRegistrySchema = z.object({
+  register: z.function(
+    z.tuple([ConfigNotifierSchema]),
+    z.void(),
+  ),
+});
+
+export type ConfigNotifierRegistry = z.infer<typeof ConfigNotifierRegistrySchema>;

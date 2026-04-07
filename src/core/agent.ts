@@ -14,6 +14,8 @@ import type {
     ErrorHandlerRegistry,
     AfterTurnProcessor,
     AfterTurnProcessorRegistry,
+    ConfigNotifier,
+    ConfigNotifierRegistry,
     ToolCallMessage,
     ToolResultMessage,
     FinishMessage,
@@ -22,13 +24,14 @@ import {
     ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema,
     ContextProviderSchema, ContextProcessorSchema,
     MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
+    ConfigNotifierSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider, ToolProviderRegister } from "../tool/types.js";
 import { MessageSource } from "./message-source.js";
 import type { AgentConfig } from "./config.js";
 
-export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextProviderRegistry, ContextProcessorRegistry, MessageNotifierRegistry, ErrorHandlerRegistry, AfterTurnProcessorRegistry {
+export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextProviderRegistry, ContextProcessorRegistry, MessageNotifierRegistry, ErrorHandlerRegistry, AfterTurnProcessorRegistry, ConfigNotifierRegistry {
     private messageSource = new MessageSource();
     private llm: LLMRequest;
     private config: AgentConfig;
@@ -38,6 +41,7 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     private notifiers: MessageNotifier[] = [];
     private errorHandlers: ErrorHandler[] = [];
     private afterTurnProcessors: AfterTurnProcessor[] = [];
+    private configNotifiers: ConfigNotifier[] = [];
 
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
@@ -46,6 +50,9 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
 
     setConfig(config: AgentConfig): void {
         this.config = config;
+        for (const notifier of this.configNotifiers) {
+            void notifier.setConfig(config);
+        }
     }
 
     getConfig(): AgentConfig {
@@ -59,7 +66,8 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     register(notifier: MessageNotifier): void;
     register(errorHandler: ErrorHandler): void;
     register(afterTurnProcessor: AfterTurnProcessor): void;
-    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor): void {
+    register(configNotifier: ConfigNotifier): void;
+    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier): void {
         if (ToolProviderSchema.safeParse(item).success) {
             const provider = item as ToolProvider;
             const tools = provider.getTools();
@@ -97,6 +105,13 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
         if (ErrorHandlerSchema.safeParse(item).success) {
             if (!this.errorHandlers.includes(item as ErrorHandler)) {
                 this.errorHandlers.push(item as ErrorHandler);
+            }
+        }
+        if (ConfigNotifierSchema.safeParse(item).success) {
+            if (!this.configNotifiers.includes(item as ConfigNotifier)) {
+                const notifier = item as ConfigNotifier;
+                void notifier.setConfig(this.config);
+                this.configNotifiers.push(notifier);
             }
         }
     }
