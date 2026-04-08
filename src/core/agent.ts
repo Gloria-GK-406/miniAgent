@@ -45,6 +45,8 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     private afterTurnProcessors: AfterTurnProcessor[] = [];
     private configNotifiers: ConfigNotifier[] = [];
     private emitter = new EventEmitter();
+    private running = false;
+    private stopped = false;
 
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
@@ -235,80 +237,108 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
         }
     }
 
+    stop(): void {
+        if (!this.running) {
+            return;
+        }
+        this.stopped = true;
+    }
+
     async run(input: Message): Promise<Message[]> {
+        if (this.running) {
+            throw new Error("Agent is already running");
+        }
+        this.running = true;
+        this.stopped = false;
         this.emitter.emit("run:start", { input });
         await this.notify(input);
         this.messageSource.add(input);
 
-        let turn = 0;
-        while (true) {
-            turn++;
-            this.emitter.emit("turn:start", { turn });
-            try {
-                const context = await this.buildContext();
-                const tools = [...this.tools.values()];
-                this.emitter.emit("llm:request", { context, tools });
-                const stream = this.llm.streamInvoke(context, this.config.model, tools);
-                const unsubscribe = stream.onChunk((chunk) => {
-                    this.emitter.emit("llm:chunk", { chunk });
-                });
-                let response;
+        let wasStopped: boolean;
+        try {
+            let turn = 0;
+            while (!this.stopped) {
+                turn++;
+                this.emitter.emit("turn:start", { turn });
                 try {
-                    response = await stream;
-                } finally {
-                    unsubscribe();
-                }
-                this.emitter.emit("llm:response", { response });
+                    const context = await this.buildContext();
+                    const tools = [...this.tools.values()];
+                    this.emitter.emit("llm:request", { context, tools });
+                    const stream = this.llm.streamInvoke(context, this.config.model, tools);
+                    const unsubscribe = stream.onChunk((chunk) => {
+                        this.emitter.emit("llm:chunk", { chunk });
+                    });
+                    let response;
+                    try {
+                        response = await stream;
+                    } finally {
+                        unsubscribe();
+                    }
+                    this.emitter.emit("llm:response", { response });
 
-                if (!Array.isArray(response)) {
-                    await this.notify(response);
-                    this.messageSource.add(response);
-                    this.emitter.emit("turn:end", { turn });
-                    break;
-                }
-
-                const toolCalls = response;
-                for (const tc of toolCalls) {
-                    await this.notify(tc);
-                }
-
-                const results = await Promise.all(
-                    toolCalls.map(async (tc) => {
-                        const result = await this.execute(tc);
-                        return { tc, result };
-                    }),
-                );
-
-                let shouldBreak = false;
-                for (const { tc, result } of results) {
-                    this.messageSource.add(tc);
-                    if (result.type === MessageType.Finish) {
-                        shouldBreak = true;
+                    if (this.stopped) {
+                        this.emitter.emit("turn:end", { turn });
                         break;
                     }
-                    await this.notify(result);
-                    this.messageSource.add(result);
-                }
-                this.emitter.emit("turn:end", { turn });
-                if (shouldBreak) {
-                    break;
-                }
-            } catch (e: unknown) {
-                this.emitter.emit("run:error", { error: e, turn });
 
-                const candidates = this.errorHandlers
-                    .filter((h) => h.canHandle(e))
-                    .sort((a, b) => a.priority - b.priority);
+                    if (!Array.isArray(response)) {
+                        await this.notify(response);
+                        this.messageSource.add(response);
+                        this.emitter.emit("turn:end", { turn });
+                        break;
+                    }
 
-                if (candidates.length === 0) {
-                    throw e;
-                }
+                    const toolCalls = response;
+                    for (const tc of toolCalls) {
+                        await this.notify(tc);
+                    }
 
-                for (const handler of candidates) {
-                    await handler.handle(e);
+                    const results = await Promise.all(
+                        toolCalls.map(async (tc) => {
+                            const result = await this.execute(tc);
+                            return { tc, result };
+                        }),
+                    );
+
+                    let shouldBreak = false;
+                    for (const { tc, result } of results) {
+                        this.messageSource.add(tc);
+                        if (result.type === MessageType.Finish) {
+                            shouldBreak = true;
+                            break;
+                        }
+                        await this.notify(result);
+                        this.messageSource.add(result);
+                    }
+                    this.emitter.emit("turn:end", { turn });
+                    if (shouldBreak) {
+                        break;
+                    }
+                } catch (e: unknown) {
+                    this.emitter.emit("run:error", { error: e, turn });
+
+                    const candidates = this.errorHandlers
+                        .filter((h) => h.canHandle(e))
+                        .sort((a, b) => a.priority - b.priority);
+
+                    if (candidates.length === 0) {
+                        throw e;
+                    }
+
+                    for (const handler of candidates) {
+                        await handler.handle(e);
+                    }
+                    continue;
                 }
-                continue;
             }
+        } finally {
+            wasStopped = this.stopped;
+            this.running = false;
+            this.stopped = false;
+        }
+
+        if (wasStopped) {
+            this.emitter.emit("run:stopped", undefined);
         }
 
         await this.runAfterTurnProcessors(input);

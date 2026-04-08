@@ -35,8 +35,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
       expect(result.content).toBeTruthy();
-      log("Thinking response content:", result.reasoningContent);
-      log("Response content:", result.content);
+      log("result", result);      
       return;
     }
 

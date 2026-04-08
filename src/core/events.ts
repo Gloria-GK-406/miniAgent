@@ -11,6 +11,7 @@ import type { Tool } from "../tool/types.js";
 export interface AgentEventMap {
     "run:start": (payload: { input: Message }) => void;
     "run:complete": (payload: { messages: Message[] }) => void;
+    "run:stop": (payload: undefined) => void;
     "run:error": (payload: { error: unknown; turn: number }) => void;
     "turn:start": (payload: { turn: number }) => void;
     "turn:end": (payload: { turn: number }) => void;
