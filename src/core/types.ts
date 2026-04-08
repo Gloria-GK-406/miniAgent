@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AgentConfigSchema, ModelConfigSchema } from "./config.js";
 import { ToolSchema } from "../tool/types.js";
+import type { FileStore } from "./file-store.js";
 
 export enum MessageType {
   System = "system",
@@ -146,15 +147,6 @@ export const LLMRequestSchema = z.object({
 
 export type LLMRequest = z.infer<typeof LLMRequestSchema>;
 
-export const ToolRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([ToolSchema]),
-    z.void(),
-  )
-});
-
-export type ToolRegistry = z.infer<typeof ToolRegistrySchema>;
-
 export const ContextProviderSchema = z.object({
   priority: z.number().int(),
   collect: z.function(
@@ -164,15 +156,6 @@ export const ContextProviderSchema = z.object({
 });
 
 export type ContextProvider = z.infer<typeof ContextProviderSchema>;
-
-export const ContextProviderRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([ContextProviderSchema]),
-    z.void(),
-  ),
-});
-
-export type ContextProviderRegistry = z.infer<typeof ContextProviderRegistrySchema>;
 
 export enum ActionType {
   Delete = "delete",
@@ -221,15 +204,6 @@ export const ContextProcessorSchema = z.object({
 
 export type ContextProcessor = z.infer<typeof ContextProcessorSchema>;
 
-export const ContextProcessorRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([ContextProcessorSchema]),
-    z.void(),
-  ),
-});
-
-export type ContextProcessorRegistry = z.infer<typeof ContextProcessorRegistrySchema>;
-
 export const MessageNotifierSchema = z.object({
   notify: z.function(
     z.tuple([MessageSchema]),
@@ -238,15 +212,6 @@ export const MessageNotifierSchema = z.object({
 });
 
 export type MessageNotifier = z.infer<typeof MessageNotifierSchema>;
-
-export const MessageNotifierRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([MessageNotifierSchema]),
-    z.void(),
-  ),
-});
-
-export type MessageNotifierRegistry = z.infer<typeof MessageNotifierRegistrySchema>;
 
 export const ErrorHandlerSchema = z.object({
   priority: z.number().int(),
@@ -262,15 +227,6 @@ export const ErrorHandlerSchema = z.object({
 
 export type ErrorHandler = z.infer<typeof ErrorHandlerSchema>;
 
-export const ErrorHandlerRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([ErrorHandlerSchema]),
-    z.void(),
-  ),
-});
-
-export type ErrorHandlerRegistry = z.infer<typeof ErrorHandlerRegistrySchema>;
-
 export const AfterTurnProcessorSchema = z.object({
   priority: z.number().int(),
   process: z.function(
@@ -281,15 +237,6 @@ export const AfterTurnProcessorSchema = z.object({
 
 export type AfterTurnProcessor = z.infer<typeof AfterTurnProcessorSchema>;
 
-export const AfterTurnProcessorRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([AfterTurnProcessorSchema]),
-    z.void(),
-  ),
-});
-
-export type AfterTurnProcessorRegistry = z.infer<typeof AfterTurnProcessorRegistrySchema>;
-
 export const ConfigNotifierSchema = z.object({
   setConfig: z.function(
     z.tuple([AgentConfigSchema]),
@@ -299,11 +246,11 @@ export const ConfigNotifierSchema = z.object({
 
 export type ConfigNotifier = z.infer<typeof ConfigNotifierSchema>;
 
-export const ConfigNotifierRegistrySchema = z.object({
-  register: z.function(
-    z.tuple([ConfigNotifierSchema]),
-    z.void(),
+export const PersistRequireSchema = z.object({
+  setStore: z.function(
+    z.tuple([z.custom<FileStore>()]),
+    z.promise(z.void()),
   ),
 });
 
-export type ConfigNotifierRegistry = z.infer<typeof ConfigNotifierRegistrySchema>;
+export type PersistRequire = z.infer<typeof PersistRequireSchema>;

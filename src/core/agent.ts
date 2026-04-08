@@ -3,19 +3,13 @@ import type {
     Action,
     LLMRequest,
     Tool,
-    ToolRegistry,
     ContextProvider,
-    ContextProviderRegistry,
     ContextProcessor,
-    ContextProcessorRegistry,
     MessageNotifier,
-    MessageNotifierRegistry,
     ErrorHandler,
-    ErrorHandlerRegistry,
     AfterTurnProcessor,
-    AfterTurnProcessorRegistry,
     ConfigNotifier,
-    ConfigNotifierRegistry,
+    PersistRequire,
     ToolCallMessage,
     ToolResultMessage,
     FinishMessage,
@@ -24,16 +18,17 @@ import {
     ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema,
     ContextProviderSchema, ContextProcessorSchema,
     MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
-    ConfigNotifierSchema,
+    ConfigNotifierSchema, PersistRequireSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
-import type { ToolProvider, ToolProviderRegister } from "../tool/types.js";
+import type { ToolProvider } from "../tool/types.js";
 import { MessageSource } from "./message-source.js";
 import type { AgentConfig } from "./config.js";
+import { FileStore } from "./file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 
-export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextProviderRegistry, ContextProcessorRegistry, MessageNotifierRegistry, ErrorHandlerRegistry, AfterTurnProcessorRegistry, ConfigNotifierRegistry {
+export class MiniAgent {
     private messageSource = new MessageSource();
     private llm: LLMRequest;
     private config: AgentConfig;
@@ -44,6 +39,7 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     private errorHandlers: ErrorHandler[] = [];
     private afterTurnProcessors: AfterTurnProcessor[] = [];
     private configNotifiers: ConfigNotifier[] = [];
+    private store: FileStore;
     private emitter = new EventEmitter();
     private running = false;
     private stopped = false;
@@ -51,6 +47,7 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
         this.config = config;
+        this.store = new FileStore(config.paths.basepersistdir);
     }
 
     on<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
@@ -92,7 +89,8 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
     register(errorHandler: ErrorHandler): void;
     register(afterTurnProcessor: AfterTurnProcessor): void;
     register(configNotifier: ConfigNotifier): void;
-    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier): void {
+    register(persistRequire: PersistRequire): void;
+    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier | PersistRequire): void {
         if (ToolProviderSchema.safeParse(item).success) {
             const provider = item as ToolProvider;
             const tools = provider.getTools();
@@ -138,6 +136,10 @@ export class MiniAgent implements ToolRegistry, ToolProviderRegister, ContextPro
                 void notifier.setConfig(this.config);
                 this.configNotifiers.push(notifier);
             }
+        }
+        if (PersistRequireSchema.safeParse(item).success) {
+            const req = item as PersistRequire;
+            void req.setStore(this.store);
         }
     }
 

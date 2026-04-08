@@ -20,12 +20,3 @@ export const ToolProviderSchema = z.object({
 });
 
 export type ToolProvider = z.infer<typeof ToolProviderSchema>;
-
-export const ToolProviderRegisterSchema = z.object({
-    register: z.function(
-        z.tuple([ToolProviderSchema]),
-        z.void(),
-    ),
-});
-
-export type ToolProviderRegister = z.infer<typeof ToolProviderRegisterSchema>;
