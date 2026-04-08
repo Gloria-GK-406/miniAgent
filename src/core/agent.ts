@@ -29,7 +29,7 @@ import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 
 export class MiniAgent {
-    private messageSource = new MessageSource();
+    private messageSource: MessageSource;
     private llm: LLMRequest;
     private config: AgentConfig;
     private tools: Map<string, Tool> = new Map();
@@ -48,6 +48,7 @@ export class MiniAgent {
         this.llm = llm;
         this.config = config;
         this.store = new FileStore(config.paths.basepersistdir);
+        this.messageSource = new MessageSource(this.store, "messages.jsonl");
     }
 
     on<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
@@ -158,7 +159,7 @@ export class MiniAgent {
             context.push(...messages);
         }
 
-        const processed = await this.applyProcessors(this.messageSource.getAll());
+        const processed = await this.applyProcessors(await this.messageSource.getAll());
         context.push(...processed);
         return context;
     }
@@ -254,7 +255,7 @@ export class MiniAgent {
         this.stopped = false;
         this.emitter.emit("run:start", { input });
         await this.notify(input);
-        this.messageSource.add(input);
+        await this.messageSource.add(input);
 
         let wasStopped: boolean;
         try {
@@ -285,7 +286,7 @@ export class MiniAgent {
 
                     if (!Array.isArray(response)) {
                         await this.notify(response);
-                        this.messageSource.add(response);
+                        await this.messageSource.add(response);
                         this.emitter.emit("turn:end", { turn });
                         break;
                     }
@@ -304,13 +305,13 @@ export class MiniAgent {
 
                     let shouldBreak = false;
                     for (const { tc, result } of results) {
-                        this.messageSource.add(tc);
+                        await this.messageSource.add(tc);
                         if (result.type === MessageType.Finish) {
                             shouldBreak = true;
                             break;
                         }
                         await this.notify(result);
-                        this.messageSource.add(result);
+                        await this.messageSource.add(result);
                     }
                     this.emitter.emit("turn:end", { turn });
                     if (shouldBreak) {
@@ -344,7 +345,7 @@ export class MiniAgent {
         }
 
         await this.runAfterTurnProcessors(input);
-        const messages = this.messageSource.getAll();
+        const messages = await this.messageSource.getAll();
         this.emitter.emit("run:complete", { messages });
         return messages;
     }

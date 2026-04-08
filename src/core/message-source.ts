@@ -1,67 +1,119 @@
 import type { Message } from "./types.js";
+import type { FileStore } from "./file-store.js";
 
-/**
- * MessageSource 维护一条有序消息序列，支持按 discardBeforeMessageId 逻辑截断。
- *
- * 丢弃水位线（discardBeforeMessageId）之前的消息被视为不存在：
- * - getAll() 不会返回它们
- * - get(id) 对它们的查询结果为 undefined
- * - 但这些消息仍在内存中保留，可通过调整水位线重新访问
- */
 export class MessageSource {
-  private messages: Message[] = [];
+  private store: FileStore;
+  private filePath: string;
+  private cacheSize: number;
+
+  private cache: Message[] = [];
+  private cacheStartIndex = 0;
+  private historical: Message[] | null = null;
+  private initialized = false;
   private discardBeforeMessageId: string | null = null;
 
-  add(message: Message): void {
-    this.messages.push(message);
+  constructor(store: FileStore, filePath: string, cacheSize = 100) {
+    this.store = store;
+    this.filePath = filePath;
+    this.cacheSize = cacheSize;
   }
 
-  append(messages: Message[]): void {
-    this.messages.push(...messages);
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    try {
+      const content = await this.store.readFile(this.filePath);
+      if (!content.trim()) return;
+      const lines = content.trim().split("\n");
+      const allMessages = lines.map((line) => JSON.parse(line) as Message);
+
+      if (allMessages.length <= this.cacheSize) {
+        this.cache = allMessages;
+        this.cacheStartIndex = 0;
+      } else {
+        const start = allMessages.length - this.cacheSize;
+        this.historical = allMessages.slice(0, start);
+        this.cache = allMessages.slice(start);
+        this.cacheStartIndex = start;
+      }
+    } catch {
+      // file not found, start empty
+    }
+  }
+
+  async add(message: Message): Promise<void> {
+    await this.ensureInitialized();
+    const line = JSON.stringify(message) + "\n";
+    await this.store.appendFile(this.filePath, line);
+    this.pushToCache(message);
+  }
+
+  async append(messages: Message[]): Promise<void> {
+    if (messages.length === 0) return;
+    await this.ensureInitialized();
+    const lines = messages.map((m) => JSON.stringify(m)).join("\n") + "\n";
+    await this.store.appendFile(this.filePath, lines);
+    for (const msg of messages) {
+      this.pushToCache(msg);
+    }
+  }
+
+  private pushToCache(message: Message): void {
+    if (this.cache.length >= this.cacheSize && this.cache.length > 0) {
+      const evicted = this.cache.shift()!;
+      this.cacheStartIndex++;
+      if (this.historical !== null) {
+        this.historical.push(evicted);
+      }
+    }
+    this.cache.push(message);
   }
 
   setDiscardBefore(messageId: string): void {
     this.discardBeforeMessageId = messageId;
   }
 
-  /**
-   * 获取指定 id 的消息。
-   * 如果该消息位于 discardBeforeMessageId 之前（含），视为不存在，返回 undefined。
-   */
-  get(id: string): Message | undefined {
-    const message = this.messages.find((m) => m.id === id);
-    if (!message) {
-      return undefined;
-    }
-    if (this.discardBeforeMessageId !== null && !this.isAfterDiscard(message)) {
-      return undefined;
-    }
-    return message;
+  async get(id: string): Promise<Message | undefined> {
+    const all = await this.getAll();
+    return all.find((m) => m.id === id);
   }
 
-  /**
-   * 获取当前有效的全部消息（丢弃水位线之前的消息视为不存在，不会返回）。
-   */
-  getAll(): Message[] {
-    if (this.discardBeforeMessageId === null) {
-      return [...this.messages];
+  async getAll(): Promise<Message[]> {
+    await this.ensureInitialized();
+
+    if (this.discardBeforeMessageId !== null) {
+      const discardInCache = this.cache.findIndex((m) => m.id === this.discardBeforeMessageId);
+      if (discardInCache !== -1) {
+        return this.cache.slice(discardInCache + 1);
+      }
     }
-    const index = this.messages.findIndex((m) => m.id === this.discardBeforeMessageId);
+
+    if (this.cacheStartIndex === 0) {
+      return this.applyDiscard([...this.cache]);
+    }
+
+    if (this.historical === null) {
+      await this.loadHistorical();
+    }
+    return this.applyDiscard([...this.historical!, ...this.cache]);
+  }
+
+  private async loadHistorical(): Promise<void> {
+    const content = await this.store.readFile(this.filePath);
+    const lines = content.trim().split("\n");
+    const allMessages = lines.map((line) => JSON.parse(line) as Message);
+    this.historical = allMessages.slice(0, this.cacheStartIndex);
+  }
+
+  private applyDiscard(messages: Message[]): Message[] {
+    if (this.discardBeforeMessageId === null) {
+      return messages;
+    }
+    const index = messages.findIndex((m) => m.id === this.discardBeforeMessageId);
     if (index === -1) {
-      return [...this.messages];
+      return messages;
     }
-    return this.messages.slice(index + 1);
-  }
-
-  private isAfterDiscard(message: Message): boolean {
-    if (this.discardBeforeMessageId === null) {
-      return true;
-    }
-    const discardIndex = this.messages.findIndex((m) => m.id === this.discardBeforeMessageId);
-    if (discardIndex === -1) {
-      return true;
-    }
-    const messageIndex = this.messages.findIndex((m) => m.id === message.id);
-    return messageIndex > discardIndex;
+    return messages.slice(index + 1);
   }
 }

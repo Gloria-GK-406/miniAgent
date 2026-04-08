@@ -35,4 +35,10 @@ export class FileStore {
     const content = await this.readFile(path);
     return JSON.parse(content) as T;
   }
+
+  async appendFile(path: string, data: string): Promise<void> {
+    const resolved = this.resolve(path);
+    await fs.mkdir(join(resolved, ".."), { recursive: true });
+    await fs.appendFile(resolved, data, "utf-8");
+  }
 }
