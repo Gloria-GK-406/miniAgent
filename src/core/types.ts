@@ -245,10 +245,35 @@ export const ErrorHandlerSchema = z.object({
 
 export type ErrorHandler = z.infer<typeof ErrorHandlerSchema>;
 
+export const AgentContextControlSchema = z.object({
+  getMessages: z.function(
+    z.tuple([]),
+    z.promise(z.array(MessageSchema)),
+  ),
+  getMessage: z.function(
+    z.tuple([z.string()]),
+    z.promise(MessageSchema.optional()),
+  ),
+  previewContext: z.function(
+    z.tuple([]),
+    z.promise(z.array(MessageSchema)),
+  ),
+  setDiscardBefore: z.function(
+    z.tuple([z.string()]),
+    z.promise(z.void()),
+  ),
+  clearDiscardBefore: z.function(
+    z.tuple([]),
+    z.promise(z.void()),
+  ),
+});
+
+export type AgentContextControl = z.infer<typeof AgentContextControlSchema>;
+
 export const AfterTurnProcessorSchema = z.object({
   priority: z.number().int(),
   process: z.function(
-    z.tuple([z.unknown(), MessageSchema]),
+    z.tuple([AgentContextControlSchema, MessageSchema]),
     z.promise(z.void()),
   ),
 });

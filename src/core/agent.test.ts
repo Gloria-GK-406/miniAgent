@@ -7,6 +7,7 @@ import { MiniAgent } from "./agent.js";
 import { StopException } from "./errors.js";
 import { MessageType } from "./types.js";
 import type {
+  AgentContextControl,
   LLMRequest,
   LLMResponse,
   LLMStreamHandle,
@@ -125,6 +126,63 @@ describe("MiniAgent", () => {
     expect(messages.map((message) => message.id)).toEqual(["user-1", "assist-1"]);
   });
 
+  it("exposes managed context APIs without exposing MessageSource", async () => {
+    const llm = createLLM([
+      {
+        id: "assist-1",
+        type: MessageType.Assist,
+        content: "done",
+      },
+    ]);
+    const agent = new MiniAgent(llm, createConfig(testDir));
+
+    agent.register({
+      appendTurnContext: async (): Promise<Message[]> => [
+        {
+          id: "append-1",
+          type: MessageType.System,
+          content: "prepended",
+        },
+      ],
+    });
+    agent.register({
+      priority: 0,
+      collect: async (): Promise<Message[]> => [
+        {
+          id: "provider-1",
+          type: MessageType.System,
+          content: "provided",
+        },
+      ],
+    });
+
+    await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect((await agent.getMessages()).map((message) => message.id)).toEqual([
+      "user-1",
+      "assist-1",
+    ]);
+    expect((await agent.previewContext()).map((message) => message.id)).toEqual([
+      "append-1",
+      "provider-1",
+      "user-1",
+      "assist-1",
+    ]);
+
+    await agent.setDiscardBefore("user-1");
+    expect((await agent.getMessages()).map((message) => message.id)).toEqual(["assist-1"]);
+
+    await agent.clearDiscardBefore();
+    expect((await agent.getMessages()).map((message) => message.id)).toEqual([
+      "user-1",
+      "assist-1",
+    ]);
+  });
+
   it("stops the loop when a tool throws StopException", async () => {
     const onStop = vi.fn();
     const toolCall: ToolCallMessage = {
@@ -206,5 +264,39 @@ describe("MiniAgent", () => {
       seenResults[0]!.id,
       "assist-2",
     ]);
+  });
+
+  it("passes a managed control surface to after-turn processors", async () => {
+    let seenControl: AgentContextControl | undefined;
+    const llm = createLLM([
+      {
+        id: "assist-1",
+        type: MessageType.Assist,
+        content: "done",
+      },
+    ]);
+    const agent = new MiniAgent(llm, createConfig(testDir));
+
+    agent.register({
+      priority: 0,
+      process: async (control: AgentContextControl, input: Message): Promise<void> => {
+        seenControl = control;
+        expect(input.id).toBe("user-1");
+        expect((await control.getMessages()).map((message) => message.id)).toEqual([
+          "user-1",
+          "assist-1",
+        ]);
+        await control.setDiscardBefore("user-1");
+      },
+    });
+
+    const messages = await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect(seenControl).toBeDefined();
+    expect(messages.map((message) => message.id)).toEqual(["assist-1"]);
   });
 });

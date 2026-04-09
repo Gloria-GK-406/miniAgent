@@ -74,6 +74,10 @@ export class MessageSource {
     this.discardBeforeMessageId = messageId;
   }
 
+  clearDiscardBefore(): void {
+    this.discardBeforeMessageId = null;
+  }
+
   async get(id: string): Promise<Message | undefined> {
     const all = await this.getAll();
     return all.find((m) => m.id === id);

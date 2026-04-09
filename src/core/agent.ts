@@ -12,6 +12,7 @@ import type {
     PersistRequire,
     TurnContextAware,
     TurnContextAppend,
+    AgentContextControl,
     ToolCallMessage,
     ToolResultMessage,
 } from "./types.js";
@@ -119,13 +120,15 @@ export class MiniAgent {
             }
         }
         if (AfterTurnProcessorSchema.safeParse(item).success) {
-            if (!this.afterTurnProcessors.includes(item as AfterTurnProcessor)) {
-                this.afterTurnProcessors.push(item as AfterTurnProcessor);
+            const processor = item as AfterTurnProcessor;
+            if (processor.process.length >= 2 && !this.afterTurnProcessors.includes(processor)) {
+                this.afterTurnProcessors.push(processor);
             }
         }
         if (ContextProcessorSchema.safeParse(item).success) {
-            if (!this.processors.includes(item as ContextProcessor)) {
-                this.processors.push(item as ContextProcessor);
+            const processor = item as ContextProcessor;
+            if (processor.process.length < 2 && !this.processors.includes(processor)) {
+                this.processors.push(processor);
             }
         }
         if (MessageNotifierSchema.safeParse(item).success) {
@@ -166,6 +169,36 @@ export class MiniAgent {
         for (const notifier of this.notifiers) {
             await notifier.notify(message);
         }
+    }
+
+    async getMessages(): Promise<Message[]> {
+        return this.messageSource.getAll();
+    }
+
+    async getMessage(id: string): Promise<Message | undefined> {
+        return this.messageSource.get(id);
+    }
+
+    async setDiscardBefore(messageId: string): Promise<void> {
+        this.messageSource.setDiscardBefore(messageId);
+    }
+
+    async clearDiscardBefore(): Promise<void> {
+        this.messageSource.clearDiscardBefore();
+    }
+
+    async previewContext(): Promise<Message[]> {
+        return this.buildContext();
+    }
+
+    private getAgentContextControl(): AgentContextControl {
+        return {
+            getMessages: async (): Promise<Message[]> => this.getMessages(),
+            getMessage: async (id: string): Promise<Message | undefined> => this.getMessage(id),
+            previewContext: async (): Promise<Message[]> => this.previewContext(),
+            setDiscardBefore: async (messageId: string): Promise<void> => this.setDiscardBefore(messageId),
+            clearDiscardBefore: async (): Promise<void> => this.clearDiscardBefore(),
+        };
     }
 
     private async buildContext(): Promise<Message[]> {
@@ -253,8 +286,9 @@ export class MiniAgent {
 
     private async runAfterTurnProcessors(input: Message): Promise<void> {
         const sorted = [...this.afterTurnProcessors].sort((a, b) => a.priority - b.priority);
+        const control = this.getAgentContextControl();
         for (const processor of sorted) {
-            await processor.process(this.messageSource, input);
+            await processor.process(control, input);
         }
     }
 
