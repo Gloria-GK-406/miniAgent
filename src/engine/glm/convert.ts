@@ -6,6 +6,8 @@ import type {
   ToolResultMessage,
   Tool,
   ImageContent,
+  LLMMessageResponse,
+  LLMResponse,
 } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 import type {
@@ -13,6 +15,7 @@ import type {
   ChatCompletion,
 } from "openai/resources/chat/completions/completions.js";
 import { MessageType } from "../../core/types.js";
+import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
 import { convertTools } from "../openai-compatible/convert.js";
 
 type GLMMessageParam = ChatCompletionMessageParam & {
@@ -144,7 +147,7 @@ export function buildCreateParams(
 
 export function convertResponse(
   response: ChatCompletion,
-): AssistMessage | ToolCallMessage[] {
+): LLMResponse {
   const choice = response.choices[0];
   if (!choice) {
     throw new Error("No choices in GLM response");
@@ -152,8 +155,9 @@ export function convertResponse(
   const message = choice.message;
   const reasoningContent = extractReasoningContent(message);
   const toolCalls = message.tool_calls;
+  let converted: LLMMessageResponse;
   if (toolCalls && toolCalls.length > 0) {
-    return toolCalls
+    converted = toolCalls
       .filter((tc) => tc.type === "function")
       .map((tc) => {
         const args = JSON.parse(tc.function.arguments) as Record<
@@ -170,11 +174,18 @@ export function convertResponse(
           ...(reasoningContent !== undefined && { reasoningContent }),
         };
       });
+  } else {
+    converted = {
+      type: MessageType.Assist,
+      id: crypto.randomUUID(),
+      content: message.content ?? "",
+      ...(reasoningContent !== undefined && { reasoningContent }),
+    };
   }
   return {
-    type: MessageType.Assist,
-    id: crypto.randomUUID(),
-    content: message.content ?? "",
-    ...(reasoningContent !== undefined && { reasoningContent }),
+    message: converted,
+    tokenCount: response.usage
+      ? createTokenCount(response.usage.prompt_tokens, response.usage.completion_tokens)
+      : emptyTokenCount(),
   };
 }

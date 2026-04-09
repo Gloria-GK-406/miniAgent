@@ -293,11 +293,12 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(!Array.isArray(result)).toBe(true);
-    if (!Array.isArray(result)) {
-      expect(result.type).toBe(MessageType.Assist);
-      expect(result.content).toBe("Hello!");
+    expect(!Array.isArray(result.message)).toBe(true);
+    if (!Array.isArray(result.message)) {
+      expect(result.message.type).toBe(MessageType.Assist);
+      expect(result.message.content).toBe("Hello!");
     }
+    expect(result.tokenCount).toEqual({ input: 10, output: 5, total: 15 });
   });
 
   it("converts tool_use response to ToolCallMessage array", () => {
@@ -332,8 +333,8 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(Array.isArray(result)).toBe(true);
-    const toolCalls = result as Array<{ type: MessageType; content: string; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(Array.isArray(result.message)).toBe(true);
+    const toolCalls = result.message as Array<{ type: MessageType; content: string; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
     expect(toolCalls[0]!.content).toBe("Let me check.");
@@ -381,8 +382,8 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(Array.isArray(result)).toBe(true);
-    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(Array.isArray(result.message)).toBe(true);
+    const toolCalls = result.message as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
     expect(toolCalls).toHaveLength(2);
     expect(toolCalls[0]!.toolCallId).toBe("toolu_a");
     expect(toolCalls[0]!.arguments).toEqual({ query: "first" });
@@ -421,8 +422,8 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(Array.isArray(result)).toBe(true);
-    const toolCalls = result as Array<{ type: MessageType; content: string; toolCallId: string }>;
+    expect(Array.isArray(result.message)).toBe(true);
+    const toolCalls = result.message as Array<{ type: MessageType; content: string; toolCallId: string }>;
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
     expect(toolCalls[0]!.content).toBe("");

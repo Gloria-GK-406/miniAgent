@@ -50,8 +50,11 @@ describe("consumeOpenAIStream", () => {
       { type: LLMStreamChunkType.TextDelta, text: "lo" },
     ]);
     expect(result).toMatchObject({
-      type: MessageType.Assist,
-      content: "Hello",
+      message: {
+        type: MessageType.Assist,
+        content: "Hello",
+      },
+      tokenCount: { input: 0, output: 0, total: 0 },
     });
   });
 
@@ -114,15 +117,18 @@ describe("consumeOpenAIStream", () => {
         toolName: "get_weather",
       },
     ]);
-    expect(result).toMatchObject([
-      {
-        type: MessageType.ToolCall,
-        content: "Checking...",
-        toolCallId: "call_1",
-        toolName: "get_weather",
-        arguments: { city: "Beijing" },
-        reasoningContent: "think-1think-2",
-      },
-    ]);
+    expect(result).toMatchObject({
+      message: [
+        {
+          type: MessageType.ToolCall,
+          content: "Checking...",
+          toolCallId: "call_1",
+          toolName: "get_weather",
+          arguments: { city: "Beijing" },
+          reasoningContent: "think-1think-2",
+        },
+      ],
+      tokenCount: { input: 0, output: 0, total: 0 },
+    });
   });
 });

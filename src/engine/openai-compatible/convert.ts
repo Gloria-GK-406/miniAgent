@@ -6,6 +6,8 @@ import type {
   ToolResultMessage,
   Tool,
   ImageContent,
+  LLMMessageResponse,
+  LLMResponse,
 } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 import type {
@@ -15,6 +17,7 @@ import type {
   ChatCompletion
 } from "openai/resources/chat/completions/completions.js";
 import { MessageType } from "../../core/types.js";
+import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 function extractText(content: Message["content"]): string {
@@ -131,15 +134,16 @@ export function buildCreateParams(
 }
 export function convertResponse(
   response: ChatCompletion
-): AssistMessage | ToolCallMessage[] {
+): LLMResponse {
   const choice = response.choices[0];
   if (!choice) {
     throw new Error("No choices in OpenAI response");
   }
   const message = choice.message;
   const toolCalls = message.tool_calls;
+  let converted: LLMMessageResponse;
   if (toolCalls && toolCalls.length > 0) {
-    return toolCalls
+    converted = toolCalls
       .filter((tc) => tc.type === "function")
       .map((tc) => {
         const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
@@ -152,10 +156,17 @@ export function convertResponse(
           arguments: args,
         };
       });
+  } else {
+    converted = {
+      type: MessageType.Assist,
+      id: crypto.randomUUID(),
+      content: message.content ?? "",
+    };
   }
   return {
-    type: MessageType.Assist,
-    id: crypto.randomUUID(),
-    content: message.content ?? "",
+    message: converted,
+    tokenCount: response.usage
+      ? createTokenCount(response.usage.prompt_tokens, response.usage.completion_tokens)
+      : emptyTokenCount(),
   };
 }

@@ -3,6 +3,7 @@ import type {
 } from "openai/resources/chat/completions/completions.js";
 import type { LLMResponse, LLMStreamChunk } from "../../core/types.js";
 import { LLMStreamChunkType, MessageType } from "../../core/types.js";
+import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
 
 interface OpenAIToolCallBuffer {
   id?: string;
@@ -38,8 +39,13 @@ export async function consumeOpenAIStream(
   let content = "";
   let reasoningContent = "";
   const toolCalls: OpenAIToolCallBuffer[] = [];
+  let tokenCount = emptyTokenCount();
 
   for await (const chunk of stream) {
+    if (chunk.usage) {
+      tokenCount = createTokenCount(chunk.usage.prompt_tokens, chunk.usage.completion_tokens);
+    }
+
     const choice = chunk.choices[0];
     if (!choice) {
       continue;
@@ -85,7 +91,8 @@ export async function consumeOpenAIStream(
   }
 
   if (toolCalls.length > 0) {
-    return toolCalls.map((toolCall) => {
+    return {
+      message: toolCalls.map((toolCall) => {
       if (!toolCall.id) {
         throw new Error("OpenAI stream ended without a tool call id");
       }
@@ -104,13 +111,18 @@ export async function consumeOpenAIStream(
         arguments: argumentsObject,
         ...(reasoningContent !== "" && { reasoningContent }),
       };
-    });
+      }),
+      tokenCount,
+    };
   }
 
   return {
-    id: crypto.randomUUID(),
-    type: MessageType.Assist,
-    content,
-    ...(reasoningContent !== "" && { reasoningContent }),
+    message: {
+      id: crypto.randomUUID(),
+      type: MessageType.Assist,
+      content,
+      ...(reasoningContent !== "" && { reasoningContent }),
+    },
+    tokenCount,
   };
 }

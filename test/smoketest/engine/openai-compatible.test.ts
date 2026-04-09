@@ -34,7 +34,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI-Compatible Engine", () 
     const result = await invokeEngine(OpenAICompatibleEngine, config, messages, []);
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   });
 
@@ -59,7 +59,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI-Compatible Engine", () 
     const result = await invokeEngine(OpenAICompatibleEngine, config, messages, []);
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   });
 
@@ -78,9 +78,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI-Compatible Engine", () 
     const result = await invokeEngine(OpenAICompatibleEngine, config, messages, [tool]);
     expect(isToolCallResponse(result)).toBe(true);
     if (isToolCallResponse(result)) {
-      expect(result).toHaveLength(1);
-      expect(result[0]!.toolName).toBe("get_weather");
-      expect(result[0]!.arguments).toHaveProperty("city");
+      expect(result.message).toHaveLength(1);
+      expect(result.message[0]!.toolName).toBe("get_weather");
+      expect(result.message[0]!.arguments).toHaveProperty("city");
     }
   });
 
@@ -92,7 +92,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI-Compatible Engine", () 
     const result = await invokeEngine(OpenAICompatibleEngine, thinkConfig, messages, []);
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   });
 
@@ -104,7 +104,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI-Compatible Engine", () 
     const result = await invokeEngine(OpenAICompatibleEngine, noThinkConfig, messages, []);
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   });
 });

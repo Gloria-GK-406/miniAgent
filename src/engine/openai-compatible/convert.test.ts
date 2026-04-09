@@ -267,12 +267,13 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(!Array.isArray(result)).toBe(true);
-    if (!Array.isArray(result)) {
-      expect(result.type).toBe(MessageType.Assist);
-      expect(result.content).toBe("Hello!");
-      expect(result.id).toBeTruthy();
+    expect(!Array.isArray(result.message)).toBe(true);
+    if (!Array.isArray(result.message)) {
+      expect(result.message.type).toBe(MessageType.Assist);
+      expect(result.message.content).toBe("Hello!");
+      expect(result.message.id).toBeTruthy();
     }
+    expect(result.tokenCount).toEqual({ input: 0, output: 0, total: 0 });
   });
 
   it("converts tool call response to ToolCallMessage array", () => {
@@ -304,8 +305,8 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(Array.isArray(result)).toBe(true);
-    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(Array.isArray(result.message)).toBe(true);
+    const toolCalls = result.message as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
     expect(toolCalls[0]!.toolCallId).toBe("call_xyz");
@@ -350,8 +351,8 @@ describe("convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(Array.isArray(result)).toBe(true);
-    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
+    expect(Array.isArray(result.message)).toBe(true);
+    const toolCalls = result.message as Array<{ type: MessageType; toolCallId: string; toolName: string; arguments: Record<string, unknown> }>;
     expect(toolCalls).toHaveLength(2);
     expect(toolCalls[0]!.toolCallId).toBe("call_a");
     expect(toolCalls[0]!.arguments).toEqual({ query: "first" });

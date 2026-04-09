@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { ModelConfig } from "../../src/core/config.js";
 import { MessageType } from "../../src/core/types.js";
 import type { LLMEngineCtor } from "../../src/core/llm.js";
-import type { LLMResponse, Message, ToolCallMessage, Tool } from "../../src/core/types.js";
+import type { LLMResponse, LLMMessageResponse, Message, ToolCallMessage, Tool } from "../../src/core/types.js";
 
 const envCache = new Map<string, string | undefined>();
 
@@ -93,12 +93,16 @@ export async function invokeEngineForSmoke(
   }
 }
 
-export function isAssistResponse(response: LLMResponse): response is Extract<LLMResponse, { type: MessageType.Assist }> {
-  return !Array.isArray(response) && response.type === MessageType.Assist;
+export function isAssistResponse(response: LLMResponse): response is LLMResponse & {
+  message: Extract<LLMMessageResponse, { type: MessageType.Assist }>;
+} {
+  return !Array.isArray(response.message) && response.message.type === MessageType.Assist;
 }
 
-export function isToolCallResponse(response: LLMResponse): response is ToolCallMessage[] {
-  return Array.isArray(response) && response.every((message) => message.type === MessageType.ToolCall);
+export function isToolCallResponse(response: LLMResponse): response is LLMResponse & {
+  message: ToolCallMessage[];
+} {
+  return Array.isArray(response.message) && response.message.every((message) => message.type === MessageType.ToolCall);
 }
 
 function isKnownSmokeInfraError(error: unknown): boolean {

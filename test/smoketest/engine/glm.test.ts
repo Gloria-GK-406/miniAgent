@@ -32,7 +32,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   }, 20000);
 
@@ -60,7 +60,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   }, 20000);
 
@@ -82,9 +82,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     }
     expect(isToolCallResponse(result)).toBe(true);
     if (isToolCallResponse(result)) {
-      expect(result).toHaveLength(1);
-      expect(result[0]!.toolName).toBe("get_weather");
-      expect(result[0]!.arguments).toHaveProperty("city");
+      expect(result.message).toHaveLength(1);
+      expect(result.message[0]!.toolName).toBe("get_weather");
+      expect(result.message[0]!.arguments).toHaveProperty("city");
     }
   }, 20000);
 
@@ -99,7 +99,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   }, 20000);
 
@@ -114,7 +114,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
     }
   }, 20000);
 });

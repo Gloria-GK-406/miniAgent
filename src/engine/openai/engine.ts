@@ -28,6 +28,9 @@ export const OpenAIEngine: LLMEngineCtor = class implements LLMEngine {
         const stream = await this.client.chat.completions.create({
           ...params,
           stream: true,
+          stream_options: {
+            include_usage: true,
+          },
         });
         const response = await consumeOpenAIStream(stream, {
           emitChunk: (chunk) => {

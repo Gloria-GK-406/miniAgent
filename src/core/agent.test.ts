@@ -9,6 +9,7 @@ import { MessageType } from "./types.js";
 import type {
   AgentContextControl,
   LLMRequest,
+  LLMMessageResponse,
   LLMResponse,
   LLMStreamHandle,
   Message,
@@ -18,7 +19,6 @@ import type {
 } from "./types.js";
 import type { AgentConfig } from "./config.js";
 import type { Tool } from "../tool/types.js";
-
 function createConfig(basepersistdir: string): AgentConfig {
   return {
     model: {
@@ -39,6 +39,17 @@ function createResolvedHandle<T>(value: T): LLMStreamHandle<T> {
       onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
     ): PromiseLike<TResult1 | TResult2> {
       return Promise.resolve(value).then(onfulfilled, onrejected);
+    },
+  };
+}
+
+function wrapResponse(message: LLMMessageResponse, input = 0, output = 0): LLMResponse {
+  return {
+    message,
+    tokenCount: {
+      input,
+      output,
+      total: input + output,
     },
   };
 }
@@ -72,11 +83,11 @@ describe("MiniAgent", () => {
     const seenRequests: Message[][] = [];
     const llm = createLLM(
       [
-        {
+        wrapResponse({
           id: "assist-1",
           type: MessageType.Assist,
           content: "done",
-        },
+        }),
       ],
       (messages) => {
         seenRequests.push(messages);
@@ -128,11 +139,11 @@ describe("MiniAgent", () => {
 
   it("exposes managed context APIs without exposing MessageSource", async () => {
     const llm = createLLM([
-      {
+      wrapResponse({
         id: "assist-1",
         type: MessageType.Assist,
         content: "done",
-      },
+      }),
     ]);
     const agent = new MiniAgent(llm, createConfig(testDir));
 
@@ -193,7 +204,7 @@ describe("MiniAgent", () => {
       toolName: "stop_tool",
       arguments: {},
     };
-    const llm = createLLM([[toolCall]]);
+    const llm = createLLM([wrapResponse([toolCall])]);
     const agent = new MiniAgent(llm, createConfig(testDir));
     const tool: Tool = {
       name: "stop_tool",
@@ -228,12 +239,12 @@ describe("MiniAgent", () => {
       arguments: { text: "pong" },
     };
     const llm = createLLM([
-      [toolCall],
-      {
+      wrapResponse([toolCall], 3, 4),
+      wrapResponse({
         id: "assist-2",
         type: MessageType.Assist,
         content: "done",
-      },
+      }, 5, 6),
     ]);
     const agent = new MiniAgent(llm, createConfig(testDir));
     const tool: Tool = {
@@ -264,16 +275,17 @@ describe("MiniAgent", () => {
       seenResults[0]!.id,
       "assist-2",
     ]);
+    expect(agent.getContextCount()).toEqual({ input: 8, output: 10, total: 18 });
   });
 
   it("passes a managed control surface to after-turn processors", async () => {
     let seenControl: AgentContextControl | undefined;
     const llm = createLLM([
-      {
+      wrapResponse({
         id: "assist-1",
         type: MessageType.Assist,
         content: "done",
-      },
+      }),
     ]);
     const agent = new MiniAgent(llm, createConfig(testDir));
 

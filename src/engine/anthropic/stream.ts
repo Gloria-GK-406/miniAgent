@@ -4,6 +4,7 @@ import type {
 } from "@anthropic-ai/sdk/resources/messages/messages.js";
 import type { LLMResponse, LLMStreamChunk } from "../../core/types.js";
 import { LLMStreamChunkType, MessageType } from "../../core/types.js";
+import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
 
 interface AnthropicToolUseBuffer {
   id: string;
@@ -33,8 +34,29 @@ export async function consumeAnthropicStream(
   let content = "";
   let reasoningContent = "";
   const toolUses = new Map<number, AnthropicToolUseBuffer>();
+  let tokenCount = emptyTokenCount();
 
   for await (const event of stream) {
+    if (event.type === "message_start") {
+      tokenCount = createTokenCount(
+        (event.message.usage.input_tokens ?? 0)
+          + (event.message.usage.cache_creation_input_tokens ?? 0)
+          + (event.message.usage.cache_read_input_tokens ?? 0),
+        event.message.usage.output_tokens,
+      );
+      continue;
+    }
+
+    if (event.type === "message_delta") {
+      tokenCount = createTokenCount(
+        (event.usage.input_tokens ?? 0)
+          + (event.usage.cache_creation_input_tokens ?? 0)
+          + (event.usage.cache_read_input_tokens ?? 0),
+        event.usage.output_tokens,
+      );
+      continue;
+    }
+
     if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
       const toolUse = event.content_block as ToolUseBlock;
       toolUses.set(event.index, {
@@ -85,23 +107,29 @@ export async function consumeAnthropicStream(
   }
 
   if (toolUses.size > 0) {
-    return [...toolUses.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([, toolUse]) => ({
-        id: crypto.randomUUID(),
-        type: MessageType.ToolCall,
-        content,
-        toolCallId: toolUse.id,
-        toolName: toolUse.name,
-        arguments: toToolArguments(toolUse),
-        ...(reasoningContent !== "" && { reasoningContent }),
-      }));
+    return {
+      message: [...toolUses.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([, toolUse]) => ({
+          id: crypto.randomUUID(),
+          type: MessageType.ToolCall,
+          content,
+          toolCallId: toolUse.id,
+          toolName: toolUse.name,
+          arguments: toToolArguments(toolUse),
+          ...(reasoningContent !== "" && { reasoningContent }),
+        })),
+      tokenCount,
+    };
   }
 
   return {
-    id: crypto.randomUUID(),
-    type: MessageType.Assist,
-    content,
-    ...(reasoningContent !== "" && { reasoningContent }),
+    message: {
+      id: crypto.randomUUID(),
+      type: MessageType.Assist,
+      content,
+      ...(reasoningContent !== "" && { reasoningContent }),
+    },
+    tokenCount,
   };
 }

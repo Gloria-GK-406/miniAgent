@@ -161,11 +161,11 @@ describe("GLM convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(!Array.isArray(result)).toBe(true);
-    if (!Array.isArray(result)) {
-      expect(result.type).toBe(MessageType.Assist);
-      expect(result.content).toBe("The answer is 42");
-      expect(result.reasoningContent).toBe("Let me analyze this step by step...");
+    expect(!Array.isArray(result.message)).toBe(true);
+    if (!Array.isArray(result.message)) {
+      expect(result.message.type).toBe(MessageType.Assist);
+      expect(result.message.content).toBe("The answer is 42");
+      expect(result.message.reasoningContent).toBe("Let me analyze this step by step...");
     }
   });
 
@@ -199,8 +199,8 @@ describe("GLM convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(Array.isArray(result)).toBe(true);
-    const toolCalls = result as Array<{ type: MessageType; toolCallId: string; reasoningContent?: string }>;
+    expect(Array.isArray(result.message)).toBe(true);
+    const toolCalls = result.message as Array<{ type: MessageType; toolCallId: string; reasoningContent?: string }>;
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]!.type).toBe(MessageType.ToolCall);
     expect(toolCalls[0]!.toolCallId).toBe("call_xyz");
@@ -226,11 +226,11 @@ describe("GLM convertResponse", () => {
     };
 
     const result = convertResponse(response as never);
-    expect(!Array.isArray(result)).toBe(true);
-    if (!Array.isArray(result)) {
-      expect(result.type).toBe(MessageType.Assist);
-      expect(result.content).toBe("Hello!");
-      expect(result.reasoningContent).toBeUndefined();
+    expect(!Array.isArray(result.message)).toBe(true);
+    if (!Array.isArray(result.message)) {
+      expect(result.message.type).toBe(MessageType.Assist);
+      expect(result.message.content).toBe("Hello!");
+      expect(result.message.reasoningContent).toBeUndefined();
     }
   });
 });

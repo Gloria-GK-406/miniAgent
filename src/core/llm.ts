@@ -3,6 +3,7 @@ import type {
   Tool,
   LLMRequest,
   LLMResponse,
+  TokenCount,
   LLMStreamChunk,
   LLMStreamHandle,
 } from "./types.js";
@@ -115,4 +116,24 @@ export class LLMEngineManager implements LLMRequest {
     const engine = this.get(config);
     return engine.streamGenerate(messages, tools);
   }
+}
+
+export function emptyTokenCount(): TokenCount {
+  return {
+    input: 0,
+    output: 0,
+    total: 0,
+  };
+}
+
+export function createTokenCount(input: number, output: number): TokenCount {
+  return {
+    input,
+    output,
+    total: input + output,
+  };
+}
+
+export function addTokenCount(left: TokenCount, right: TokenCount): TokenCount {
+  return createTokenCount(left.input + right.input, left.output + right.output);
 }

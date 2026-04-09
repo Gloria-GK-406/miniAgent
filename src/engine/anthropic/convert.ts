@@ -5,17 +5,17 @@ import type {
   ToolResultMessage,
   Tool,
   ImageContent,
+  LLMMessageResponse,
+  LLMResponse,
 } from "../../core/types.js";
 import type { ModelConfig } from "../../core/config.js";
 import type {
-  AssistMessage as AssistMessageType,
-  ToolCallMessage as ToolCallMessageType,
-} from "../../core/types.js";import type {
   MessageParam,
   ContentBlockParam,
   Tool as AnthropicTool,
 } from "@anthropic-ai/sdk/resources/messages/messages.js";
 import { MessageType } from "../../core/types.js";
+import { createTokenCount } from "../../core/llm.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 interface ConvertedInput {
@@ -186,7 +186,7 @@ export function buildCreateParams(
 
 export function convertResponse(
   response: Anthropic.Message,
-): AssistMessageType | ToolCallMessageType[] {
+): LLMResponse {
   const textParts: string[] = [];
   const toolUses: {
     id: string;
@@ -202,9 +202,10 @@ export function convertResponse(
     }
   }
 
+  let converted: LLMMessageResponse;
   if (toolUses.length > 0) {
     const text = textParts.join("");
-    return toolUses.map((tu) => ({
+    converted = toolUses.map((tu) => ({
       id: crypto.randomUUID(),
       type: MessageType.ToolCall,
       content: text,
@@ -212,11 +213,21 @@ export function convertResponse(
       toolName: tu.name,
       arguments: (tu.input as Record<string, unknown>) ?? {},
     }));
+  } else {
+    converted = {
+      id: crypto.randomUUID(),
+      type: MessageType.Assist,
+      content: textParts.join(""),
+    };
   }
 
   return {
-    id: crypto.randomUUID(),
-    type: MessageType.Assist,
-    content: textParts.join(""),
+    message: converted,
+    tokenCount: createTokenCount(
+      (response.usage.input_tokens ?? 0)
+        + (response.usage.cache_creation_input_tokens ?? 0)
+        + (response.usage.cache_read_input_tokens ?? 0),
+      response.usage.output_tokens,
+    ),
   };
 }

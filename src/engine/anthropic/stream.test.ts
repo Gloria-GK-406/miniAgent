@@ -44,9 +44,12 @@ describe("consumeAnthropicStream", () => {
       { type: LLMStreamChunkType.TextDelta, text: "Hello" },
     ]);
     expect(result).toMatchObject({
-      type: MessageType.Assist,
-      content: "Hello",
-      reasoningContent: "step-1",
+      message: {
+        type: MessageType.Assist,
+        content: "Hello",
+        reasoningContent: "step-1",
+      },
+      tokenCount: { input: 0, output: 0, total: 0 },
     });
   });
 
@@ -104,13 +107,16 @@ describe("consumeAnthropicStream", () => {
         toolName: "get_weather",
       },
     ]);
-    expect(result).toMatchObject([
-      {
-        type: MessageType.ToolCall,
-        toolCallId: "toolu_1",
-        toolName: "get_weather",
-        arguments: { city: "Beijing" },
-      },
-    ]);
+    expect(result).toMatchObject({
+      message: [
+        {
+          type: MessageType.ToolCall,
+          toolCallId: "toolu_1",
+          toolName: "get_weather",
+          arguments: { city: "Beijing" },
+        },
+      ],
+      tokenCount: { input: 0, output: 0, total: 0 },
+    });
   });
 });

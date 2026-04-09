@@ -34,7 +34,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
+      expect(result.message.content).toBeTruthy();
       log("result", result);      
       return;
     }
@@ -66,8 +66,8 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
-      log("Response content:", result.content);
+      expect(result.message.content).toBeTruthy();
+      log("Response content:", result.message.content);
       return;
     }
 
@@ -92,10 +92,10 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
     expect(isToolCallResponse(result)).toBe(true);
     if (isToolCallResponse(result)) {
-      expect(result).toHaveLength(1);
-      expect(result[0]!.toolName).toBe("get_weather");
-      expect(result[0]!.arguments).toHaveProperty("city");
-      log("Tool call:", result[0]);
+      expect(result.message).toHaveLength(1);
+      expect(result.message[0]!.toolName).toBe("get_weather");
+      expect(result.message[0]!.arguments).toHaveProperty("city");
+      log("Tool call:", result.message[0]);
       return;
     }
 
@@ -113,10 +113,10 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
-      expect(result.reasoningContent).toBeDefined();
-      log("Thinking response content:", result.reasoningContent);
-      log("Response content:", result.content);
+      expect(result.message.content).toBeTruthy();
+      expect(result.message.reasoningContent).toBeDefined();
+      log("Thinking response content:", result.message.reasoningContent);
+      log("Response content:", result.message.content);
       return;
     }
 
@@ -134,9 +134,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM CodePlan Engine", () => {
     }
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
-      expect(result.content).toBeTruthy();
-      expect(result.reasoningContent).toBeUndefined();
-      log("Response content:", result.content);
+      expect(result.message.content).toBeTruthy();
+      expect(result.message.reasoningContent).toBeUndefined();
+      log("Response content:", result.message.content);
       return;
     }
 

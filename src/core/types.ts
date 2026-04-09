@@ -79,10 +79,25 @@ export type ToolCallMessage = z.infer<typeof ToolCallMessageSchema>;
 export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 
-export const LLMResponseSchema = z.union([
+export const LLMMessageResponseSchema = z.union([
   AssistMessageSchema,
   z.array(ToolCallMessageSchema),
 ]);
+
+export type LLMMessageResponse = z.infer<typeof LLMMessageResponseSchema>;
+
+export const TokenCountSchema = z.object({
+  input: z.number().int().nonnegative(),
+  output: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+
+export type TokenCount = z.infer<typeof TokenCountSchema>;
+
+export const LLMResponseSchema = z.object({
+  message: LLMMessageResponseSchema,
+  tokenCount: TokenCountSchema,
+});
 
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 

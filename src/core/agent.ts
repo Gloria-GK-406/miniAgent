@@ -15,6 +15,7 @@ import type {
     AgentContextControl,
     ToolCallMessage,
     ToolResultMessage,
+    TokenCount,
 } from "./types.js";
 import {
     ActionType, MessageType, ToolResultMessageSchema,
@@ -31,6 +32,7 @@ import { FileStore } from "./file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 import { StopException } from "./errors.js";
+import { addTokenCount, emptyTokenCount } from "./llm.js";
 
 export class MiniAgent {
     private messageSource: MessageSource;
@@ -49,6 +51,7 @@ export class MiniAgent {
     private emitter = new EventEmitter();
     private running = false;
     private stopped = false;
+    private contextCount: TokenCount = emptyTokenCount();
 
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
@@ -86,6 +89,10 @@ export class MiniAgent {
 
     getConfig(): AgentConfig {
         return this.config;
+    }
+
+    getContextCount(): TokenCount {
+        return this.contextCount;
     }
 
     register(tool: Tool): void;
@@ -330,6 +337,7 @@ export class MiniAgent {
                     } finally {
                         unsubscribe();
                     }
+                    this.contextCount = addTokenCount(this.contextCount, response.tokenCount);
                     this.emitter.emit("llm:response", { response });
 
                     if (this.stopped) {
@@ -337,14 +345,14 @@ export class MiniAgent {
                         break;
                     }
 
-                    if (!Array.isArray(response)) {
-                        await this.notify(response);
-                        await this.messageSource.add(response);
+                    if (!Array.isArray(response.message)) {
+                        await this.notify(response.message);
+                        await this.messageSource.add(response.message);
                         this.emitter.emit("turn:end", { turn });
                         break;
                     }
 
-                    const toolCalls = response;
+                    const toolCalls = response.message;
                     for (const tc of toolCalls) {
                         await this.notify(tc);
                         await this.messageSource.add(tc);
