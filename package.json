@@ -12,7 +12,8 @@
     "lint:fix": "eslint src --fix",
     "test": "vitest run --exclude 'test/smoketest/**'",
     "test:watch": "vitest --exclude 'test/smoketest/**'",
-    "smoketest": "vitest run --config vitest.config.ts test/smoketest/"
+    "smoketest": "vitest run --config vitest.config.ts test/smoketest/",
+    "chat": "tsx src/cli/index.ts"
   },
   "keywords": [],
   "author": "",

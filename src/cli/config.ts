@@ -1,0 +1,81 @@
+import { z } from "zod";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import type { ModelConfig } from "../core/config.js";
+
+export const CLIAGENT_DIR = ".cliagent";
+
+export const CLIModelSchema = z.object({
+  name: z.string(),
+  provider: z.string(),
+  model: z.string(),
+  apiKey: z.string(),
+  baseUrl: z.string().optional(),
+  thinking: z.boolean().optional(),
+  maxTokens: z.number().int().positive().optional(),
+  contextSize: z.number().int().positive().optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().min(0).max(1).optional(),
+});
+
+export type CLIModel = z.infer<typeof CLIModelSchema>;
+
+export const CLIConfigSchema = z.object({
+  models: z.array(CLIModelSchema),
+  defaultModel: z.string(),
+  systemPrompt: z.string().optional(),
+});
+
+export type CLIConfig = z.infer<typeof CLIConfigSchema>;
+
+export function toModelConfig(m: CLIModel): ModelConfig {
+  return {
+    provider: m.provider,
+    model: m.model,
+    apiKey: m.apiKey,
+    baseUrl: m.baseUrl ?? "",
+    ...(m.thinking !== undefined && { thinking: m.thinking }),
+    ...(m.maxTokens !== undefined && { maxTokens: m.maxTokens }),
+    ...(m.contextSize !== undefined && { contextSize: m.contextSize }),
+    ...(m.maxOutputTokens !== undefined && { maxOutputTokens: m.maxOutputTokens }),
+    ...(m.temperature !== undefined && { temperature: m.temperature }),
+    ...(m.topP !== undefined && { topP: m.topP }),
+  };
+}
+
+export async function loadConfig(baseDir: string): Promise<CLIConfig> {
+  const dir = join(baseDir, CLIAGENT_DIR);
+  const configPath = join(dir, "config.json");
+
+  if (!existsSync(configPath)) {
+    await mkdir(dir, { recursive: true });
+    const template: CLIConfig = {
+      models: [],
+      defaultModel: "",
+      systemPrompt: "You are a helpful assistant.",
+    };
+    await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");
+    console.log(`Config template created at ${configPath}`);
+    console.log("Please add your model configurations and run again.");
+    process.exit(0);
+  }
+
+  const content = await readFile(configPath, "utf-8");
+  const result = CLIConfigSchema.safeParse(JSON.parse(content));
+  if (!result.success) {
+    console.error("Invalid config file:");
+    for (const issue of result.error.issues) {
+      console.error(`  ${issue.path.join(".")}: ${issue.message}`);
+    }
+    process.exit(1);
+  }
+
+  return result.data;
+}
+
+export function findModel(config: CLIConfig, name?: string): CLIModel | undefined {
+  const target = name ?? config.defaultModel;
+  return config.models.find((m) => m.name === target);
+}
