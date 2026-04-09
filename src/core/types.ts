@@ -9,7 +9,6 @@ export enum MessageType {
   Assist = "assist",
   ToolCall = "toolcall",
   ToolResult = "toolresult",
-  Finish = "finish",
 }
 
 export const TextContentSchema = z.object({
@@ -61,17 +60,12 @@ export const ToolResultMessageSchema = BaseMessageSchema.extend({
   toolCallId: z.string(),
 });
 
-export const FinishMessageSchema = BaseMessageSchema.extend({
-  type: z.literal(MessageType.Finish),
-});
-
 export const MessageSchema = z.union([
   SystemMessageSchema,
   UserMessageSchema,
   AssistMessageSchema,
   ToolCallMessageSchema,
   ToolResultMessageSchema,
-  FinishMessageSchema,
 ]);
 
 export type BaseMessage = z.infer<typeof BaseMessageSchema>;
@@ -83,7 +77,6 @@ export type UserMessage = z.infer<typeof UserMessageSchema>;
 export type AssistMessage = z.infer<typeof AssistMessageSchema>;
 export type ToolCallMessage = z.infer<typeof ToolCallMessageSchema>;
 export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
-export type FinishMessage = z.infer<typeof FinishMessageSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 
 export const LLMResponseSchema = z.union([
@@ -156,6 +149,31 @@ export const ContextProviderSchema = z.object({
 });
 
 export type ContextProvider = z.infer<typeof ContextProviderSchema>;
+
+export const TurnContextSchema = z.object({
+  turn: z.number().int().positive(),
+  context: z.array(MessageSchema),
+});
+
+export type TurnContext = z.infer<typeof TurnContextSchema>;
+
+export const TurnContextAwareSchema = z.object({
+  setTurnContext: z.function(
+    z.tuple([TurnContextSchema]),
+    z.promise(z.void()),
+  ),
+});
+
+export type TurnContextAware = z.infer<typeof TurnContextAwareSchema>;
+
+export const TurnContextAppendSchema = z.object({
+  appendTurnContext: z.function(
+    z.tuple([]),
+    z.promise(z.array(MessageSchema)),
+  ),
+});
+
+export type TurnContextAppend = z.infer<typeof TurnContextAppendSchema>;
 
 export enum ActionType {
   Delete = "delete",

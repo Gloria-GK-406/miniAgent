@@ -10,15 +10,17 @@ import type {
     AfterTurnProcessor,
     ConfigNotifier,
     PersistRequire,
+    TurnContextAware,
+    TurnContextAppend,
     ToolCallMessage,
     ToolResultMessage,
-    FinishMessage,
 } from "./types.js";
 import {
-    ActionType, MessageType, ToolResultMessageSchema, FinishMessageSchema,
+    ActionType, MessageType, ToolResultMessageSchema,
     ContextProviderSchema, ContextProcessorSchema,
     MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
     ConfigNotifierSchema, PersistRequireSchema,
+    TurnContextAwareSchema, TurnContextAppendSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider } from "../tool/types.js";
@@ -27,6 +29,7 @@ import type { AgentConfig } from "./config.js";
 import { FileStore } from "./file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
+import { StopException } from "./errors.js";
 
 export class MiniAgent {
     private messageSource: MessageSource;
@@ -39,6 +42,8 @@ export class MiniAgent {
     private errorHandlers: ErrorHandler[] = [];
     private afterTurnProcessors: AfterTurnProcessor[] = [];
     private configNotifiers: ConfigNotifier[] = [];
+    private turnContextAwares: TurnContextAware[] = [];
+    private turnContextAppenders: TurnContextAppend[] = [];
     private store: FileStore;
     private emitter = new EventEmitter();
     private running = false;
@@ -91,7 +96,9 @@ export class MiniAgent {
     register(afterTurnProcessor: AfterTurnProcessor): void;
     register(configNotifier: ConfigNotifier): void;
     register(persistRequire: PersistRequire): void;
-    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier | PersistRequire): void {
+    register(turnContextAware: TurnContextAware): void;
+    register(turnContextAppend: TurnContextAppend): void;
+    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier | PersistRequire | TurnContextAware | TurnContextAppend): void {
         if (ToolProviderSchema.safeParse(item).success) {
             const provider = item as ToolProvider;
             const tools = provider.getTools();
@@ -142,6 +149,16 @@ export class MiniAgent {
             const req = item as PersistRequire;
             void req.setStore(this.store);
         }
+        if (TurnContextAwareSchema.safeParse(item).success) {
+            if (!this.turnContextAwares.includes(item as TurnContextAware)) {
+                this.turnContextAwares.push(item as TurnContextAware);
+            }
+        }
+        if (TurnContextAppendSchema.safeParse(item).success) {
+            if (!this.turnContextAppenders.includes(item as TurnContextAppend)) {
+                this.turnContextAppenders.push(item as TurnContextAppend);
+            }
+        }
     }
 
     private async notify(message: Message): Promise<void> {
@@ -152,8 +169,13 @@ export class MiniAgent {
     }
 
     private async buildContext(): Promise<Message[]> {
-        const sortedProviders = [...this.providers].sort((a, b) => a.priority - b.priority);
         const context: Message[] = [];
+        for (const appender of this.turnContextAppenders) {
+            const messages = await appender.appendTurnContext();
+            context.push(...messages);
+        }
+
+        const sortedProviders = [...this.providers].sort((a, b) => a.priority - b.priority);
         for (const provider of sortedProviders) {
             const messages = await provider.collect();
             context.push(...messages);
@@ -206,22 +228,18 @@ export class MiniAgent {
         return [...addFirst, ...mirror, ...addLast];
     }
 
-    async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage | FinishMessage> {
+    private async setTurnContext(turn: number, context: Message[]): Promise<void> {
+        for (const aware of this.turnContextAwares) {
+            await aware.setTurnContext({ turn, context });
+        }
+    }
+
+    async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage> {
         this.emitter.emit("tool:execute", { toolCall });
         const tool = this.tools.get(toolCall.toolName);
         const content = tool
             ? await tool.execute(toolCall.arguments as Record<string, unknown>)
             : `tool not found: ${toolCall.toolName}`;
-
-        if (content === "stop") {
-            const result = FinishMessageSchema.parse({
-                id: crypto.randomUUID(),
-                type: MessageType.Finish,
-                content: "",
-            });
-            this.emitter.emit("tool:result", { toolCall, result });
-            return result;
-        }
 
         const result = ToolResultMessageSchema.parse({
             id: crypto.randomUUID(),
@@ -265,6 +283,7 @@ export class MiniAgent {
                 this.emitter.emit("turn:start", { turn });
                 try {
                     const context = await this.buildContext();
+                    await this.setTurnContext(turn, context);
                     const tools = [...this.tools.values()];
                     this.emitter.emit("llm:request", { context, tools });
                     const stream = this.llm.streamInvoke(context, this.config.model, tools);
@@ -294,30 +313,22 @@ export class MiniAgent {
                     const toolCalls = response;
                     for (const tc of toolCalls) {
                         await this.notify(tc);
+                        await this.messageSource.add(tc);
                     }
 
-                    const results = await Promise.all(
-                        toolCalls.map(async (tc) => {
-                            const result = await this.execute(tc);
-                            return { tc, result };
-                        }),
-                    );
-
-                    let shouldBreak = false;
-                    for (const { tc, result } of results) {
-                        await this.messageSource.add(tc);
-                        if (result.type === MessageType.Finish) {
-                            shouldBreak = true;
-                            break;
-                        }
+                    for (const tc of toolCalls) {
+                        const result = await this.execute(tc);
                         await this.notify(result);
                         await this.messageSource.add(result);
                     }
                     this.emitter.emit("turn:end", { turn });
-                    if (shouldBreak) {
+                } catch (e: unknown) {
+                    if (e instanceof StopException) {
+                        this.stopped = true;
+                        this.emitter.emit("turn:end", { turn });
                         break;
                     }
-                } catch (e: unknown) {
+
                     this.emitter.emit("run:error", { error: e, turn });
 
                     const candidates = this.errorHandlers
@@ -341,7 +352,7 @@ export class MiniAgent {
         }
 
         if (wasStopped) {
-            this.emitter.emit("run:stopped", undefined);
+            this.emitter.emit("run:stop", undefined);
         }
 
         await this.runAfterTurnProcessors(input);

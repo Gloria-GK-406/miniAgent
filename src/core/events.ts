@@ -2,7 +2,6 @@ import type {
     Message,
     ToolCallMessage,
     ToolResultMessage,
-    FinishMessage,
     LLMResponse,
     LLMStreamChunk,
 } from "./types.js";
@@ -19,6 +18,6 @@ export interface AgentEventMap {
     "llm:chunk": (payload: { chunk: LLMStreamChunk }) => void;
     "llm:response": (payload: { response: LLMResponse }) => void;
     "tool:execute": (payload: { toolCall: ToolCallMessage }) => void;
-    "tool:result": (payload: { toolCall: ToolCallMessage; result: ToolResultMessage | FinishMessage }) => void;
+    "tool:result": (payload: { toolCall: ToolCallMessage; result: ToolResultMessage }) => void;
     "message:notify": (payload: { message: Message }) => void;
 }

@@ -38,9 +38,8 @@ export function convertMessages(
         return convertToolCallMessage(msg);
       case MessageType.ToolResult:
         return convertToolResultMessage(msg);
-      default:
-        throw new Error("Unknown message type: " + msg.type);
     }
+    throw new Error("Unknown message type");
   });
 }
 

@@ -10,7 +10,6 @@ import type {
   LLMStreamChunk,
   ToolCallMessage,
   ToolResultMessage,
-  FinishMessage,
 } from "../core/types.js";
 import type { AgentConfig } from "../core/config.js";
 import type { LLMEngineCtor } from "../core/llm.js";
@@ -196,13 +195,11 @@ export class CLI {
       "tool:result",
       ({
         result,
-      }: { toolCall: ToolCallMessage; result: ToolResultMessage | FinishMessage }) => {
-        if (result.type === "toolresult") {
-          const content = String(result.content);
-          const display =
-            content.length > 200 ? `${content.slice(0, 197)}...` : content;
-          process.stdout.write(`  ${A.dim}→ ${display}${A.reset}\n`);
-        }
+      }: { toolCall: ToolCallMessage; result: ToolResultMessage }) => {
+        const content = String(result.content);
+        const display =
+          content.length > 200 ? `${content.slice(0, 197)}...` : content;
+        process.stdout.write(`  ${A.dim}→ ${display}${A.reset}\n`);
       },
     );
 
