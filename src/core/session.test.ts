@@ -39,6 +39,7 @@ describe("SessionManager", () => {
         await manager.load();
 
         const s1 = await manager.create("first");
+        await new Promise((r) => setTimeout(r, 5));
         const s2 = await manager.create("second");
 
         const list = manager.list();
