@@ -33,6 +33,8 @@ import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 import { StopException } from "./errors.js";
 import { addTokenCount, emptyTokenCount } from "./llm.js";
+import type { ToolApprover } from "../tool/approver.js";
+import { ToolApproverSchema } from "../tool/approver.js";
 
 export class MiniAgent {
     private messageSource: MessageSource;
@@ -47,6 +49,8 @@ export class MiniAgent {
     private configNotifiers: ConfigNotifier[] = [];
     private turnContextAwares: TurnContextAware[] = [];
     private turnContextAppenders: TurnContextAppend[] = [];
+    private approvers: ToolApprover[] = [];
+    private autoApprovedTools: Set<string> = new Set();
     private store: FileStore;
     private emitter = new EventEmitter();
     private running = false;
@@ -56,7 +60,7 @@ export class MiniAgent {
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
         this.config = config;
-        this.store = new FileStore(config.paths.basepersistdir);
+        this.store = new FileStore(config.paths.sessiondir);
         this.messageSource = new MessageSource(this.store, "messages.jsonl");
     }
 
@@ -106,7 +110,8 @@ export class MiniAgent {
     register(persistRequire: PersistRequire): void;
     register(turnContextAware: TurnContextAware): void;
     register(turnContextAppend: TurnContextAppend): void;
-    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier | PersistRequire | TurnContextAware | TurnContextAppend): void {
+    register(approver: ToolApprover): void;
+    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier | PersistRequire | TurnContextAware | TurnContextAppend | ToolApprover): void {
         if (ToolProviderSchema.safeParse(item).success) {
             const provider = item as ToolProvider;
             const tools = provider.getTools();
@@ -167,6 +172,11 @@ export class MiniAgent {
         if (TurnContextAppendSchema.safeParse(item).success) {
             if (!this.turnContextAppenders.includes(item as TurnContextAppend)) {
                 this.turnContextAppenders.push(item as TurnContextAppend);
+            }
+        }
+        if (ToolApproverSchema.safeParse(item).success) {
+            if (!this.approvers.includes(item as ToolApprover)) {
+                this.approvers.push(item as ToolApprover);
             }
         }
     }
@@ -274,8 +284,37 @@ export class MiniAgent {
         }
     }
 
+    setAutoApprovedTools(tools: string[]): void {
+        this.autoApprovedTools = new Set(tools);
+    }
+
+    private async requestApproval(toolName: string, args: Record<string, unknown>): Promise<boolean> {
+        if (this.autoApprovedTools.has(toolName)) return true;
+        if (this.approvers.length === 0) return true;
+        for (const approver of this.approvers) {
+            const decision = await approver.requestApproval(toolName, args);
+            if (decision === "deny") return false;
+            if (decision === "approve_all") {
+                this.autoApprovedTools.add(toolName);
+                return true;
+            }
+        }
+        return true;
+    }
+
     async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage> {
         this.emitter.emit("tool:execute", { toolCall });
+        const approved = await this.requestApproval(toolCall.toolName, toolCall.arguments as Record<string, unknown>);
+        if (!approved) {
+            const result = ToolResultMessageSchema.parse({
+                id: crypto.randomUUID(),
+                type: MessageType.ToolResult,
+                toolCallId: toolCall.toolCallId,
+                content: "Tool execution denied by user.",
+            });
+            this.emitter.emit("tool:result", { toolCall, result });
+            return result;
+        }
         const tool = this.tools.get(toolCall.toolName);
         const content = tool
             ? await tool.execute(toolCall.arguments as Record<string, unknown>)

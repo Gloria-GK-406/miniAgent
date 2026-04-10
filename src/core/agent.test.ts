@@ -27,7 +27,7 @@ function createConfig(basepersistdir: string): AgentConfig {
       apiKey: "test-key",
       baseUrl: "http://localhost",
     },
-    paths: { basepersistdir },
+    paths: { sessiondir: basepersistdir },
   };
 }
 

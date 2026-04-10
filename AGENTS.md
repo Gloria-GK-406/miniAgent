@@ -12,6 +12,10 @@ src/
     types.ts                            # 所有 Zod schema、类型推导、枚举定义
     llm.ts                              # LLMEngine 抽象层、DefaultLLMEngineRegister、createLLMRequest
     message-source.ts                   # MessageSource 消息序列管理（含丢弃水位线）
+  context/
+    compressor.ts                       # ContextCompressor 上下文压缩（摘要旧消息）
+  tool/
+    approver.ts                         # ToolApprover 工具审批（人工确认机制）
   engine/
     anthropic/                          # Anthropic Claude 引擎
       engine.ts                         # createAnthropicEngine

@@ -16,7 +16,7 @@ export const ModelConfigSchema = z.object({
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
 export const PathConfigSchema = z.object({
-    basepersistdir: z.string(),
+    sessiondir: z.string(),
 });
 
 export type PathConfig = z.infer<typeof PathConfigSchema>;
