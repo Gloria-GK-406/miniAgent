@@ -1,8 +1,59 @@
 {
-  "name": "miniagent",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@piaoxianguo/miniagent",
+  "version": "0.1.0",
+  "description": "A minimal, extensible TypeScript Agent framework",
+  "keywords": [
+    "agent",
+    "llm",
+    "ai",
+    "tool-use",
+    "streaming",
+    "anthropic",
+    "openai",
+    "glm"
+  ],
+  "author": "Gloria-GK-406",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gloria-GK-406/miniAgent.git"
+  },
+  "homepage": "https://github.com/Gloria-GK-406/miniAgent#readme",
+  "type": "module",
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./engine/anthropic": {
+      "types": "./dist/engine/anthropic/index.d.ts",
+      "import": "./dist/engine/anthropic/index.js"
+    },
+    "./engine/openai": {
+      "types": "./dist/engine/openai/index.d.ts",
+      "import": "./dist/engine/openai/index.js"
+    },
+    "./engine/openai-compatible": {
+      "types": "./dist/engine/openai-compatible/index.d.ts",
+      "import": "./dist/engine/openai-compatible/index.js"
+    },
+    "./engine/glm": {
+      "types": "./dist/engine/glm/index.d.ts",
+      "import": "./dist/engine/glm/index.js"
+    },
+    "./engine/glm-codeplan": {
+      "types": "./dist/engine/glm-codeplan/index.d.ts",
+      "import": "./dist/engine/glm-codeplan/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
@@ -13,12 +64,9 @@
     "test": "vitest run --exclude 'test/smoketest/**'",
     "test:watch": "vitest --exclude 'test/smoketest/**'",
     "smoketest": "vitest run --config vitest.config.ts test/smoketest/",
-    "chat": "tsx src/cli/index.ts"
+    "chat": "tsx src/cli/index.ts",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
-  "type": "module",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.0",

@@ -1,4 +1,6 @@
 node_modules/
 dist/
 .test.env
-.*
+.*/
+!.gitignore
+!.github
