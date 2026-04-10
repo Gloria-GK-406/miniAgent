@@ -159,6 +159,7 @@ export class CLI {
                 );
             }
 
+            this.printTokenUsage();
             this.running = false;
             process.stdout.write("\n");
             this.rl.prompt();
@@ -319,6 +320,13 @@ export class CLI {
                 `\n${A.red}Error: ${error instanceof Error ? error.message : String(error)}${A.reset}\n`,
             );
         });
+    }
+
+    private printTokenUsage(): void {
+        const tc = this.agent.getContextCount();
+        process.stdout.write(
+            `\n${A.dim}ctx tokens: ${tc.input.toLocaleString()} in / ${tc.output.toLocaleString()} out / ${tc.total.toLocaleString()} total${A.reset}`,
+        );
     }
 
     private async tryCompress(): Promise<void> {
