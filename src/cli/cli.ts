@@ -188,6 +188,8 @@ export class CLI {
 
             const agentConfig: AgentConfig = {
                 model: toModelConfig(this.activeModel),
+                models: new Map(),
+                plugins: new Map(),
                 paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
             };
             const agent = new MiniAgent(this.manager, agentConfig);
@@ -211,6 +213,8 @@ export class CLI {
         const persistDir = this.sessionManager.getSessionPersistDir(sessionId);
         const agentConfig: AgentConfig = {
             model: toModelConfig(this.activeModel),
+            models: new Map(),
+            plugins: new Map(),
             paths: { sessiondir: persistDir },
         };
         const agent = new MiniAgent(this.manager, agentConfig);

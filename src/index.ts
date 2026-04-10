@@ -39,7 +39,23 @@ export type {
 } from "./core/types.js";
 
 export { ModelConfigSchema, PathConfigSchema, AgentConfigSchema } from "./core/config.js";
-export type { ModelConfig, PathConfig, AgentConfig } from "./core/config.js";
+export {
+    JsonValueSchema,
+    ModelGroupSchema,
+    PersistConfigFileSchema,
+    PersistConfigSchema,
+    RuntimeConfigSchema,
+} from "./core/config.js";
+export type {
+    JsonValue,
+    ModelConfig,
+    ModelGroup,
+    PathConfig,
+    PersistConfigFile,
+    PersistConfig,
+    RuntimeConfig,
+    AgentConfig,
+} from "./core/config.js";
 
 export { MessageSource } from "./core/message-source.js";
 export { FileStore } from "./core/file-store.js";
@@ -55,3 +71,10 @@ export { ToolSchema, ToolProviderSchema } from "./tool/types.js";
 export type { Tool, ToolProvider } from "./tool/types.js";
 export { ToolApproverSchema } from "./tool/approver.js";
 export type { ToolApprover, ApprovalDecision } from "./tool/approver.js";
+
+export {
+    PersistentConfigFileLoader,
+    PersistentConfigAggregator,
+    AgentConfigResolver,
+    AgentConfigService,
+} from "./utils/config/index.js";

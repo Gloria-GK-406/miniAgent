@@ -35,7 +35,7 @@ export function toModelConfig(m: CLIModel): ModelConfig {
     provider: m.provider,
     model: m.model,
     apiKey: m.apiKey,
-    baseUrl: m.baseUrl ?? "",
+    ...(m.baseUrl !== undefined && { baseUrl: m.baseUrl }),
     ...(m.thinking !== undefined && { thinking: m.thinking }),
     ...(m.maxTokens !== undefined && { maxTokens: m.maxTokens }),
     ...(m.contextSize !== undefined && { contextSize: m.contextSize }),
