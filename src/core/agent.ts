@@ -278,7 +278,7 @@ export class MiniAgent {
         };
     }
 
-    private async buildToolMap(): Promise<void> {
+    async getToolList(): Promise<Tool[]> {
         const map = new Map(this.tools);
         for (const provider of this.toolProviders) {
             const tools = await provider.getTools();
@@ -286,7 +286,13 @@ export class MiniAgent {
                 map.set(t.name, t);
             }
         }
-        this.turnToolMap = map;
+        return [...map.values()];
+    }
+
+    private async buildToolMap(): Promise<void> {
+        this.turnToolMap = new Map(
+            (await this.getToolList()).map((t) => [t.name, t]),
+        );
     }
 
     private async buildContext(): Promise<Message[]> {

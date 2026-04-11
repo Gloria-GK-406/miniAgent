@@ -27,9 +27,11 @@ import {
     readTool, writeTool, editTool, globTool, grepTool, bashTool,
     TodoManager, SubAgentProvider,
 } from "../tool/index.js";
+import { McpPlugin } from "../tool/mcp/plugin.js";
 import type { AgentFactory } from "../tool/subagent.js";
 import { CLIAGENT_DIR, loadConfig, findModel, toModelConfig } from "./config.js";
 import type { CLIConfig, CLIModel } from "./config.js";
+import type { JsonValue } from "../core/config.js";
 
 const A = {
     reset: "\x1b[0m",
@@ -201,10 +203,15 @@ export class CLI {
             const sessionId = active?.id ?? "temp";
             const persistDir = this.sessionManager.getSessionPersistDir(sessionId);
 
+            const subPlugins = new Map<string, JsonValue>();
+            if (this.config.mcp) {
+                subPlugins.set("mcp", JSON.parse(JSON.stringify(this.config.mcp)) as JsonValue);
+            }
+
             const agentConfig: AgentConfig = {
                 model: toModelConfig(this.activeModel),
                 models: new Map(),
-                plugins: new Map(),
+                plugins: subPlugins,
                 paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
             };
             const subFactory = this.createAgentFactory();
@@ -215,6 +222,7 @@ export class CLI {
                     ...BUILTIN_TOOLS,
                     new TodoManager(),
                     new SubAgentProvider(subFactory),
+                    new McpPlugin(),
                     defineAgentModule({
                         priority: 0,
                         collect: async (): Promise<Message[]> => [
@@ -228,16 +236,21 @@ export class CLI {
 
     private buildAgent(sessionId: string): MiniAgent {
         const persistDir = this.sessionManager.getSessionPersistDir(sessionId);
+        const plugins = new Map<string, JsonValue>();
+        if (this.config.mcp) {
+            plugins.set("mcp", JSON.parse(JSON.stringify(this.config.mcp)) as JsonValue);
+        }
         const agentConfig: AgentConfig = {
             model: toModelConfig(this.activeModel),
             models: this.buildModelsMap(),
-            plugins: new Map(),
+            plugins,
             paths: { sessiondir: persistDir },
         };
         this.compressor = new ContextCompressor(this.manager, toModelConfig(this.activeModel), {
             maxMessages: 60,
             keepRecent: 15,
         });
+        const mcpPlugin = new McpPlugin();
         const agent = createMiniAgent({
             llm: this.manager,
             config: agentConfig,
@@ -245,6 +258,7 @@ export class CLI {
                 ...BUILTIN_TOOLS,
                 new TodoManager(),
                 new SubAgentProvider(this.createAgentFactory()),
+                mcpPlugin,
                 defineAgentModule({
                     priority: 0,
                     collect: async (): Promise<Message[]> => [
@@ -412,16 +426,15 @@ export class CLI {
             }
 
             case "/tools": {
-                console.log(`${A.bold}Tools:${A.reset}`);
-                for (const t of BUILTIN_TOOLS) {
-                    console.log(`  ${A.cyan}${t.name}${A.reset} — ${t.description}`);
+                try {
+                    const tools = await this.agent.getToolList();
+                    console.log(`${A.bold}Tools (${tools.length}):${A.reset}`);
+                    for (const t of tools) {
+                        console.log(`  ${A.cyan}${t.name}${A.reset} — ${t.description}`);
+                    }
+                } catch {
+                    console.log(`${A.red}Failed to list tools.${A.reset}`);
                 }
-                console.log(
-                    `  ${A.cyan}todo_create${A.reset}, ${A.cyan}todo_update${A.reset}, ${A.cyan}todo_delete${A.reset} — Todo management`,
-                );
-                console.log(
-                    `  ${A.cyan}subagent${A.reset} — Spawn sub-agent for delegated tasks`,
-                );
                 break;
             }
 

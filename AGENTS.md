@@ -90,6 +90,12 @@ npx vitest run -t "convertMessages"
 - `@typescript-eslint/no-unused-vars`：允许 `_` 前缀的未使用变量/参数
 - `@typescript-eslint/consistent-type-imports`：强制 `import { type X }` 内联类型导入风格
 
+## Git Commit 规则
+
+- **提交前必须依次运行** `npm run lint`、`npm run build`、`npm test`，三项全部通过才能提交
+- 如果任何一项失败，**拒绝提交**，告知用户具体错误并要求修复后重新检查
+- 修复时只修复当前改动引入的问题，不主动修复预存在的问题（除非用户要求）
+
 ## 代码风格
 
 ### Imports

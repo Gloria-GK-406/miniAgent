@@ -39,6 +39,7 @@ export class MessageSource {
         this.discardBeforeMessageId = meta.discardBeforeMessageId;
       }
     } catch {
+      // intentionally swallowed: meta file may not exist on first run
     }
 
     try {

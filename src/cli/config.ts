@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ModelConfig } from "../core/config.js";
+import { McpPluginConfigSchema } from "../tool/mcp/types.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 
@@ -26,6 +27,7 @@ export const CLIConfigSchema = z.object({
   models: z.array(CLIModelSchema),
   defaultModel: z.string(),
   systemPrompt: z.string().optional(),
+  mcp: McpPluginConfigSchema.optional(),
 });
 
 export type CLIConfig = z.infer<typeof CLIConfigSchema>;
@@ -55,6 +57,14 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
       models: [],
       defaultModel: "",
       systemPrompt: "You are a helpful assistant.",
+      mcp: {
+        servers: {
+          "open-weather": {
+            transport: "streamable-http",
+            url: "https://mcp.open-mcp.org/api/server/open-weather@latest/mcp",
+          },
+        },
+      },
     };
     await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");
     console.log(`Config template created at ${configPath}`);
