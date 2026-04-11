@@ -13,7 +13,7 @@ import type {
     ToolResultMessage,
 } from "../core/types.js";
 import type { MiniAgent } from "../core/agent.js";
-import type { AgentConfig, ModelGroup } from "../core/config.js";
+import type { AgentConfig, ModelConfig, ModelGroup } from "../core/config.js";
 import type { LLMEngineCtor } from "../core/llm.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
@@ -26,11 +26,11 @@ import { GLMEngine } from "../engine/glm/index.js";
 import { GLMCodePlanEngine } from "../engine/glm-codeplan/index.js";
 import {
     readTool, writeTool, editTool, globTool, grepTool, bashTool,
-    TodoManager, SubAgentProvider, AgentContextProvider,
+    TodoManager, SubagentPlugin, AgentContextProvider,
 } from "../tool/index.js";
 import { McpPlugin } from "../tool/mcp/plugin.js";
 import { SkillPlugin } from "../tool/skill/plugin.js";
-import type { AgentFactory } from "../tool/subagent.js";
+import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/subagent.js";
 import { CLIAGENT_DIR, loadConfig, findModel, toModelConfig } from "./config.js";
 import type { CLIConfig, CLIModel } from "./config.js";
 import type { JsonValue } from "../core/config.js";
@@ -227,7 +227,7 @@ export class CLI {
         registry.register("tool.grep", () => grepTool);
         registry.register("tool.bash", () => bashTool);
         registry.register("tool.todo", () => new TodoManager());
-        registry.register("plugin.subagent", () => new SubAgentProvider(this.createAgentFactory()));
+        registry.register("plugin.subagent", () => new SubagentPlugin(this.createConfiguredSubagentFactory()));
         registry.register("plugin.mcp", () => new McpPlugin());
         registry.register("plugin.skill", () => new SkillPlugin());
         registry.register("plugin.agent-context", () => new AgentContextProvider(this.baseDir));
@@ -235,8 +235,29 @@ export class CLI {
         return registry;
     }
 
-    private createAgentFactory(): AgentFactory {
-        return async (task: string, systemPrompt: string): Promise<MiniAgent> => {
+    private resolveModelConfig(path: string): ModelConfig {
+        const sep = path.indexOf("/");
+        if (sep === -1) {
+            throw new Error(`Invalid model path: "${path}". Expected format: provider/model`);
+        }
+
+        const provider = path.slice(0, sep);
+        const model = path.slice(sep + 1);
+        const group = this.buildModelsMap().get(provider);
+        if (!group) {
+            throw new Error(`No models found for provider: "${provider}"`);
+        }
+
+        const found = group.models.find((entry) => entry.model === model);
+        if (!found) {
+            throw new Error(`Model "${model}" not found for provider: "${provider}"`);
+        }
+
+        return found;
+    }
+
+    private createConfiguredSubagentFactory(): ConfiguredSubagentFactory {
+        return async (request: SubagentInvocation): Promise<MiniAgent> => {
             const active = this.sessionManager.getActive();
             const sessionId = active?.id ?? "temp";
             const persistDir = this.sessionManager.getSessionPersistDir(sessionId);
@@ -248,9 +269,14 @@ export class CLI {
             if (this.config.skill) {
                 subPlugins.set("skill", JSON.parse(JSON.stringify(this.config.skill)) as JsonValue);
             }
+            if (this.config.subagent) {
+                subPlugins.set("subagent", JSON.parse(JSON.stringify(this.config.subagent)) as JsonValue);
+            }
 
             const agentConfig: AgentConfig = {
-                model: toModelConfig(this.activeModel),
+                model: request.entry.model !== undefined
+                    ? this.resolveModelConfig(request.entry.model)
+                    : toModelConfig(this.activeModel),
                 models: this.buildModelsMap(),
                 plugins: subPlugins,
                 paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
@@ -259,6 +285,7 @@ export class CLI {
                 llm: this.manager,
                 config: agentConfig,
                 blueprint: SHARED_BLUEPRINT,
+                capabilities: request.entry.capabilities,
                 extraUses: [
                     defineAgentModule({
                         priority: 0,
@@ -266,7 +293,12 @@ export class CLI {
                             {
                                 id: "system-prompt",
                                 type: MessageType.System,
-                                content: systemPrompt || `You are a focused sub-agent. Task: ${task}. Working directory: ${this.baseDir}`,
+                                content: [
+                                    request.entry.prompt,
+                                    "",
+                                    `Subagent id: ${request.entry.id}`,
+                                    `Working directory: ${this.baseDir}`,
+                                ].join("\n"),
                             },
                         ],
                     }),
@@ -283,6 +315,9 @@ export class CLI {
         }
         if (this.config.skill) {
             plugins.set("skill", JSON.parse(JSON.stringify(this.config.skill)) as JsonValue);
+        }
+        if (this.config.subagent) {
+            plugins.set("subagent", JSON.parse(JSON.stringify(this.config.subagent)) as JsonValue);
         }
         const agentConfig: AgentConfig = {
             model: toModelConfig(this.activeModel),

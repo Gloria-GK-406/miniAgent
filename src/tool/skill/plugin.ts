@@ -8,6 +8,7 @@ import type { Message } from "../../core/types.js";
 import type { AgentConfig } from "../../core/config.js";
 import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/capability.js";
 import type { AgentCapabilitySelector } from "../../core/capability.js";
+import { parseFrontmatter } from "../../utils/frontmatter.js";
 import { SkillCapabilitySelectorSchema, SkillPluginConfigSchema } from "./types.js";
 import type { SkillCapabilitySelector, SkillPluginConfig, SkillEntry } from "./types.js";
 
@@ -184,25 +185,4 @@ export class SkillPlugin {
             files,
         };
     }
-}
-
-function parseFrontmatter(raw: string): { data: Record<string, unknown>; content: string } {
-    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-    if (!match) {
-        return { data: {}, content: raw };
-    }
-
-    const data: Record<string, unknown> = {};
-    const frontmatter = match[1]!;
-    for (const line of frontmatter.split("\n")) {
-        const colonIndex = line.indexOf(":");
-        if (colonIndex === -1) continue;
-        const key = line.slice(0, colonIndex).trim();
-        const value = line.slice(colonIndex + 1).trim();
-        if (key) {
-            data[key] = value || undefined;
-        }
-    }
-
-    return { data, content: match[2] ?? "" };
 }

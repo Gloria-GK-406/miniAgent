@@ -393,9 +393,19 @@ export class MiniAgent {
             return result;
         }
         const tool = this.turnToolMap.get(toolCall.toolName);
-        const content = tool
-            ? await tool.execute(toolCall.arguments as Record<string, unknown>)
-            : `tool not found: ${toolCall.toolName}`;
+        let content: string;
+        if (!tool) {
+            content = `tool not found: ${toolCall.toolName}`;
+        } else {
+            try {
+                content = await tool.execute(toolCall.arguments as Record<string, unknown>);
+            } catch (e: unknown) {
+                if (e instanceof StopException) {
+                    throw e;
+                }
+                content = e instanceof Error ? e.message : String(e);
+            }
+        }
 
         const result = ToolResultMessageSchema.parse({
             id: crypto.randomUUID(),

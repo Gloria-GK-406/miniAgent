@@ -280,6 +280,52 @@ describe("MiniAgent", () => {
     expect(agent.getContextCount()).toEqual({ input: 8, output: 10, total: 18 });
   });
 
+  it("returns tool execution errors as tool results instead of failing the turn", async () => {
+    const toolCall: ToolCallMessage = {
+      id: "tool-call-1",
+      type: MessageType.ToolCall,
+      content: "",
+      toolCallId: "call-1",
+      toolName: "strict_tool",
+      arguments: {},
+    };
+    const llm = createLLM([
+      wrapResponse([toolCall]),
+      wrapResponse({
+        id: "assist-2",
+        type: MessageType.Assist,
+        content: "recovered",
+      }),
+    ]);
+    const agent = new MiniAgent(llm, createConfig(testDir));
+    const strictTool: Tool = {
+      name: "strict_tool",
+      description: "Requires a path",
+      parameters: z.object({
+        path: z.string(),
+      }),
+      execute: async (args: Record<string, unknown>): Promise<string> => {
+        const parsed = z.object({
+          path: z.string(),
+        }).parse(args);
+        return parsed.path;
+      },
+    };
+
+    agent.register(strictTool);
+
+    const messages = await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "call the strict tool",
+    });
+
+    const toolResult = messages.find((message) => message.type === MessageType.ToolResult) as ToolResultMessage | undefined;
+    expect(toolResult).toBeDefined();
+    expect(String(toolResult!.content)).toContain("\"path\"");
+    expect(messages[messages.length - 1]!.id).toBe("assist-2");
+  });
+
   it("passes a managed control surface to after-turn processors", async () => {
     let seenControl: AgentContextControl | undefined;
     const llm = createLLM([

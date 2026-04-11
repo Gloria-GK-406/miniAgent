@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { ModelConfig } from "../core/config.js";
 import { McpPluginConfigSchema } from "../tool/mcp/types.js";
 import { SkillPluginConfigSchema } from "../tool/skill/types.js";
+import { SubagentPluginConfigSchema } from "../tool/subagent.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 
@@ -30,6 +31,7 @@ export const CLIConfigSchema = z.object({
   systemPrompt: z.string().optional(),
   mcp: McpPluginConfigSchema.optional(),
   skill: SkillPluginConfigSchema.optional(),
+  subagent: SubagentPluginConfigSchema.optional(),
 });
 
 export type CLIConfig = z.infer<typeof CLIConfigSchema>;
@@ -69,6 +71,9 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
       },
       skill: {
         directories: [join(baseDir, CLIAGENT_DIR, "skill")],
+      },
+      subagent: {
+        path: join(baseDir, CLIAGENT_DIR, "subagent"),
       },
     };
     await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");

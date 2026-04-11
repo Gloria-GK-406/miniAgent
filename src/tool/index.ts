@@ -5,8 +5,22 @@ export { globTool } from "./glob.js";
 export { grepTool } from "./grep.js";
 export { bashTool } from "./bash.js";
 export { TodoManager } from "./todo.js";
-export { SubAgentProvider } from "./subagent.js";
-export type { AgentFactory } from "./subagent.js";
+export {
+    SubAgentProvider,
+    SubagentPlugin,
+    SubagentPluginConfigSchema,
+    SubagentCapabilitySelectorSchema,
+    SubagentDefinitionSchema,
+} from "./subagent.js";
+export type {
+    AgentFactory,
+    ConfiguredSubagentFactory,
+    SubagentPluginConfig,
+    SubagentCapabilitySelector,
+    SubagentDefinition,
+    SubagentEntry,
+    SubagentInvocation,
+} from "./subagent.js";
 export { ToolApproverSchema } from "./approver.js";
 export type { ToolApprover, ApprovalDecision } from "./approver.js";
 export { ToolSchema, ToolProviderSchema } from "./types.js";

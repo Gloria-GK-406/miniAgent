@@ -94,6 +94,22 @@ export { ToolSchema, ToolProviderSchema } from "./tool/types.js";
 export type { Tool, ToolProvider } from "./tool/types.js";
 export { ToolApproverSchema } from "./tool/approver.js";
 export type { ToolApprover, ApprovalDecision } from "./tool/approver.js";
+export {
+    SubAgentProvider,
+    SubagentPlugin,
+    SubagentPluginConfigSchema,
+    SubagentCapabilitySelectorSchema,
+    SubagentDefinitionSchema,
+} from "./tool/subagent.js";
+export type {
+    AgentFactory,
+    ConfiguredSubagentFactory,
+    SubagentPluginConfig,
+    SubagentCapabilitySelector,
+    SubagentDefinition,
+    SubagentEntry,
+    SubagentInvocation,
+} from "./tool/subagent.js";
 
 export { McpPlugin } from "./tool/mcp/plugin.js";
 export { McpClient } from "./tool/mcp/client.js";
