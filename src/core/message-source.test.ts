@@ -168,7 +168,7 @@ describe("MessageSource", () => {
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
 
-            ms.setDiscardBefore("m1");
+            await ms.setDiscardBefore("m1");
             const all = await ms.getAll();
             expect(all.map((m) => m.id)).toEqual(["m2", "m3"]);
         });
@@ -180,7 +180,7 @@ describe("MessageSource", () => {
             await ms.add(userMsg("m3", "c"));
             await ms.add(userMsg("m4", "d"));
 
-            ms.setDiscardBefore("m2");
+            await ms.setDiscardBefore("m2");
             const all = await ms.getAll();
             expect(all.map((m) => m.id)).toEqual(["m3", "m4"]);
         });
@@ -190,7 +190,7 @@ describe("MessageSource", () => {
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
 
-            ms.setDiscardBefore("m2");
+            await ms.setDiscardBefore("m2");
             const all = await ms.getAll();
             expect(all).toEqual([]);
         });
@@ -200,7 +200,7 @@ describe("MessageSource", () => {
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
 
-            ms.setDiscardBefore("nonexistent");
+            await ms.setDiscardBefore("nonexistent");
             const all = await ms.getAll();
             expect(all).toHaveLength(2);
         });
@@ -211,7 +211,7 @@ describe("MessageSource", () => {
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
 
-            ms.setDiscardBefore("m1");
+            await ms.setDiscardBefore("m1");
             const msg = await ms.get("m1");
             expect(msg).toBeUndefined();
         });
@@ -222,7 +222,7 @@ describe("MessageSource", () => {
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
 
-            ms.setDiscardBefore("m1");
+            await ms.setDiscardBefore("m1");
             const msg = await ms.get("m2");
             expect(msg).toBeDefined();
             expect(msg!.content).toBe("b");
@@ -235,10 +235,51 @@ describe("MessageSource", () => {
             }
 
             const ms2 = new MessageSource(store, "discard.jsonl", 3);
-            ms2.setDiscardBefore("m5");
+            await ms2.setDiscardBefore("m5");
             const all = await ms2.getAll();
             expect(all).toHaveLength(1);
             expect(all[0]!.id).toBe("m6");
+        });
+    });
+
+    describe("discardBefore persistence", () => {
+        it("restores discardBeforeMessageId from meta file", async () => {
+            await ms_addMessages(store, "persist-discard.jsonl", [
+                userMsg("m1", "a"),
+                userMsg("m2", "b"),
+                userMsg("m3", "c"),
+            ]);
+            await store.writeJsonTo("persist-discard.jsonl.meta.json", {
+                discardBeforeMessageId: "m1",
+            });
+
+            const ms = new MessageSource(store, "persist-discard.jsonl");
+            const all = await ms.getAll();
+            expect(all.map((m) => m.id)).toEqual(["m2", "m3"]);
+        });
+
+        it("persists discardBeforeMessageId on setDiscardBefore", async () => {
+            const ms = new MessageSource(store, "persist-discard2.jsonl");
+            await ms.add(userMsg("m1", "a"));
+            await ms.add(userMsg("m2", "b"));
+            await ms.add(userMsg("m3", "c"));
+            await ms.setDiscardBefore("m1");
+
+            const ms2 = new MessageSource(store, "persist-discard2.jsonl");
+            const all = await ms2.getAll();
+            expect(all.map((m) => m.id)).toEqual(["m2", "m3"]);
+        });
+
+        it("persists clearDiscardBefore", async () => {
+            const ms = new MessageSource(store, "persist-discard3.jsonl");
+            await ms.add(userMsg("m1", "a"));
+            await ms.add(userMsg("m2", "b"));
+            await ms.setDiscardBefore("m1");
+            await ms.clearDiscardBefore();
+
+            const ms2 = new MessageSource(store, "persist-discard3.jsonl");
+            const all = await ms2.getAll();
+            expect(all.map((m) => m.id)).toEqual(["m1", "m2"]);
         });
     });
 });

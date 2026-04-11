@@ -1,9 +1,19 @@
+import { join, dirname, basename } from "node:path";
 import type { Message } from "./types.js";
 import type { FileStore } from "./file-store.js";
+
+interface MessageSourceMeta {
+  discardBeforeMessageId: string | null;
+}
+
+function metaPathFrom(filePath: string): string {
+  return join(dirname(filePath), basename(filePath) + ".meta.json");
+}
 
 export class MessageSource {
   private store: FileStore;
   private filePath: string;
+  private metaFilePath: string;
   private cacheSize: number;
 
   private cache: Message[] = [];
@@ -15,12 +25,21 @@ export class MessageSource {
   constructor(store: FileStore, filePath: string, cacheSize = 100) {
     this.store = store;
     this.filePath = filePath;
+    this.metaFilePath = metaPathFrom(filePath);
     this.cacheSize = cacheSize;
   }
 
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
     this.initialized = true;
+
+    try {
+      const meta = await this.store.readJsonFrom<MessageSourceMeta>(this.metaFilePath);
+      if (meta?.discardBeforeMessageId) {
+        this.discardBeforeMessageId = meta.discardBeforeMessageId;
+      }
+    } catch {
+    }
 
     try {
       const content = await this.store.readFile(this.filePath);
@@ -70,12 +89,14 @@ export class MessageSource {
     this.cache.push(message);
   }
 
-  setDiscardBefore(messageId: string): void {
+  async setDiscardBefore(messageId: string): Promise<void> {
     this.discardBeforeMessageId = messageId;
+    await this.persistMeta();
   }
 
-  clearDiscardBefore(): void {
+  async clearDiscardBefore(): Promise<void> {
     this.discardBeforeMessageId = null;
+    await this.persistMeta();
   }
 
   async get(id: string): Promise<Message | undefined> {
@@ -119,5 +140,10 @@ export class MessageSource {
       return messages;
     }
     return messages.slice(index + 1);
+  }
+
+  private async persistMeta(): Promise<void> {
+    const meta: MessageSourceMeta = { discardBeforeMessageId: this.discardBeforeMessageId };
+    await this.store.writeJsonTo(this.metaFilePath, meta);
   }
 }
