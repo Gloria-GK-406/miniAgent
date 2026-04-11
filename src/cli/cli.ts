@@ -1,7 +1,8 @@
 import { createInterface, type Interface } from "node:readline";
 import { join } from "node:path";
 
-import { MiniAgent } from "../core/agent.js";
+import { createMiniAgent } from "../core/create-agent.js";
+import { defineAgentModule } from "../core/module.js";
 import { LLMEngineManager } from "../core/llm.js";
 import { MessageType, LLMStreamChunkType } from "../core/types.js";
 import type {
@@ -10,6 +11,7 @@ import type {
     ToolCallMessage,
     ToolResultMessage,
 } from "../core/types.js";
+import type { MiniAgent } from "../core/agent.js";
 import type { AgentConfig, ModelGroup } from "../core/config.js";
 import type { LLMEngineCtor } from "../core/llm.js";
 import { SessionManager } from "../core/session.js";
@@ -205,20 +207,22 @@ export class CLI {
                 plugins: new Map(),
                 paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
             };
-            const agent = new MiniAgent(this.manager, agentConfig);
-            for (const tool of BUILTIN_TOOLS) {
-                agent.register(tool);
-            }
-            agent.register(new TodoManager());
             const subFactory = this.createAgentFactory();
-            agent.register(new SubAgentProvider(subFactory));
-            agent.register({
-                priority: 0,
-                collect: async (): Promise<Message[]> => [
-                    { id: "system-prompt", type: MessageType.System, content: systemPrompt || `You are a focused sub-agent. Task: ${task}. Working directory: ${this.baseDir}` },
+            return createMiniAgent({
+                llm: this.manager,
+                config: agentConfig,
+                use: [
+                    ...BUILTIN_TOOLS,
+                    new TodoManager(),
+                    new SubAgentProvider(subFactory),
+                    defineAgentModule({
+                        priority: 0,
+                        collect: async (): Promise<Message[]> => [
+                            { id: "system-prompt", type: MessageType.System, content: systemPrompt || `You are a focused sub-agent. Task: ${task}. Working directory: ${this.baseDir}` },
+                        ],
+                    }),
                 ],
             });
-            return agent;
         };
     }
 
@@ -230,20 +234,37 @@ export class CLI {
             plugins: new Map(),
             paths: { sessiondir: persistDir },
         };
-        const agent = new MiniAgent(this.manager, agentConfig);
-        this.registerTools(agent);
-        agent.register({
-            priority: 0,
-            collect: async (): Promise<Message[]> => [
-                { id: "system-prompt", type: MessageType.System, content: this.buildSystemPrompt() },
-            ],
-        });
-
         this.compressor = new ContextCompressor(this.manager, toModelConfig(this.activeModel), {
             maxMessages: 60,
             keepRecent: 15,
         });
-        agent.register(this.compressor);
+        const agent = createMiniAgent({
+            llm: this.manager,
+            config: agentConfig,
+            use: [
+                ...BUILTIN_TOOLS,
+                new TodoManager(),
+                new SubAgentProvider(this.createAgentFactory()),
+                defineAgentModule({
+                    priority: 0,
+                    collect: async (): Promise<Message[]> => [
+                        { id: "system-prompt", type: MessageType.System, content: this.buildSystemPrompt() },
+                    ],
+                }),
+                this.compressor,
+                (createdAgent: MiniAgent): void => {
+                    createdAgent.setAutoApprovedTools(AUTO_APPROVE_TOOLS);
+                    createdAgent.register(
+                        defineAgentModule({
+                            requestApproval: async (toolName: string, args: Record<string, unknown>): Promise<ApprovalDecision> => {
+                                if (!this.hitlEnabled) return "approve";
+                                return this.cliApprove(toolName, args);
+                            },
+                        }),
+                    );
+                },
+            ],
+        });
         this.setupStreaming(agent);
         return agent;
     }
@@ -260,22 +281,6 @@ export class CLI {
             this.manager.register(m.provider, ctor);
             seen.add(m.provider);
         }
-    }
-
-    private registerTools(agent: MiniAgent): void {
-        for (const tool of BUILTIN_TOOLS) {
-            agent.register(tool);
-        }
-        agent.register(new TodoManager());
-        const factory = this.createAgentFactory();
-        agent.register(new SubAgentProvider(factory));
-        agent.setAutoApprovedTools(AUTO_APPROVE_TOOLS);
-        agent.register({
-            requestApproval: async (toolName: string, args: Record<string, unknown>): Promise<ApprovalDecision> => {
-                if (!this.hitlEnabled) return "approve";
-                return this.cliApprove(toolName, args);
-            },
-        });
     }
 
     private cliApprove(toolName: string, args: Record<string, unknown>): Promise<ApprovalDecision> {

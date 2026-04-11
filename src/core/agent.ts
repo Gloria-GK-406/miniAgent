@@ -35,6 +35,7 @@ import { StopException } from "./errors.js";
 import { addTokenCount, emptyTokenCount } from "./llm.js";
 import type { ToolApprover } from "../tool/approver.js";
 import { ToolApproverSchema } from "../tool/approver.js";
+import type { AgentModule, AgentRegistrable } from "./module.js";
 
 export class MiniAgent {
     private messageSource: MessageSource;
@@ -84,7 +85,7 @@ export class MiniAgent {
         return this;
     }
 
-    setConfig(config: AgentConfig): void {
+    private applyConfig(config: AgentConfig): void {
         this.config = config;
         for (const notifier of this.configNotifiers) {
             void notifier.setConfig(config);
@@ -112,7 +113,7 @@ export class MiniAgent {
     }
 
     setModel(config: ModelConfig): void {
-        this.setConfig({
+        this.applyConfig({
             ...this.config,
             model: config,
         });
@@ -153,9 +154,14 @@ export class MiniAgent {
     register(turnContextAware: TurnContextAware): void;
     register(turnContextAppend: TurnContextAppend): void;
     register(approver: ToolApprover): void;
-    register(item: Tool | ToolProvider | ContextProvider | ContextProcessor | MessageNotifier | ErrorHandler | AfterTurnProcessor | ConfigNotifier | PersistRequire | TurnContextAware | TurnContextAppend | ToolApprover): void {
-        if (ToolProviderSchema.safeParse(item).success) {
-            const provider = item as ToolProvider;
+    register(module: AgentModule): void;
+    register(item: AgentRegistrable | AgentModule): void {
+        let matched = false;
+        const candidate = item as AgentRegistrable;
+
+        if (ToolProviderSchema.safeParse(candidate).success) {
+            matched = true;
+            const provider = candidate as ToolProvider;
             const tools = provider.getTools();
             const resolved = tools instanceof Promise ? tools : Promise.resolve(tools);
             resolved.then((ts) => {
@@ -165,61 +171,76 @@ export class MiniAgent {
             });
         }
         
-        if (ToolSchema.safeParse(item).success) {
-            this.tools.set((item as Tool).name, item as Tool);
+        if (ToolSchema.safeParse(candidate).success) {
+            matched = true;
+            this.tools.set((candidate as Tool).name, candidate as Tool);
         }
-        if (ContextProviderSchema.safeParse(item).success) {
-            if (!this.providers.includes(item as ContextProvider)) {
-                this.providers.push(item as ContextProvider);
+        if (ContextProviderSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.providers.includes(candidate as ContextProvider)) {
+                this.providers.push(candidate as ContextProvider);
             }
         }
-        if (AfterTurnProcessorSchema.safeParse(item).success) {
-            const processor = item as AfterTurnProcessor;
+        if (AfterTurnProcessorSchema.safeParse(candidate).success) {
+            matched = true;
+            const processor = candidate as AfterTurnProcessor;
             if (processor.process.length >= 2 && !this.afterTurnProcessors.includes(processor)) {
                 this.afterTurnProcessors.push(processor);
             }
         }
-        if (ContextProcessorSchema.safeParse(item).success) {
-            const processor = item as ContextProcessor;
+        if (ContextProcessorSchema.safeParse(candidate).success) {
+            matched = true;
+            const processor = candidate as ContextProcessor;
             if (processor.process.length < 2 && !this.processors.includes(processor)) {
                 this.processors.push(processor);
             }
         }
-        if (MessageNotifierSchema.safeParse(item).success) {
-            if (!this.notifiers.includes(item as MessageNotifier)) {
-                this.notifiers.push(item as MessageNotifier);
+        if (MessageNotifierSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.notifiers.includes(candidate as MessageNotifier)) {
+                this.notifiers.push(candidate as MessageNotifier);
             }
         }
-        if (ErrorHandlerSchema.safeParse(item).success) {
-            if (!this.errorHandlers.includes(item as ErrorHandler)) {
-                this.errorHandlers.push(item as ErrorHandler);
+        if (ErrorHandlerSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.errorHandlers.includes(candidate as ErrorHandler)) {
+                this.errorHandlers.push(candidate as ErrorHandler);
             }
         }
-        if (ConfigNotifierSchema.safeParse(item).success) {
-            if (!this.configNotifiers.includes(item as ConfigNotifier)) {
-                const notifier = item as ConfigNotifier;
+        if (ConfigNotifierSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.configNotifiers.includes(candidate as ConfigNotifier)) {
+                const notifier = candidate as ConfigNotifier;
                 void notifier.setConfig(this.config);
                 this.configNotifiers.push(notifier);
             }
         }
-        if (PersistRequireSchema.safeParse(item).success) {
-            const req = item as PersistRequire;
+        if (PersistRequireSchema.safeParse(candidate).success) {
+            matched = true;
+            const req = candidate as PersistRequire;
             void req.setStore(this.store);
         }
-        if (TurnContextAwareSchema.safeParse(item).success) {
-            if (!this.turnContextAwares.includes(item as TurnContextAware)) {
-                this.turnContextAwares.push(item as TurnContextAware);
+        if (TurnContextAwareSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.turnContextAwares.includes(candidate as TurnContextAware)) {
+                this.turnContextAwares.push(candidate as TurnContextAware);
             }
         }
-        if (TurnContextAppendSchema.safeParse(item).success) {
-            if (!this.turnContextAppenders.includes(item as TurnContextAppend)) {
-                this.turnContextAppenders.push(item as TurnContextAppend);
+        if (TurnContextAppendSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.turnContextAppenders.includes(candidate as TurnContextAppend)) {
+                this.turnContextAppenders.push(candidate as TurnContextAppend);
             }
         }
-        if (ToolApproverSchema.safeParse(item).success) {
-            if (!this.approvers.includes(item as ToolApprover)) {
-                this.approvers.push(item as ToolApprover);
+        if (ToolApproverSchema.safeParse(candidate).success) {
+            matched = true;
+            if (!this.approvers.includes(candidate as ToolApprover)) {
+                this.approvers.push(candidate as ToolApprover);
             }
+        }
+
+        if (!matched) {
+            throw new Error("Unsupported agent registration item");
         }
     }
 

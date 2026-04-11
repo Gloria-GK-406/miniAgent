@@ -1,9 +1,17 @@
 export { MiniAgent } from "./core/agent.js";
+export { createMiniAgent } from "./core/create-agent.js";
+export { defineAgentModule } from "./core/module.js";
 export { LLMEngineManager } from "./core/llm.js";
 export type { LLMEngine, LLMEngineCtor } from "./core/llm.js";
 export { createLLMStreamHandle } from "./core/llm.js";
 export type { LLMStreamController } from "./core/llm.js";
 export { emptyTokenCount, createTokenCount, addTokenCount } from "./core/llm.js";
+export type {
+    CreateMiniAgentOptions,
+    AgentInstaller,
+    AgentUse,
+} from "./core/create-agent.js";
+export type { AgentModule, AgentRegistrable } from "./core/module.js";
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
 export type {
