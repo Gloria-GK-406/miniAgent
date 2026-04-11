@@ -80,6 +80,26 @@ export type { Tool, ToolProvider } from "./tool/types.js";
 export { ToolApproverSchema } from "./tool/approver.js";
 export type { ToolApprover, ApprovalDecision } from "./tool/approver.js";
 
+export { McpPlugin } from "./tool/mcp/plugin.js";
+export { McpClient } from "./tool/mcp/client.js";
+export type { McpToolEntry } from "./tool/mcp/client.js";
+export { convertMcpTool, parsePrefixedName, prefixToolName, MCP_TOOL_PREFIX } from "./tool/mcp/convert.js";
+export {
+    McpPluginConfigSchema,
+    McpServerConfigSchema,
+    McpStdioConfigSchema,
+    McpSseConfigSchema,
+    McpStreamableHttpConfigSchema,
+} from "./tool/mcp/types.js";
+export type {
+    McpPluginConfig,
+    McpServerConfig,
+    McpStdioConfig,
+    McpSseConfig,
+    McpStreamableHttpConfig,
+    McpToolInfo,
+} from "./tool/mcp/types.js";
+
 export {
     PersistentConfigFileLoader,
     PersistentConfigAggregator,

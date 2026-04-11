@@ -49,6 +49,10 @@
     "./engine/glm-codeplan": {
       "types": "./dist/engine/glm-codeplan/index.d.ts",
       "import": "./dist/engine/glm-codeplan/index.js"
+    },
+    "./tool/mcp": {
+      "types": "./dist/tool/mcp/index.d.ts",
+      "import": "./dist/tool/mcp/index.js"
     }
   },
   "files": [
@@ -78,6 +82,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "eventemitter3": "^5.0.4",
     "lru-cache": "^11.3.2",
     "openai": "^6.33.0",

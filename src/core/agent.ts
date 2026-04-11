@@ -42,6 +42,8 @@ export class MiniAgent {
     private llm: LLMRequest;
     private config: AgentConfig;
     private tools: Map<string, Tool> = new Map();
+    private toolProviders: ToolProvider[] = [];
+    private turnToolMap: Map<string, Tool> = new Map();
     private providers: ContextProvider[] = [];
     private processors: ContextProcessor[] = [];
     private notifiers: MessageNotifier[] = [];
@@ -161,14 +163,9 @@ export class MiniAgent {
 
         if (ToolProviderSchema.safeParse(candidate).success) {
             matched = true;
-            const provider = candidate as ToolProvider;
-            const tools = provider.getTools();
-            const resolved = tools instanceof Promise ? tools : Promise.resolve(tools);
-            resolved.then((ts) => {
-                for (const t of ts) {
-                    this.tools.set(t.name, t);
-                }
-            });
+            if (!this.toolProviders.includes(candidate as ToolProvider)) {
+                this.toolProviders.push(candidate as ToolProvider);
+            }
         }
         
         if (ToolSchema.safeParse(candidate).success) {
@@ -281,6 +278,17 @@ export class MiniAgent {
         };
     }
 
+    private async buildToolMap(): Promise<void> {
+        const map = new Map(this.tools);
+        for (const provider of this.toolProviders) {
+            const tools = await provider.getTools();
+            for (const t of tools) {
+                map.set(t.name, t);
+            }
+        }
+        this.turnToolMap = map;
+    }
+
     private async buildContext(): Promise<Message[]> {
         const context: Message[] = [];
         for (const appender of this.turnContextAppenders) {
@@ -378,7 +386,7 @@ export class MiniAgent {
             this.emitter.emit("tool:result", { toolCall, result });
             return result;
         }
-        const tool = this.tools.get(toolCall.toolName);
+        const tool = this.turnToolMap.get(toolCall.toolName);
         const content = tool
             ? await tool.execute(toolCall.arguments as Record<string, unknown>)
             : `tool not found: ${toolCall.toolName}`;
@@ -427,7 +435,8 @@ export class MiniAgent {
                 try {
                     const context = await this.buildContext();
                     await this.setTurnContext(turn, context);
-                    const tools = [...this.tools.values()];
+                    await this.buildToolMap();
+                    const tools = [...this.turnToolMap.values()];
                     this.emitter.emit("llm:request", { context, tools });
                     const stream = this.llm.streamInvoke(context, this.config.model, tools);
                     const unsubscribe = stream.onChunk((chunk) => {
