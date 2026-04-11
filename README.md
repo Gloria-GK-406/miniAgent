@@ -12,6 +12,7 @@
 - **消息持久化** — 内置 JSONL 消息存储，支持历史加载与水位线丢弃
 - **工具审批** — HITL（Human-in-the-Loop）机制，执行前人工确认
 - **事件系统** — 基于 EventEmitter 的完整生命周期事件
+- **MCP 插件** — 内置 Model Context Protocol 客户端，支持 stdio / SSE / Streamable HTTP 传输
 
 ## 安装
 
@@ -145,12 +146,55 @@ const approver: ToolApprover = {
 agent.register(approver);
 ```
 
+### MCP 插件
+
+内置 `McpPlugin`，自动连接 MCP 服务器并将其工具暴露给 Agent：
+
+```typescript
+import { McpPlugin } from "@piaoxianguo/miniagent/tool/mcp";
+
+const mcp = new McpPlugin();
+agent.register(mcp);
+```
+
+在配置文件的 `plugins.mcp` 中声明 MCP 服务器：
+
+```json
+{
+  "plugins": {
+    "mcp": {
+      "servers": {
+        "filesystem": {
+          "transport": "stdio",
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+        },
+        "remote": {
+          "transport": "streamable-http",
+          "url": "http://localhost:3000/mcp"
+        }
+      }
+    }
+  }
+}
+```
+
+支持三种传输方式：
+
+| 传输 | 配置字段 | 说明 |
+|------|---------|------|
+| `stdio` | `command`, `args?`, `env?` | 启动子进程通信 |
+| `sse` | `url` | HTTP SSE 连接（旧版） |
+| `streamable-http` | `url` | Streamable HTTP（推荐） |
+
+MCP 工具会以 `mcp__{serverName}__{toolName}` 格式注册，避免命名冲突。`McpPlugin` 同时实现 `ToolProvider` 和 `ConfigNotifier`，每个 turn 动态构建可用工具列表——连接失败的 server 其工具不会出现在当前 turn 中。
+
 ## 技术栈
 
 - TypeScript (strict, ESM)
 - Zod schema 验证
 - Vitest 测试
-- 支持 Anthropic / OpenAI / OpenAI 兼容协议 / 智谱 GLM
+- 支持 Anthropic / OpenAI / OpenAI 兼容协议 / 智谱 GLM / MCP
 
 ## License
 
