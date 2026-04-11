@@ -1,6 +1,7 @@
 export { MiniAgent } from "./core/agent.js";
 export { createMiniAgent } from "./core/create-agent.js";
 export { defineAgentModule } from "./core/module.js";
+export { AgentAssembler, AgentBlueprintRegistry } from "./core/assembler.js";
 export { LLMEngineManager } from "./core/llm.js";
 export type { LLMEngine, LLMEngineCtor } from "./core/llm.js";
 export { createLLMStreamHandle } from "./core/llm.js";
@@ -12,6 +13,20 @@ export type {
     AgentUse,
 } from "./core/create-agent.js";
 export type { AgentModule, AgentRegistrable } from "./core/module.js";
+export { AgentBlueprintSchema } from "./core/blueprint.js";
+export type { AgentBlueprint } from "./core/blueprint.js";
+export {
+    AgentCapabilityRuleSchema,
+    AgentCapabilitySelectorSchema,
+    AgentCapabilityAwareSchema,
+    getCapabilityNamespace,
+    isCapabilityEnabled,
+} from "./core/capability.js";
+export type {
+    AgentCapabilityRule,
+    AgentCapabilitySelector,
+    AgentCapabilityAware,
+} from "./core/capability.js";
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
 export type {
@@ -86,12 +101,14 @@ export type { McpToolEntry } from "./tool/mcp/client.js";
 export { convertMcpTool, parsePrefixedName, prefixToolName, MCP_TOOL_PREFIX } from "./tool/mcp/convert.js";
 export {
     McpPluginConfigSchema,
+    McpCapabilitySelectorSchema,
     McpServerConfigSchema,
     McpStdioConfigSchema,
     McpSseConfigSchema,
     McpStreamableHttpConfigSchema,
 } from "./tool/mcp/types.js";
 export type {
+    McpCapabilitySelector,
     McpPluginConfig,
     McpServerConfig,
     McpStdioConfig,
@@ -99,6 +116,9 @@ export type {
     McpStreamableHttpConfig,
     McpToolInfo,
 } from "./tool/mcp/types.js";
+export { SkillPlugin } from "./tool/skill/plugin.js";
+export { SkillPluginConfigSchema, SkillCapabilitySelectorSchema } from "./tool/skill/types.js";
+export type { SkillPluginConfig, SkillCapabilitySelector, SkillEntry } from "./tool/skill/types.js";
 
 export {
     PersistentConfigFileLoader,

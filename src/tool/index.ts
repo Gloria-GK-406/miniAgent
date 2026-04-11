@@ -17,12 +17,14 @@ export type { McpToolEntry } from "./mcp/client.js";
 export { convertMcpTool, parsePrefixedName, prefixToolName, MCP_TOOL_PREFIX } from "./mcp/convert.js";
 export {
     McpPluginConfigSchema,
+    McpCapabilitySelectorSchema,
     McpServerConfigSchema,
     McpStdioConfigSchema,
     McpSseConfigSchema,
     McpStreamableHttpConfigSchema,
 } from "./mcp/types.js";
 export type {
+    McpCapabilitySelector,
     McpPluginConfig,
     McpServerConfig,
     McpStdioConfig,
@@ -31,5 +33,5 @@ export type {
     McpToolInfo,
 } from "./mcp/types.js";
 export { SkillPlugin } from "./skill/plugin.js";
-export { SkillPluginConfigSchema } from "./skill/types.js";
-export type { SkillPluginConfig, SkillEntry } from "./skill/types.js";
+export { SkillPluginConfigSchema, SkillCapabilitySelectorSchema } from "./skill/types.js";
+export type { SkillPluginConfig, SkillCapabilitySelector, SkillEntry } from "./skill/types.js";

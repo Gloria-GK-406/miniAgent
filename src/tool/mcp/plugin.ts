@@ -1,14 +1,32 @@
 import type { Tool } from "../types.js";
 import type { AgentConfig } from "../../core/config.js";
 import { McpClient } from "./client.js";
-import { convertMcpTool } from "./convert.js";
-import { McpPluginConfigSchema } from "./types.js";
-import type { McpPluginConfig } from "./types.js";
+import { convertMcpTool, prefixToolName } from "./convert.js";
+import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/capability.js";
+import type { AgentCapabilitySelector } from "../../core/capability.js";
+import { McpCapabilitySelectorSchema, McpPluginConfigSchema } from "./types.js";
+import type { McpCapabilitySelector, McpPluginConfig } from "./types.js";
 
 export class McpPlugin {
     private clients = new Map<string, McpClient>();
     private cachedTools: Tool[] = [];
     private config: McpPluginConfig | null = null;
+    private capabilities: McpCapabilitySelector = {};
+
+    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+        const raw = getCapabilityNamespace(capabilities, "mcp");
+        const nextCapabilities = raw === undefined
+            ? {}
+            : McpCapabilitySelectorSchema.parse(raw);
+
+        const changed = JSON.stringify(this.capabilities) !== JSON.stringify(nextCapabilities);
+        this.capabilities = nextCapabilities;
+
+        if (changed && this.config) {
+            await this.disconnectAll();
+            await this.connectAll();
+        }
+    }
 
     async setConfig(agentConfig: AgentConfig): Promise<void> {
         const pluginConfig = agentConfig.plugins.get("mcp");
@@ -56,6 +74,10 @@ export class McpPlugin {
 
         await Promise.allSettled(
             serverEntries.map(async ([name, serverConfig]) => {
+                if (!isCapabilityEnabled(name, this.capabilities.server)) {
+                    return;
+                }
+
                 const client = new McpClient(name, serverConfig);
                 try {
                     await client.connect();
@@ -63,6 +85,10 @@ export class McpPlugin {
 
                     const mcpTools = await client.listTools();
                     for (const entry of mcpTools) {
+                        const prefixedName = prefixToolName(name, entry.name);
+                        if (!isCapabilityEnabled(prefixedName, this.capabilities.tool)) {
+                            continue;
+                        }
                         tools.push(convertMcpTool(name, entry, client));
                     }
                 } catch (e) {

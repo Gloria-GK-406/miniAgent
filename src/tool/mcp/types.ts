@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AgentCapabilityRuleSchema } from "../../core/capability.js";
 
 export const McpStdioConfigSchema = z.object({
     transport: z.literal("stdio"),
@@ -36,6 +37,13 @@ export const McpPluginConfigSchema = z.object({
 });
 
 export type McpPluginConfig = z.infer<typeof McpPluginConfigSchema>;
+
+export const McpCapabilitySelectorSchema = z.object({
+    server: AgentCapabilityRuleSchema.optional(),
+    tool: AgentCapabilityRuleSchema.optional(),
+});
+
+export type McpCapabilitySelector = z.infer<typeof McpCapabilitySelectorSchema>;
 
 export interface McpToolInfo {
     serverName: string;

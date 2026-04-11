@@ -12,7 +12,7 @@ interface MockClient {
 
 const mockClients: MockClient[] = [];
 
-const defaultTools = [{
+let defaultTools = [{
     name: "read_file",
     description: "Read file",
     inputSchema: { type: "object" },
@@ -59,6 +59,11 @@ describe("McpPlugin", () => {
         vi.clearAllMocks();
         mockClients.length = 0;
         failServers.clear();
+        defaultTools = [{
+            name: "read_file",
+            description: "Read file",
+            inputSchema: { type: "object" },
+        }];
         plugin = new McpPlugin();
     });
 
@@ -188,5 +193,55 @@ describe("McpPlugin", () => {
 
         const tools = await plugin.getTools();
         expect(tools).toEqual([]);
+    });
+
+    it("filters servers by capability selector", async () => {
+        await plugin.setAgentCapabilities({
+            mcp: {
+                server: {
+                    allow: ["good"],
+                },
+            },
+        });
+
+        const config = makeConfig({
+            good: { transport: "stdio", command: "ok" },
+            blocked: { transport: "stdio", command: "nope" },
+        });
+        await plugin.setConfig(config);
+
+        expect(mockClients).toHaveLength(1);
+        expect(mockClients[0]!.serverName).toBe("good");
+    });
+
+    it("filters MCP tools by capability selector", async () => {
+        defaultTools = [
+            {
+                name: "read_file",
+                description: "Read file",
+                inputSchema: { type: "object" },
+            },
+            {
+                name: "write_file",
+                description: "Write file",
+                inputSchema: { type: "object" },
+            },
+        ];
+
+        await plugin.setAgentCapabilities({
+            mcp: {
+                tool: {
+                    allow: ["mcp__fs__read_file"],
+                },
+            },
+        });
+
+        const config = makeConfig({
+            fs: { transport: "stdio", command: "npx" },
+        });
+        await plugin.setConfig(config);
+
+        const tools = await plugin.getTools();
+        expect(tools.map((tool) => tool.name)).toEqual(["mcp__fs__read_file"]);
     });
 });

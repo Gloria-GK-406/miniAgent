@@ -6,8 +6,10 @@ import type { Tool } from "../types.js";
 import { MessageType } from "../../core/types.js";
 import type { Message } from "../../core/types.js";
 import type { AgentConfig } from "../../core/config.js";
-import { SkillPluginConfigSchema } from "./types.js";
-import type { SkillPluginConfig, SkillEntry } from "./types.js";
+import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/capability.js";
+import type { AgentCapabilitySelector } from "../../core/capability.js";
+import { SkillCapabilitySelectorSchema, SkillPluginConfigSchema } from "./types.js";
+import type { SkillCapabilitySelector, SkillPluginConfig, SkillEntry } from "./types.js";
 
 const SKILL_MANIFEST = "SKILL.md";
 
@@ -16,6 +18,22 @@ export class SkillPlugin {
 
     private skills = new Map<string, SkillEntry>();
     private config: SkillPluginConfig | null = null;
+    private capabilities: SkillCapabilitySelector = {};
+
+    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+        const raw = getCapabilityNamespace(capabilities, "skill");
+        if (raw === undefined) {
+            this.capabilities = {};
+            return;
+        }
+
+        const parsed = SkillCapabilitySelectorSchema.safeParse(raw);
+        if (!parsed.success) {
+            throw new Error(`Invalid skill capability selector: ${parsed.error.message}`);
+        }
+
+        this.capabilities = parsed.data;
+    }
 
     async setConfig(agentConfig: AgentConfig): Promise<void> {
         const pluginConfig = agentConfig.plugins.get("skill");
@@ -41,10 +59,11 @@ export class SkillPlugin {
     }
 
     async collect(): Promise<Message[]> {
-        if (this.skills.size === 0) return [];
+        const visibleSkills = this.getVisibleSkills();
+        if (visibleSkills.length === 0) return [];
 
         const lines: string[] = ["<available_skills>"];
-        for (const [, skill] of this.skills) {
+        for (const skill of visibleSkills) {
             lines.push(`- id: ${skill["id"]}`);
             lines.push(`  name: ${skill["name"]}`);
             lines.push(`  description: ${skill["description"]}`);
@@ -63,7 +82,8 @@ export class SkillPlugin {
     }
 
     async getTools(): Promise<Tool[]> {
-        if (this.skills.size === 0) return [];
+        const visibleSkills = this.getVisibleSkills();
+        if (visibleSkills.length === 0) return [];
 
         return [{
             name: "load_skill",
@@ -76,9 +96,9 @@ export class SkillPlugin {
             }),
             execute: async (args: Record<string, unknown>): Promise<string> => {
                 const id = args["id"] as string;
-                const skill = this.skills.get(id);
+                const skill = visibleSkills.find((entry) => entry.id === id);
                 if (!skill) {
-                    const available = [...this.skills.keys()].join(", ");
+                    const available = visibleSkills.map((entry) => entry.id).join(", ");
                     return `Skill "${id}" not found. Available skills: ${available}`;
                 }
                 const parts: string[] = [];
@@ -94,6 +114,12 @@ export class SkillPlugin {
                 return parts.join("\n");
             },
         }];
+    }
+
+    private getVisibleSkills(): SkillEntry[] {
+        return [...this.skills.values()].filter((skill) =>
+            isCapabilityEnabled(skill.id, this.capabilities),
+        );
     }
 
     private configChanged(old: SkillPluginConfig, next: SkillPluginConfig): boolean {

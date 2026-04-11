@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { Tool, ToolProvider } from "./types.js";
 import type { ContextProcessor, Action, Message } from "../core/types.js";
 import { ActionType, MessageType } from "../core/types.js";
+import { isCapabilityEnabled } from "../core/capability.js";
+import type { AgentCapabilitySelector } from "../core/capability.js";
 
 interface TodoItem {
     id: string;
@@ -12,6 +14,11 @@ interface TodoItem {
 export class TodoManager implements ToolProvider, ContextProcessor {
     priority = 100;
     private todos: TodoItem[] = [];
+    private capabilities: AgentCapabilitySelector = {};
+
+    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+        this.capabilities = capabilities;
+    }
 
     async getTools(): Promise<Tool[]> {
         return [
@@ -67,7 +74,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                     return `Deleted todo: ${removed.content}`;
                 },
             },
-        ];
+        ].filter((tool) => isCapabilityEnabled(tool.name, this.capabilities.tool));
     }
 
     async process(_messages: Message[]): Promise<Action[]> {

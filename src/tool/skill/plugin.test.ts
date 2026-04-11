@@ -195,6 +195,40 @@ describe("SkillPlugin", () => {
             expect(result).toContain("<skill_files>");
             expect(result).toContain("helper.ts");
         });
+
+        it("filters visible skills by capability selector", async () => {
+            const skillADir = join(testDir, "skill-a");
+            await mkdir(skillADir);
+            await writeFile(
+                join(skillADir, "SKILL.md"),
+                makeSkillManifest("skill-a", "Skill A", "Desc A", "A"),
+                "utf-8",
+            );
+
+            const skillBDir = join(testDir, "skill-b");
+            await mkdir(skillBDir);
+            await writeFile(
+                join(skillBDir, "SKILL.md"),
+                makeSkillManifest("skill-b", "Skill B", "Desc B", "B"),
+                "utf-8",
+            );
+
+            await plugin.setAgentCapabilities({
+                skill: {
+                    allow: ["skill-a"],
+                },
+            });
+            await plugin.setConfig(makeConfig([testDir]));
+
+            const messages = await plugin.collect();
+            expect(messages[0]!.content).toContain("skill-a");
+            expect(messages[0]!.content).not.toContain("skill-b");
+
+            const tools = await plugin.getTools();
+            const result = await tools[0]!.execute({ id: "skill-b" });
+            expect(result).toContain("Skill \"skill-b\" not found");
+            expect(result).toContain("skill-a");
+        });
     });
 
     describe("skill manifest parsing", () => {

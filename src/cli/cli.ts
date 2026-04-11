@@ -1,7 +1,8 @@
 import { createInterface, type Interface } from "node:readline";
 import { join } from "node:path";
 
-import { createMiniAgent } from "../core/create-agent.js";
+import { AgentAssembler, AgentBlueprintRegistry } from "../core/assembler.js";
+import type { AgentBlueprint } from "../core/blueprint.js";
 import { defineAgentModule } from "../core/module.js";
 import { LLMEngineManager } from "../core/llm.js";
 import { MessageType, LLMStreamChunkType } from "../core/types.js";
@@ -53,8 +54,21 @@ const ENGINES: Record<string, LLMEngineCtor> = {
     "glm-codeplan": GLMCodePlanEngine,
 };
 
-const BUILTIN_TOOLS = [readTool, writeTool, editTool, globTool, grepTool, bashTool];
 const AUTO_APPROVE_TOOLS = ["read", "glob", "grep"];
+const SHARED_BLUEPRINT: AgentBlueprint = {
+    uses: [
+        "tool.read",
+        "tool.write",
+        "tool.edit",
+        "tool.glob",
+        "tool.grep",
+        "tool.bash",
+        "tool.todo",
+        "plugin.subagent",
+        "plugin.mcp",
+        "plugin.skill",
+    ],
+};
 
 export class CLI {
     private config!: CLIConfig;
@@ -67,6 +81,8 @@ export class CLI {
     private persistDir!: string;
     private sessionManager!: SessionManager;
     private compressor!: ContextCompressor;
+    private blueprintRegistry!: AgentBlueprintRegistry;
+    private assembler!: AgentAssembler;
     private hitlEnabled = true;
     private running = false;
 
@@ -103,6 +119,8 @@ export class CLI {
         this.persistDir = join(this.baseDir, CLIAGENT_DIR);
         this.manager = new LLMEngineManager();
         this.registerEngines();
+        this.blueprintRegistry = this.createBlueprintRegistry();
+        this.assembler = new AgentAssembler(this.blueprintRegistry);
 
         this.activeModel = defaultModel;
         this.userSystemPrompt = this.config.systemPrompt ?? "You are a helpful assistant.";
@@ -119,7 +137,7 @@ export class CLI {
             session = await this.sessionManager.create("default");
         }
 
-        this.agent = this.buildAgent(session.id);
+        this.agent = await this.buildAgent(session.id);
 
         console.log(
             `${A.green}MiniAgent CLI${A.reset} — model: ${A.bold}${this.activeModel.name}${A.reset} (${this.activeModel.provider}/${this.activeModel.model})`,
@@ -198,6 +216,23 @@ export class CLI {
         ].join("\n");
     }
 
+    private createBlueprintRegistry(): AgentBlueprintRegistry {
+        const registry = new AgentBlueprintRegistry();
+
+        registry.register("tool.read", () => readTool);
+        registry.register("tool.write", () => writeTool);
+        registry.register("tool.edit", () => editTool);
+        registry.register("tool.glob", () => globTool);
+        registry.register("tool.grep", () => grepTool);
+        registry.register("tool.bash", () => bashTool);
+        registry.register("tool.todo", () => new TodoManager());
+        registry.register("plugin.subagent", () => new SubAgentProvider(this.createAgentFactory()));
+        registry.register("plugin.mcp", () => new McpPlugin());
+        registry.register("plugin.skill", () => new SkillPlugin());
+
+        return registry;
+    }
+
     private createAgentFactory(): AgentFactory {
         return async (task: string, systemPrompt: string): Promise<MiniAgent> => {
             const active = this.sessionManager.getActive();
@@ -214,24 +249,23 @@ export class CLI {
 
             const agentConfig: AgentConfig = {
                 model: toModelConfig(this.activeModel),
-                models: new Map(),
+                models: this.buildModelsMap(),
                 plugins: subPlugins,
                 paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
             };
-            const subFactory = this.createAgentFactory();
-            return createMiniAgent({
+            return this.assembler.assemble({
                 llm: this.manager,
                 config: agentConfig,
-                use: [
-                    ...BUILTIN_TOOLS,
-                    new TodoManager(),
-                    new SubAgentProvider(subFactory),
-                    new McpPlugin(),
-                    new SkillPlugin(),
+                blueprint: SHARED_BLUEPRINT,
+                extraUses: [
                     defineAgentModule({
                         priority: 0,
                         collect: async (): Promise<Message[]> => [
-                            { id: "system-prompt", type: MessageType.System, content: systemPrompt || `You are a focused sub-agent. Task: ${task}. Working directory: ${this.baseDir}` },
+                            {
+                                id: "system-prompt",
+                                type: MessageType.System,
+                                content: systemPrompt || `You are a focused sub-agent. Task: ${task}. Working directory: ${this.baseDir}`,
+                            },
                         ],
                     }),
                 ],
@@ -239,7 +273,7 @@ export class CLI {
         };
     }
 
-    private buildAgent(sessionId: string): MiniAgent {
+    private async buildAgent(sessionId: string): Promise<MiniAgent> {
         const persistDir = this.sessionManager.getSessionPersistDir(sessionId);
         const plugins = new Map<string, JsonValue>();
         if (this.config.mcp) {
@@ -258,17 +292,11 @@ export class CLI {
             maxMessages: 60,
             keepRecent: 15,
         });
-        const mcpPlugin = new McpPlugin();
-        const skillPlugin = new SkillPlugin();
-        const agent = createMiniAgent({
+        const agent = await this.assembler.assemble({
             llm: this.manager,
             config: agentConfig,
-            use: [
-                ...BUILTIN_TOOLS,
-                new TodoManager(),
-                new SubAgentProvider(this.createAgentFactory()),
-                mcpPlugin,
-                skillPlugin,
+            blueprint: SHARED_BLUEPRINT,
+            extraUses: [
                 defineAgentModule({
                     priority: 0,
                     collect: async (): Promise<Message[]> => [
@@ -451,7 +479,7 @@ export class CLI {
             case "/clear": {
                 const active = this.sessionManager.getActive();
                 if (active) {
-                    this.agent = this.buildAgent(active.id);
+                    this.agent = await this.buildAgent(active.id);
                 }
                 console.log(`${A.green}Conversation cleared.${A.reset}`);
                 break;
@@ -623,7 +651,7 @@ export class CLI {
     private async createSession(): Promise<void> {
         const session = await this.sessionManager.create();
         this.sessionManager.setActive(session.id);
-        this.agent = this.buildAgent(session.id);
+        this.agent = await this.buildAgent(session.id);
         console.log(`${A.green}Created & switched to session: ${A.bold}${session.name}${A.reset} (${session.id.slice(0, 8)})`);
     }
 
@@ -635,7 +663,7 @@ export class CLI {
             return;
         }
         this.sessionManager.setActive(match.id);
-        this.agent = this.buildAgent(match.id);
+        this.agent = await this.buildAgent(match.id);
         console.log(`${A.green}Switched to session: ${A.bold}${match.name}${A.reset} (${match.messageCount} messages)`);
     }
 
@@ -659,7 +687,7 @@ export class CLI {
             if (remaining.length > 0) {
                 const next = remaining[0]!;
                 this.sessionManager.setActive(next.id);
-                this.agent = this.buildAgent(next.id);
+                this.agent = await this.buildAgent(next.id);
                 console.log(`${A.green}Switched to session: ${A.bold}${next.name}${A.reset}`);
             }
         }
