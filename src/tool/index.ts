@@ -35,3 +35,4 @@ export type {
 export { SkillPlugin } from "./skill/plugin.js";
 export { SkillPluginConfigSchema, SkillCapabilitySelectorSchema } from "./skill/types.js";
 export type { SkillPluginConfig, SkillCapabilitySelector, SkillEntry } from "./skill/types.js";
+export { AgentContextProvider } from "./agent-context.js";

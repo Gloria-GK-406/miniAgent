@@ -26,7 +26,7 @@ import { GLMEngine } from "../engine/glm/index.js";
 import { GLMCodePlanEngine } from "../engine/glm-codeplan/index.js";
 import {
     readTool, writeTool, editTool, globTool, grepTool, bashTool,
-    TodoManager, SubAgentProvider,
+    TodoManager, SubAgentProvider, AgentContextProvider,
 } from "../tool/index.js";
 import { McpPlugin } from "../tool/mcp/plugin.js";
 import { SkillPlugin } from "../tool/skill/plugin.js";
@@ -67,6 +67,7 @@ const SHARED_BLUEPRINT: AgentBlueprint = {
         "plugin.subagent",
         "plugin.mcp",
         "plugin.skill",
+        "plugin.agent-context",
     ],
 };
 
@@ -229,6 +230,7 @@ export class CLI {
         registry.register("plugin.subagent", () => new SubAgentProvider(this.createAgentFactory()));
         registry.register("plugin.mcp", () => new McpPlugin());
         registry.register("plugin.skill", () => new SkillPlugin());
+        registry.register("plugin.agent-context", () => new AgentContextProvider(this.baseDir));
 
         return registry;
     }

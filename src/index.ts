@@ -119,6 +119,7 @@ export type {
 export { SkillPlugin } from "./tool/skill/plugin.js";
 export { SkillPluginConfigSchema, SkillCapabilitySelectorSchema } from "./tool/skill/types.js";
 export type { SkillPluginConfig, SkillCapabilitySelector, SkillEntry } from "./tool/skill/types.js";
+export { AgentContextProvider } from "./tool/agent-context.js";
 
 export {
     PersistentConfigFileLoader,
