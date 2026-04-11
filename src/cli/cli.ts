@@ -28,6 +28,7 @@ import {
     TodoManager, SubAgentProvider,
 } from "../tool/index.js";
 import { McpPlugin } from "../tool/mcp/plugin.js";
+import { SkillPlugin } from "../tool/skill/plugin.js";
 import type { AgentFactory } from "../tool/subagent.js";
 import { CLIAGENT_DIR, loadConfig, findModel, toModelConfig } from "./config.js";
 import type { CLIConfig, CLIModel } from "./config.js";
@@ -207,6 +208,9 @@ export class CLI {
             if (this.config.mcp) {
                 subPlugins.set("mcp", JSON.parse(JSON.stringify(this.config.mcp)) as JsonValue);
             }
+            if (this.config.skill) {
+                subPlugins.set("skill", JSON.parse(JSON.stringify(this.config.skill)) as JsonValue);
+            }
 
             const agentConfig: AgentConfig = {
                 model: toModelConfig(this.activeModel),
@@ -223,6 +227,7 @@ export class CLI {
                     new TodoManager(),
                     new SubAgentProvider(subFactory),
                     new McpPlugin(),
+                    new SkillPlugin(),
                     defineAgentModule({
                         priority: 0,
                         collect: async (): Promise<Message[]> => [
@@ -240,6 +245,9 @@ export class CLI {
         if (this.config.mcp) {
             plugins.set("mcp", JSON.parse(JSON.stringify(this.config.mcp)) as JsonValue);
         }
+        if (this.config.skill) {
+            plugins.set("skill", JSON.parse(JSON.stringify(this.config.skill)) as JsonValue);
+        }
         const agentConfig: AgentConfig = {
             model: toModelConfig(this.activeModel),
             models: this.buildModelsMap(),
@@ -251,6 +259,7 @@ export class CLI {
             keepRecent: 15,
         });
         const mcpPlugin = new McpPlugin();
+        const skillPlugin = new SkillPlugin();
         const agent = createMiniAgent({
             llm: this.manager,
             config: agentConfig,
@@ -259,6 +268,7 @@ export class CLI {
                 new TodoManager(),
                 new SubAgentProvider(this.createAgentFactory()),
                 mcpPlugin,
+                skillPlugin,
                 defineAgentModule({
                     priority: 0,
                     collect: async (): Promise<Message[]> => [

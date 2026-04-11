@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ModelConfig } from "../core/config.js";
 import { McpPluginConfigSchema } from "../tool/mcp/types.js";
+import { SkillPluginConfigSchema } from "../tool/skill/types.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 
@@ -28,6 +29,7 @@ export const CLIConfigSchema = z.object({
   defaultModel: z.string(),
   systemPrompt: z.string().optional(),
   mcp: McpPluginConfigSchema.optional(),
+  skill: SkillPluginConfigSchema.optional(),
 });
 
 export type CLIConfig = z.infer<typeof CLIConfigSchema>;
@@ -64,6 +66,9 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
             url: "https://mcp.open-mcp.org/api/server/open-weather@latest/mcp",
           },
         },
+      },
+      skill: {
+        directories: [join(baseDir, CLIAGENT_DIR, "skill")],
       },
     };
     await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");

@@ -30,3 +30,6 @@ export type {
     McpStreamableHttpConfig,
     McpToolInfo,
 } from "./mcp/types.js";
+export { SkillPlugin } from "./skill/plugin.js";
+export { SkillPluginConfigSchema } from "./skill/types.js";
+export type { SkillPluginConfig, SkillEntry } from "./skill/types.js";

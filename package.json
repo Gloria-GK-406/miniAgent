@@ -53,6 +53,10 @@
     "./tool/mcp": {
       "types": "./dist/tool/mcp/index.d.ts",
       "import": "./dist/tool/mcp/index.js"
+    },
+    "./tool/skill": {
+      "types": "./dist/tool/skill/index.d.ts",
+      "import": "./dist/tool/skill/index.js"
     }
   },
   "files": [
