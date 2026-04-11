@@ -27,7 +27,7 @@ import {
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider } from "../tool/types.js";
 import { MessageSource } from "./message-source.js";
-import type { AgentConfig } from "./config.js";
+import type { AgentConfig, ModelConfig } from "./config.js";
 import { FileStore } from "./file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
@@ -93,6 +93,48 @@ export class MiniAgent {
 
     getConfig(): AgentConfig {
         return this.config;
+    }
+
+    getModelList(): ModelConfig[] {
+        const all: ModelConfig[] = [];
+        for (const group of this.config.models.values()) {
+            all.push(...group.models);
+        }
+        return all;
+    }
+
+    getModelDisplayList(): string[] {
+        return this.getModelList().map((m) => `${m.provider}/${m.model}`);
+    }
+
+    getCurrentModel(): ModelConfig {
+        return this.config.model;
+    }
+
+    setModel(config: ModelConfig): void {
+        this.setConfig({
+            ...this.config,
+            model: config,
+        });
+    }
+
+    setModelByPath(path: string): void {
+        const sep = path.indexOf("/");
+        if (sep === -1) {
+            throw new Error(`Invalid model path: "${path}". Expected format: provider/model`);
+        }
+        const provider = path.slice(0, sep);
+        const model = path.slice(sep + 1);
+        const group = this.config.models.get(provider);
+        if (!group) {
+            const available = [...this.config.models.keys()];
+            throw new Error(`No models found for provider: "${provider}". Available providers: ${available.join(", ")}`);
+        }
+        const found = group.models.find((m) => m.model === model);
+        if (!found) {
+            throw new Error(`Model "${model}" not found for provider: "${provider}". Available: ${group.models.map((m) => m.model).join(", ")}`);
+        }
+        this.setModel(found);
     }
 
     getContextCount(): TokenCount {

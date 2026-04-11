@@ -10,7 +10,7 @@ import type {
     ToolCallMessage,
     ToolResultMessage,
 } from "../core/types.js";
-import type { AgentConfig } from "../core/config.js";
+import type { AgentConfig, ModelGroup } from "../core/config.js";
 import type { LLMEngineCtor } from "../core/llm.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
@@ -64,6 +64,19 @@ export class CLI {
     private compressor!: ContextCompressor;
     private hitlEnabled = true;
     private running = false;
+
+    private buildModelsMap(): Map<string, ModelGroup> {
+        const map = new Map<string, ModelGroup>();
+        for (const m of this.config.models) {
+            const group = map.get(m.provider);
+            if (group) {
+                group.models.push(toModelConfig(m));
+            } else {
+                map.set(m.provider, { models: [toModelConfig(m)] });
+            }
+        }
+        return map;
+    }
 
     async start(): Promise<void> {
         this.baseDir = process.cwd();
@@ -213,7 +226,7 @@ export class CLI {
         const persistDir = this.sessionManager.getSessionPersistDir(sessionId);
         const agentConfig: AgentConfig = {
             model: toModelConfig(this.activeModel),
-            models: new Map(),
+            models: this.buildModelsMap(),
             plugins: new Map(),
             paths: { sessiondir: persistDir },
         };
@@ -358,35 +371,38 @@ export class CLI {
             }
 
             case "/models": {
+                const displayList = this.agent.getModelDisplayList();
+                const current = this.agent.getCurrentModel();
+                const currentPath = `${current.provider}/${current.model}`;
                 console.log(`${A.bold}Models:${A.reset}`);
-                for (const m of this.config.models) {
-                    const marker =
-                        m.name === this.activeModel.name ? ` ${A.green}← active${A.reset}` : "";
-                    console.log(`  ${A.cyan}${m.name}${A.reset} (${m.provider}/${m.model})${marker}`);
+                for (const p of displayList) {
+                    const marker = p === currentPath ? ` ${A.green}← active${A.reset}` : "";
+                    console.log(`  ${A.cyan}${p}${A.reset}${marker}`);
                 }
                 break;
             }
 
             case "/model": {
                 if (!arg) {
+                    const current = this.agent.getCurrentModel();
                     console.log(
-                        `Current: ${A.bold}${this.activeModel.name}${A.reset} (${this.activeModel.provider}/${this.activeModel.model})`,
+                        `Current: ${A.bold}${current.provider}/${current.model}${A.reset}`,
                     );
                     break;
                 }
-                const found = findModel(this.config, arg);
-                if (!found) {
-                    console.log(`${A.red}"${arg}" not found. Use /models to list.${A.reset}`);
-                    break;
+                try {
+                    this.agent.setModelByPath(arg);
+                    const current = this.agent.getCurrentModel();
+                    const found = this.config.models.find(
+                        (m) => m.provider === current.provider && m.model === current.model,
+                    );
+                    if (found) this.activeModel = found;
+                    console.log(
+                        `Switched to ${A.bold}${current.provider}/${current.model}${A.reset}`,
+                    );
+                } catch (e: unknown) {
+                    console.log(`${A.red}${e instanceof Error ? e.message : String(e)}${A.reset}`);
                 }
-                this.activeModel = found;
-                this.agent.setConfig({
-                    ...this.agent.getConfig(),
-                    model: toModelConfig(found),
-                });
-                console.log(
-                    `Switched to ${A.bold}${found.name}${A.reset} (${found.provider}/${found.model})`,
-                );
                 break;
             }
 
@@ -636,7 +652,7 @@ export class CLI {
         const lines = [
             `${A.bold}Commands:${A.reset}`,
             `  ${A.cyan}/models${A.reset}                List configured models`,
-            `  ${A.cyan}/model <name>${A.reset}          Switch active model`,
+            `  ${A.cyan}/model <provider/model>${A.reset} Switch active model`,
             `  ${A.cyan}/tools${A.reset}                 List registered tools`,
             `  ${A.cyan}/history [page]${A.reset}        View conversation history`,
             `  ${A.cyan}/context${A.reset}               Preview context sent to LLM`,
