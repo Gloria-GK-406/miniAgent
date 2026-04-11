@@ -18,6 +18,10 @@
 - **MCP 插件** — 内置 Model Context Protocol 客户端，支持 stdio / SSE / Streamable HTTP 传输
 - **Skill 插件** — 从可配置目录中的 `SKILL.md` 清单加载技能指令
 - **内置工具** — 文件操作（read、write、edit）、搜索（glob、grep）、bash 执行、todo 管理、子 Agent 生成
+- **蓝图装配** — 通过蓝图声明式定义 Agent 组件组合，可复用的组件工厂
+- **能力系统** — 工具、插件和子 Agent 的 allow/deny 规则，支持 glob 风格模式匹配
+- **子 Agent 插件** — 基于 Markdown + frontmatter 文件定义子 Agent，提供 `run_subagent` 工具
+- **Agent 上下文提供者** — 自动加载项目/全局 Agent 框架配置文件（CLAUDE.md、AGENTS.md 等）
 - **会话管理** — 创建、切换、重命名、删除会话，每个会话独立持久化
 - **配置系统** — 分层配置，包含文件加载器、聚合器、解析器和运行时服务
 - **CLI** — 交互式 REPL，支持模型切换、会话管理、HITL 开关、上下文预览等
@@ -130,7 +134,10 @@ npm run chat
     }
   ],
   "defaultModel": "claude",
-  "systemPrompt": "You are a helpful assistant."
+  "systemPrompt": "You are a helpful assistant.",
+  "subagent": {
+    "path": "./.cliagent/subagent/"
+  }
 }
 ```
 
@@ -269,7 +276,9 @@ agent.register(provider);
 | `grepTool` | 使用正则表达式搜索文件内容 |
 | `bashTool` | 执行 bash 命令，支持超时和工作目录 |
 | `TodoManager` | 创建、更新、删除待办事项；将 todo 列表注入上下文 |
-| `SubAgentProvider` | 生成子 Agent 处理委托任务 |
+| `SubAgentProvider` | 生成子 Agent 处理委托任务（简单的内联方式） |
+| `SubagentPlugin` | 基于文件的子 Agent 管理，提供 `run_subagent` 工具 |
+| `AgentContextProvider` | 自动加载项目/全局 Agent 框架配置文件到上下文 |
 
 ### 上下文系统
 
@@ -393,6 +402,146 @@ agent.register(handler);
 import { StopException } from "@piaoxianguo/miniagent";
 throw new StopException("任务完成");
 ```
+
+### 蓝图装配
+
+`AgentAssembler` 从声明式蓝图构建 Agent。蓝图列出组件工厂 ID，装配器解析、创建并通过能力系统过滤它们：
+
+```typescript
+import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+
+const registry = new AgentBlueprintRegistry();
+registry.register("tool.read", () => readTool);
+registry.register("plugin.mcp", () => new McpPlugin());
+registry.register("plugin.subagent", () => new SubagentPlugin(factory));
+
+const assembler = new AgentAssembler(registry);
+const agent = await assembler.assemble({
+  llm: engines,
+  config: agentConfig,
+  blueprint: { uses: ["tool.read", "plugin.mcp", "plugin.subagent"] },
+  capabilities: { tool: { deny: ["bash"] } },
+});
+```
+
+`AgentBlueprint` schema：
+
+```typescript
+interface AgentBlueprint {
+  uses: string[];  // 要解析的工厂 ID 列表
+}
+```
+
+### 能力系统
+
+通过 allow/deny 规则和 glob 风格模式匹配，控制每个 Agent 可见的工具、服务器、技能和子 Agent：
+
+```typescript
+const capabilities: AgentCapabilitySelector = {
+  tool: { allow: ["read", "glob", "grep"], deny: ["bash"] },
+  mcp: {
+    server: { allow: ["filesystem"] },
+    tool: { deny: ["mcp__filesystem__write_file"] },
+  },
+  skill: { allow: ["*"] },
+  subagent: { deny: ["dangerous-agent"] },
+};
+```
+
+支持能力过滤的组件实现 `AgentCapabilityAware` 接口：
+
+```typescript
+interface AgentCapabilityAware {
+  setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void>;
+}
+```
+
+模式匹配支持 `*` 通配符（例如 `"mcp__*"` 匹配所有 MCP 工具）。
+
+### 子 Agent 插件（SubagentPlugin）
+
+`SubagentPlugin` 扫描目录中带 frontmatter 的 Markdown 文件来定义子 Agent。每个文件成为一个拥有独立系统提示词、模型和能力规则的子 Agent：
+
+```typescript
+import { SubagentPlugin } from "@piaoxianguo/miniagent/tool/subagent";
+
+const subagent = new SubagentPlugin(factory);
+agent.register(subagent);
+```
+
+在 `plugins.subagent` 中配置：
+
+```json
+{
+  "plugins": {
+    "subagent": {
+      "path": "./.cliagent/subagent/"
+    }
+  }
+}
+```
+
+子 Agent 目录中的每个 Markdown 文件定义一个子 Agent：
+
+```markdown
+---
+id: code-reviewer
+name: 代码审查员
+description: 审查代码质量和安全问题
+model: anthropic/claude-sonnet-4-20250514
+capabilities:
+  tool:
+    allow: ["read", "glob", "grep"]
+    deny: ["bash", "write", "edit"]
+---
+
+你是一名资深代码审查员。分析代码中的以下问题：
+- 安全漏洞
+- 性能问题
+- 最佳实践违规
+```
+
+Frontmatter 字段：
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `id` | 是 | 唯一的子 Agent 标识符 |
+| `name` | 否 | 显示名称（默认为 `id`） |
+| `description` | 否 | 在工具列表中显示的简短描述 |
+| `model` | 否 | 使用的模型，`provider/model` 格式 |
+| `capabilities` | 否 | 用于过滤可用工具的 `AgentCapabilityRule` |
+
+插件暴露 `run_subagent` 工具，参数如下：
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `agent` | 是 | 要调用的子 Agent `id` 或 `name` |
+| `task` | 是 | 要委托的任务描述 |
+| `context` | 否 | 注入到子 Agent 的额外上下文 |
+
+### Agent 上下文提供者（AgentContextProvider）
+
+`AgentContextProvider` 自动从项目和全局位置加载 Agent 框架配置文件，并将其作为系统上下文注入：
+
+```typescript
+import { AgentContextProvider } from "@piaoxianguo/miniagent";
+
+const contextProvider = new AgentContextProvider(process.cwd());
+agent.register(contextProvider);
+```
+
+扫描的位置：
+
+| 位置 | 说明 |
+|------|------|
+| `CLAUDE.md`、`AGENTS.md`、`GEMINI.md` | 项目级 Agent 指令 |
+| `.github/copilot-instructions.md` | GitHub Copilot 指令 |
+| `.cursorrules`、`.cursor/rules/` | Cursor 规则（`.mdc` 和 `.md`） |
+| `.windsurfrules` | Windsurf 规则 |
+| `CONVENTIONS.md` | 项目约定 |
+| `replit.md`、`.gemini/styleguide.md`、`.junie/guidelines.md` | 其他 Agent 配置 |
+| `.amazonq/rules/` | Amazon Q 规则 |
+| `~/.claude/CLAUDE.md`、`~/.gemini/GEMINI.md` | 全局用户级指令 |
 
 ### MCP 插件
 
@@ -581,6 +730,9 @@ src/
   core/
     agent.ts                  # MiniAgent 类 — 主循环
     create-agent.ts           # createMiniAgent 工厂函数
+    assembler.ts              # AgentAssembler, AgentBlueprintRegistry — 蓝图装配
+    blueprint.ts              # AgentBlueprint schema
+    capability.ts             # 能力系统（allow/deny 规则、模式匹配）
     module.ts                 # defineAgentModule 辅助函数
     types.ts                  # Zod schema 和类型定义
     llm.ts                    # LLMEngineManager，引擎抽象层
@@ -595,11 +747,12 @@ src/
   tool/
     types.ts                  # Tool 和 ToolProvider schema
     approver.ts               # ToolApprover（HITL）
+    agent-context.ts          # AgentContextProvider — 自动加载框架配置文件
+    subagent.ts               # SubAgentProvider + SubagentPlugin
     read.ts / write.ts / edit.ts  # 文件操作工具
     glob.ts / grep.ts         # 搜索工具
     bash.ts                   # Shell 执行工具
     todo.ts                   # TodoManager 工具 + 上下文处理器
-    subagent.ts               # SubAgentProvider
     mcp/                      # MCP 插件
     skill/                    # Skill 插件
   engine/
@@ -609,7 +762,9 @@ src/
     glm/                      # 智谱 GLM 引擎
     glm-codeplan/             # 智谱 GLM CodePlan 引擎
   cli/                        # 交互式 CLI
-  utils/config/               # 配置工具
+  utils/
+    config/                   # 配置工具
+    frontmatter.ts            # Frontmatter 解析器
 ```
 
 ## 技术栈
@@ -627,6 +782,12 @@ src/
 ```typescript
 // 核心
 import { MiniAgent, createMiniAgent, defineAgentModule } from "@piaoxianguo/miniagent";
+import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+import { AgentBlueprintSchema, type AgentBlueprint } from "@piaoxianguo/miniagent";
+import {
+  AgentCapabilityRuleSchema, AgentCapabilitySelectorSchema,
+  isCapabilityEnabled, getCapabilityNamespace,
+} from "@piaoxianguo/miniagent";
 import { LLMEngineManager } from "@piaoxianguo/miniagent";
 import { MessageSource, FileStore, SessionManager } from "@piaoxianguo/miniagent";
 import { ContextCompressor } from "@piaoxianguo/miniagent";
@@ -645,6 +806,8 @@ import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
 // 插件
 import { McpPlugin } from "@piaoxianguo/miniagent/tool/mcp";
 import { SkillPlugin } from "@piaoxianguo/miniagent/tool/skill";
+import { SubagentPlugin } from "@piaoxianguo/miniagent";
+import { AgentContextProvider } from "@piaoxianguo/miniagent";
 
 // 配置工具
 import {

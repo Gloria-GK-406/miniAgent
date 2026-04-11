@@ -17,6 +17,10 @@ A minimal, extensible TypeScript Agent framework. Simple by default, powerful wh
 - **Event System** — Full lifecycle events via `EventEmitter` (run, turn, llm, tool, message)
 - **MCP Plugin** — Built-in Model Context Protocol client with stdio / SSE / Streamable HTTP transports
 - **Skill Plugin** — Load skill instructions from `SKILL.md` manifests in configurable directories
+- **Blueprint Assembly** — Define agent compositions declaratively via blueprints; reusable component factories
+- **Capability System** — Allow/deny patterns for tools, plugins, and subagents with glob-style matching
+- **Subagent Plugin** — File-based subagent definitions (Markdown + frontmatter) with `run_subagent` tool
+- **Agent Context Provider** — Auto-load project/global agent framework config files (CLAUDE.md, AGENTS.md, etc.)
 - **Built-in Tools** — File operations (read, write, edit), search (glob, grep), bash execution, todo management, sub-agent spawning
 - **Session Management** — Create, switch, rename, delete sessions with per-session persistence
 - **Configuration System** — Layered config with file loader, aggregator, resolver, and runtime service
@@ -130,7 +134,10 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
     }
   ],
   "defaultModel": "claude",
-  "systemPrompt": "You are a helpful assistant."
+  "systemPrompt": "You are a helpful assistant.",
+  "subagent": {
+    "path": "./.cliagent/subagent/"
+  }
 }
 ```
 
@@ -269,7 +276,9 @@ The framework ships with ready-to-use tools:
 | `grepTool` | Search file contents with regex |
 | `bashTool` | Execute bash commands with timeout and working directory |
 | `TodoManager` | Create, update, delete todo items; injects todo list into context |
-| `SubAgentProvider` | Spawn sub-agents for delegated tasks |
+| `SubAgentProvider` | Spawn sub-agents for delegated tasks (simple, inline) |
+| `SubagentPlugin` | File-based subagent management with `run_subagent` tool |
+| `AgentContextProvider` | Auto-load project/global agent framework config files into context |
 
 ### Context System
 
@@ -393,6 +402,146 @@ Throw `StopException` from any component to gracefully stop the agent loop:
 import { StopException } from "@piaoxianguo/miniagent";
 throw new StopException("Task complete");
 ```
+
+### Blueprint Assembly
+
+`AgentAssembler` builds agents from declarative blueprints. A blueprint lists component factory IDs, and the assembler resolves, creates, and filters them through the capability system:
+
+```typescript
+import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+
+const registry = new AgentBlueprintRegistry();
+registry.register("tool.read", () => readTool);
+registry.register("plugin.mcp", () => new McpPlugin());
+registry.register("plugin.subagent", () => new SubagentPlugin(factory));
+
+const assembler = new AgentAssembler(registry);
+const agent = await assembler.assemble({
+  llm: engines,
+  config: agentConfig,
+  blueprint: { uses: ["tool.read", "plugin.mcp", "plugin.subagent"] },
+  capabilities: { tool: { deny: ["bash"] } },
+});
+```
+
+`AgentBlueprint` schema:
+
+```typescript
+interface AgentBlueprint {
+  uses: string[];  // Factory IDs to resolve
+}
+```
+
+### Capability System
+
+Control which tools, servers, skills, and subagents are visible to each agent via allow/deny rules with glob-style pattern matching:
+
+```typescript
+const capabilities: AgentCapabilitySelector = {
+  tool: { allow: ["read", "glob", "grep"], deny: ["bash"] },
+  mcp: {
+    server: { allow: ["filesystem"] },
+    tool: { deny: ["mcp__filesystem__write_file"] },
+  },
+  skill: { allow: ["*"] },
+  subagent: { deny: ["dangerous-agent"] },
+};
+```
+
+Components that support capability filtering implement `AgentCapabilityAware`:
+
+```typescript
+interface AgentCapabilityAware {
+  setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void>;
+}
+```
+
+Pattern matching supports `*` as a wildcard (e.g., `"mcp__*"` matches all MCP tools).
+
+### Subagent Plugin
+
+`SubagentPlugin` scans directories for Markdown files with frontmatter that define subagents. Each file becomes a subagent with its own system prompt, model, and capability rules:
+
+```typescript
+import { SubagentPlugin } from "@piaoxianguo/miniagent/tool/subagent";
+
+const subagent = new SubagentPlugin(factory);
+agent.register(subagent);
+```
+
+Configure in `plugins.subagent`:
+
+```json
+{
+  "plugins": {
+    "subagent": {
+      "path": "./.cliagent/subagent/"
+    }
+  }
+}
+```
+
+Each Markdown file in the subagent directory defines one subagent:
+
+```markdown
+---
+id: code-reviewer
+name: Code Reviewer
+description: Reviews code for quality and security issues
+model: anthropic/claude-sonnet-4-20250514
+capabilities:
+  tool:
+    allow: ["read", "glob", "grep"]
+    deny: ["bash", "write", "edit"]
+---
+
+You are a senior code reviewer. Analyze code for:
+- Security vulnerabilities
+- Performance issues
+- Best practice violations
+```
+
+Frontmatter fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | Yes | Unique subagent identifier |
+| `name` | No | Display name (defaults to `id`) |
+| `description` | No | Short description shown in tool listing |
+| `model` | No | Model to use in `provider/model` format |
+| `capabilities` | No | `AgentCapabilityRule` for filtering available tools |
+
+The plugin exposes a `run_subagent` tool with parameters:
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `agent` | Yes | Subagent `id` or `name` to invoke |
+| `task` | Yes | Task description to delegate |
+| `context` | No | Additional context injected into the subagent |
+
+### Agent Context Provider
+
+`AgentContextProvider` automatically loads agent framework configuration files from the project and global locations, injecting them as system context:
+
+```typescript
+import { AgentContextProvider } from "@piaoxianguo/miniagent";
+
+const contextProvider = new AgentContextProvider(process.cwd());
+agent.register(contextProvider);
+```
+
+Scanned locations:
+
+| Location | Description |
+|----------|-------------|
+| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` | Project-level agent instructions |
+| `.github/copilot-instructions.md` | GitHub Copilot instructions |
+| `.cursorrules`, `.cursor/rules/` | Cursor rules (`.mdc` and `.md`) |
+| `.windsurfrules` | Windsurf rules |
+| `CONVENTIONS.md` | Project conventions |
+| `replit.md`, `.gemini/styleguide.md`, `.junie/guidelines.md` | Other agent configs |
+| `.amazonq/rules/` | Amazon Q rules |
+| `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md` | Global user-level instructions |
 
 ### MCP Plugin
 
@@ -581,6 +730,9 @@ src/
   core/
     agent.ts                  # MiniAgent class — main loop
     create-agent.ts           # createMiniAgent factory
+    assembler.ts              # AgentAssembler, AgentBlueprintRegistry — blueprint-based assembly
+    blueprint.ts              # AgentBlueprint schema
+    capability.ts             # Capability system (allow/deny rules, pattern matching)
     module.ts                 # defineAgentModule helper
     types.ts                  # Zod schemas and type definitions
     llm.ts                    # LLMEngineManager, engine abstraction
@@ -595,11 +747,12 @@ src/
   tool/
     types.ts                  # Tool and ToolProvider schemas
     approver.ts               # ToolApprover (HITL)
+    agent-context.ts          # AgentContextProvider — auto-load framework config files
+    subagent.ts               # SubAgentProvider + SubagentPlugin
     read.ts / write.ts / edit.ts  # File operation tools
     glob.ts / grep.ts         # Search tools
     bash.ts                   # Shell execution tool
     todo.ts                   # TodoManager tool + context processor
-    subagent.ts               # SubAgentProvider
     mcp/                      # MCP plugin
     skill/                    # Skill plugin
   engine/
@@ -609,7 +762,9 @@ src/
     glm/                      # Zhipu GLM engine
     glm-codeplan/             # Zhipu GLM CodePlan engine
   cli/                        # Interactive CLI
-  utils/config/               # Configuration utilities
+  utils/
+    config/                   # Configuration utilities
+    frontmatter.ts            # Frontmatter parser
 ```
 
 ## Tech Stack
@@ -627,6 +782,12 @@ src/
 ```typescript
 // Core
 import { MiniAgent, createMiniAgent, defineAgentModule } from "@piaoxianguo/miniagent";
+import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+import { AgentBlueprintSchema, type AgentBlueprint } from "@piaoxianguo/miniagent";
+import {
+  AgentCapabilityRuleSchema, AgentCapabilitySelectorSchema,
+  isCapabilityEnabled, getCapabilityNamespace,
+} from "@piaoxianguo/miniagent";
 import { LLMEngineManager } from "@piaoxianguo/miniagent";
 import { MessageSource, FileStore, SessionManager } from "@piaoxianguo/miniagent";
 import { ContextCompressor } from "@piaoxianguo/miniagent";
@@ -645,6 +806,8 @@ import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
 // Plugins
 import { McpPlugin } from "@piaoxianguo/miniagent/tool/mcp";
 import { SkillPlugin } from "@piaoxianguo/miniagent/tool/skill";
+import { SubagentPlugin } from "@piaoxianguo/miniagent";
+import { AgentContextProvider } from "@piaoxianguo/miniagent";
 
 // Config utilities
 import {
