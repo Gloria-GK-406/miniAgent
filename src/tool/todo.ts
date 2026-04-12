@@ -28,7 +28,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                 parameters: z.object({
                     content: z.string().describe("Description of the todo item"),
                 }),
-                execute: async (args: Record<string, unknown>): Promise<string> => {
+                execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                     const parsed = z.object({ content: z.string() }).parse(args);
                     const item: TodoItem = {
                         id: crypto.randomUUID(),
@@ -47,7 +47,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                     content: z.string().optional().describe("New description"),
                     status: z.enum(["pending", "in_progress", "completed"]).optional().describe("New status"),
                 }),
-                execute: async (args: Record<string, unknown>): Promise<string> => {
+                execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                     const parsed = z.object({
                         id: z.string(),
                         content: z.string().optional(),
@@ -66,7 +66,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                 parameters: z.object({
                     id: z.string().describe("ID of the todo item to delete"),
                 }),
-                execute: async (args: Record<string, unknown>): Promise<string> => {
+                execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                     const parsed = z.object({ id: z.string() }).parse(args);
                     const index = this.todos.findIndex((t) => t.id === parsed.id);
                     if (index === -1) return `Todo not found: ${parsed.id}`;

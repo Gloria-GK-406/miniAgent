@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { exec } from "node:child_process";
-import type { ExecOptions } from "node:child_process";
+import { spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import type { Tool } from "./types.js";
 
 const BashParamsSchema = z.object({
@@ -9,30 +9,81 @@ const BashParamsSchema = z.object({
     workdir: z.string().optional().describe("Working directory for command execution"),
 });
 
-function bashExecute(args: Record<string, unknown>): Promise<string> {
+function bashExecute(args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
     const parsed = BashParamsSchema.parse(args);
+    const timeout = parsed.timeout ?? 120000;
+
     return new Promise((resolve) => {
-        const options: ExecOptions = {
-            timeout: parsed.timeout ?? 120000,
-            maxBuffer: 1024 * 1024 * 10,
-        };
-        if (parsed.workdir) {
-            options.cwd = parsed.workdir;
+        let stdout = "";
+        let stderr = "";
+        let killed = false;
+        let timedOut = false;
+        let child: ChildProcess;
+
+        try {
+            child = spawn("bash", ["-c", parsed.command], {
+                cwd: parsed.workdir,
+                env: process.env,
+                stdio: ["pipe", "pipe", "pipe"],
+            });
+        } catch (e: unknown) {
+            resolve(e instanceof Error ? e.message : String(e));
+            return;
         }
-        exec(parsed.command, options, (error, stdout, stderr) => {
+
+        const timer = setTimeout(() => {
+            timedOut = true;
+            killed = true;
+            child.kill("SIGKILL");
+        }, timeout);
+
+        child.stdout?.on("data", (data: Buffer) => {
+            stdout += data.toString();
+        });
+
+        child.stderr?.on("data", (data: Buffer) => {
+            stderr += data.toString();
+        });
+
+        const onAbort = (): void => {
+            killed = true;
+            child.kill("SIGTERM");
+        };
+
+        if (signal) {
+            if (signal.aborted) {
+                onAbort();
+            } else {
+                signal.addEventListener("abort", onAbort, { once: true });
+            }
+        }
+
+        child.on("close", (code: number | null) => {
+            clearTimeout(timer);
+            if (signal) {
+                signal.removeEventListener("abort", onAbort);
+            }
+
             let output = "";
             if (stdout) output += stdout;
             if (stderr) output += (output ? "\n" : "") + stderr;
-            if (error) {
-                const code = error.code;
-                if (error.killed) {
-                    output += (output ? "\n" : "") + `[Process timed out after ${parsed.timeout ?? 120000}ms]`;
-                }
-                if (typeof code === "number") {
-                    output += (output ? "\n" : "") + `[Exit code: ${code}]`;
-                }
+            if (killed && timedOut) {
+                output += (output ? "\n" : "") + `[Process timed out after ${timeout}ms]`;
+            } else if (killed) {
+                output += (output ? "\n" : "") + "[Process aborted]";
+            }
+            if (typeof code === "number" && code !== 0 && !killed) {
+                output += (output ? "\n" : "") + `[Exit code: ${code}]`;
             }
             resolve(output || "[No output]");
+        });
+
+        child.on("error", (err: Error) => {
+            clearTimeout(timer);
+            if (signal) {
+                signal.removeEventListener("abort", onAbort);
+            }
+            resolve(err.message);
         });
     });
 }

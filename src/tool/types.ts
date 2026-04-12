@@ -5,7 +5,7 @@ export const ToolSchema = z.object({
     description: z.string(),
     parameters: z.instanceof(z.ZodType),
     execute: z.function(
-        z.tuple([z.record(z.unknown())]),
+        z.tuple([z.record(z.unknown()), z.instanceof(AbortSignal).optional()]),
         z.promise(z.string()),
     ),
 });

@@ -80,9 +80,20 @@ export class SubAgentProvider implements ToolProvider {
                 name: "subagent",
                 description: "Spawn a sub-agent to handle a specific task autonomously. The sub-agent has access to all tools and can perform multi-step operations. Use this for complex tasks that benefit from focused attention.",
                 parameters: SubAgentParamsSchema,
-                execute: async (args: Record<string, unknown>): Promise<string> => {
+                execute: async (args: Record<string, unknown>, signal?: AbortSignal): Promise<string> => {
                     const parsed = SubAgentParamsSchema.parse(args);
                     const agent = await this.factory(parsed.task, parsed.system_prompt ?? "");
+
+                    const onAbort = (): void => {
+                        agent.stop();
+                    };
+                    if (signal) {
+                        if (signal.aborted) {
+                            onAbort();
+                        } else {
+                            signal.addEventListener("abort", onAbort, { once: true });
+                        }
+                    }
 
                     const inputMsg: Message = {
                         id: crypto.randomUUID(),
@@ -91,6 +102,9 @@ export class SubAgentProvider implements ToolProvider {
                     };
 
                     const messages = await agent.run(inputMsg);
+                    if (signal) {
+                        signal.removeEventListener("abort", onAbort);
+                    }
                     const lastMsg = messages[messages.length - 1];
                     if (lastMsg && lastMsg.type === MessageType.Assist) {
                         const content = typeof lastMsg.content === "string"
@@ -194,7 +208,7 @@ export class SubagentPlugin {
                 "Run a configured subagent by id or name. "
                 + "Use this when a specialized delegated agent should handle a task synchronously.",
             parameters: RunSubagentParamsSchema,
-            execute: async (args: Record<string, unknown>): Promise<string> => {
+            execute: async (args: Record<string, unknown>, signal?: AbortSignal): Promise<string> => {
                 const parsed = RunSubagentParamsSchema.parse(args);
                 const entry = this.resolveEntry(parsed.agent, visibleEntries);
                 if (!entry) {
@@ -208,6 +222,17 @@ export class SubagentPlugin {
                     ...(parsed.context !== undefined && { context: parsed.context }),
                 });
 
+                const onAbort = (): void => {
+                    agent.stop();
+                };
+                if (signal) {
+                    if (signal.aborted) {
+                        onAbort();
+                    } else {
+                        signal.addEventListener("abort", onAbort, { once: true });
+                    }
+                }
+
                 const inputMsg: Message = {
                     id: crypto.randomUUID(),
                     type: MessageType.User,
@@ -215,6 +240,9 @@ export class SubagentPlugin {
                 };
 
                 const messages = await agent.run(inputMsg);
+                if (signal) {
+                    signal.removeEventListener("abort", onAbort);
+                }
                 const finalMessage = getFinalMessageText(messages);
                 return [
                     `<subagent_result id="${entry.id}" name="${entry.name}">`,

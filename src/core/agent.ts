@@ -58,6 +58,7 @@ export class MiniAgent {
     private running = false;
     private stopped = false;
     private contextCount: TokenCount = emptyTokenCount();
+    private toolAbortController: AbortController | null = null;
 
     constructor(llm: LLMRequest, config: AgentConfig) {
         this.llm = llm;
@@ -387,13 +388,17 @@ export class MiniAgent {
         if (!tool) {
             content = `tool not found: ${toolCall.toolName}`;
         } else {
+            const abortController = new AbortController();
+            this.toolAbortController = abortController;
             try {
-                content = await tool.execute(toolCall.arguments as Record<string, unknown>);
+                content = await tool.execute(toolCall.arguments as Record<string, unknown>, abortController.signal);
             } catch (e: unknown) {
                 if (e instanceof StopException) {
                     throw e;
                 }
                 content = e instanceof Error ? e.message : String(e);
+            } finally {
+                this.toolAbortController = null;
             }
         }
 
@@ -420,6 +425,7 @@ export class MiniAgent {
             return;
         }
         this.stopped = true;
+        this.toolAbortController?.abort();
     }
 
     async run(input: Message): Promise<Message[]> {

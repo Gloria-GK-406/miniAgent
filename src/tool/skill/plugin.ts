@@ -95,7 +95,7 @@ export class SkillPlugin {
             parameters: z.object({
                 id: z.string().describe("The skill id to load"),
             }),
-            execute: async (args: Record<string, unknown>): Promise<string> => {
+            execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                 const id = args["id"] as string;
                 const skill = visibleSkills.find((entry) => entry.id === id);
                 if (!skill) {

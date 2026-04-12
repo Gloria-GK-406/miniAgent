@@ -37,7 +37,7 @@ export function convertMcpTool(
         name: prefixedName,
         description: entry.description ?? "",
         parameters: passthroughSchema,
-        execute: async (args: Record<string, unknown>): Promise<string> => {
+        execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
             try {
                 return await client.callTool(entry.name, args);
             } catch (e: unknown) {
