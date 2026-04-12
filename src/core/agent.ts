@@ -53,7 +53,6 @@ export class MiniAgent {
     private turnContextAwares: TurnContextAware[] = [];
     private turnContextAppenders: TurnContextAppend[] = [];
     private approvers: ToolApprover[] = [];
-    private autoApprovedTools: Set<string> = new Set();
     private store: FileStore;
     private emitter = new EventEmitter();
     private running = false;
@@ -361,20 +360,11 @@ export class MiniAgent {
         }
     }
 
-    setAutoApprovedTools(tools: string[]): void {
-        this.autoApprovedTools = new Set(tools);
-    }
-
     private async requestApproval(toolName: string, args: Record<string, unknown>): Promise<boolean> {
-        if (this.autoApprovedTools.has(toolName)) return true;
         if (this.approvers.length === 0) return true;
         for (const approver of this.approvers) {
             const decision = await approver.requestApproval(toolName, args);
-            if (decision === "deny") return false;
-            if (decision === "approve_all") {
-                this.autoApprovedTools.add(toolName);
-                return true;
-            }
+            if (!decision) return false;
         }
         return true;
     }

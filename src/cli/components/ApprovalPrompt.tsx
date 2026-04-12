@@ -1,10 +1,9 @@
 import { Box, Text, useInput } from "ink";
-import type { ApprovalDecision } from "../../tool/approver.js";
 
 interface ApprovalPromptProps {
   toolName: string;
   args: Record<string, unknown>;
-  onDecision: (decision: ApprovalDecision) => void;
+  onDecision: (decision: boolean) => void;
 }
 
 export function ApprovalPrompt({ toolName, args, onDecision }: ApprovalPromptProps) {
@@ -13,9 +12,8 @@ export function ApprovalPrompt({ toolName, args, onDecision }: ApprovalPromptPro
 
   useInput((input) => {
     const key = input.toLowerCase();
-    if (key === "y") onDecision("approve");
-    else if (key === "n") onDecision("deny");
-    else if (key === "a") onDecision("approve_all");
+    if (key === "y") onDecision(true);
+    else if (key === "n") onDecision(false);
   });
 
   return (
@@ -23,7 +21,7 @@ export function ApprovalPrompt({ toolName, args, onDecision }: ApprovalPromptPro
       <Text color="yellow">[HITL] Tool call: </Text>
       <Text bold>{toolName}</Text>
       <Text dimColor>{display}</Text>
-      <Text color="yellow">Approve? [y]es / [n]o / [a]lways: </Text>
+      <Text color="yellow">Approve? [y]es / [n]o: </Text>
     </Box>
   );
 }

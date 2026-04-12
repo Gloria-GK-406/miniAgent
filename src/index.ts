@@ -93,7 +93,7 @@ export type { CompressionConfig } from "./context/compressor.js";
 export { ToolSchema, ToolProviderSchema } from "./tool/types.js";
 export type { Tool, ToolProvider } from "./tool/types.js";
 export { ToolApproverSchema } from "./tool/approver.js";
-export type { ToolApprover, ApprovalDecision } from "./tool/approver.js";
+export type { ToolApprover } from "./tool/approver.js";
 export {
     SubAgentProvider,
     SubagentPlugin,

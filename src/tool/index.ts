@@ -22,7 +22,7 @@ export type {
     SubagentInvocation,
 } from "./subagent.js";
 export { ToolApproverSchema } from "./approver.js";
-export type { ToolApprover, ApprovalDecision } from "./approver.js";
+export type { ToolApprover } from "./approver.js";
 export { ToolSchema, ToolProviderSchema } from "./types.js";
 export type { Tool, ToolProvider } from "./types.js";
 export { McpPlugin } from "./mcp/plugin.js";

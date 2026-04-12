@@ -326,6 +326,116 @@ describe("MiniAgent", () => {
     expect(messages[messages.length - 1]!.id).toBe("assist-2");
   });
 
+  it("executes a tool only after every approver allows it", async () => {
+    const decisions: string[] = [];
+    const toolCall: ToolCallMessage = {
+      id: "tool-call-1",
+      type: MessageType.ToolCall,
+      content: "",
+      toolCallId: "call-1",
+      toolName: "echo_tool",
+      arguments: { text: "pong" },
+    };
+    const llm = createLLM([
+      wrapResponse([toolCall]),
+      wrapResponse({
+        id: "assist-2",
+        type: MessageType.Assist,
+        content: "done",
+      }),
+    ]);
+    const agent = new MiniAgent(llm, createConfig(testDir));
+
+    agent.register({
+      requestApproval: async (): Promise<true> => {
+        decisions.push("first");
+        return true;
+      },
+    });
+    agent.register({
+      requestApproval: async (): Promise<true> => {
+        decisions.push("second");
+        return true;
+      },
+    });
+    agent.register({
+      name: "echo_tool",
+      description: "Echoes text",
+      parameters: z.object({
+        text: z.string(),
+      }),
+      execute: async (args: Record<string, unknown>): Promise<string> => String(args["text"]),
+    });
+
+    const messages = await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "call the tool",
+    });
+
+    expect(decisions).toEqual(["first", "second"]);
+    const toolResult = messages.find((message) => message.type === MessageType.ToolResult) as ToolResultMessage | undefined;
+    expect(toolResult?.content).toBe("pong");
+  });
+
+  it("denies tool execution when any approver rejects it", async () => {
+    const decisions: string[] = [];
+    const toolCall: ToolCallMessage = {
+      id: "tool-call-1",
+      type: MessageType.ToolCall,
+      content: "",
+      toolCallId: "call-1",
+      toolName: "echo_tool",
+      arguments: { text: "pong" },
+    };
+    const llm = createLLM([
+      wrapResponse([toolCall]),
+      wrapResponse({
+        id: "assist-2",
+        type: MessageType.Assist,
+        content: "done",
+      }),
+    ]);
+    const agent = new MiniAgent(llm, createConfig(testDir));
+
+    agent.register({
+      requestApproval: async (): Promise<true> => {
+        decisions.push("first");
+        return true;
+      },
+    });
+    agent.register({
+      requestApproval: async (): Promise<false> => {
+        decisions.push("second");
+        return false;
+      },
+    });
+    agent.register({
+      requestApproval: async (): Promise<true> => {
+        decisions.push("third");
+        return true;
+      },
+    });
+    agent.register({
+      name: "echo_tool",
+      description: "Echoes text",
+      parameters: z.object({
+        text: z.string(),
+      }),
+      execute: async (): Promise<string> => "pong",
+    });
+
+    const messages = await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "call the tool",
+    });
+
+    expect(decisions).toEqual(["first", "second"]);
+    const toolResult = messages.find((message) => message.type === MessageType.ToolResult) as ToolResultMessage | undefined;
+    expect(toolResult?.content).toBe("Tool execution denied by user.");
+  });
+
   it("passes a managed control surface to after-turn processors", async () => {
     let seenControl: AgentContextControl | undefined;
     const llm = createLLM([

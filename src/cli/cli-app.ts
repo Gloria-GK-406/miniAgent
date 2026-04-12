@@ -13,7 +13,6 @@ import type { JsonValue } from "../core/config.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
 import { ContextCompressor } from "../context/compressor.js";
-import type { ApprovalDecision } from "../tool/approver.js";
 import { AnthropicEngine } from "../engine/anthropic/index.js";
 import { OpenAIEngine } from "../engine/openai/index.js";
 import { OpenAICompatibleEngine } from "../engine/openai-compatible/index.js";
@@ -214,6 +213,22 @@ function registerEngines(manager: LLMEngineManager, config: CLIConfig): void {
     }
 }
 
+function createCLIApprover(getHitlEnabled: () => boolean) {
+    const autoApprovedTools = new Set(AUTO_APPROVE_TOOLS);
+
+    return defineAgentModule({
+        requestApproval: async (toolName: string, _args: Record<string, unknown>): Promise<boolean> => {
+            if (autoApprovedTools.has(toolName)) {
+                return true;
+            }
+            if (!getHitlEnabled()) {
+                return true;
+            }
+            return true;
+        },
+    });
+}
+
 function createBlueprintRegistry(
     baseDir: string,
     subagentFactory: () => ConfiguredSubagentFactory,
@@ -355,15 +370,7 @@ async function buildAgentInner(
             }),
             compressor,
             (createdAgent: MiniAgent): void => {
-                createdAgent.setAutoApprovedTools(AUTO_APPROVE_TOOLS);
-                createdAgent.register(
-                    defineAgentModule({
-                        requestApproval: async (_toolName: string, _args: Record<string, unknown>): Promise<ApprovalDecision> => {
-                            if (!getHitlEnabled()) return "approve";
-                            return "approve";
-                        },
-                    }),
-                );
+                createdAgent.register(createCLIApprover(getHitlEnabled));
             },
         ],
     });
