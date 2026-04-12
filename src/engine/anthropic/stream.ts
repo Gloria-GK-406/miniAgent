@@ -15,6 +15,7 @@ interface AnthropicToolUseBuffer {
 
 export interface ConsumeAnthropicStreamOptions {
   emitChunk: (chunk: LLMStreamChunk) => void;
+  shouldBreak?: () => boolean;
 }
 
 function toToolArguments(toolUse: AnthropicToolUseBuffer): Record<string, unknown> {
@@ -37,6 +38,10 @@ export async function consumeAnthropicStream(
   let tokenCount = emptyTokenCount();
 
   for await (const event of stream) {
+    if (options.shouldBreak?.()) {
+      break;
+    }
+
     if (event.type === "message_start") {
       tokenCount = createTokenCount(
         (event.message.usage.input_tokens ?? 0)

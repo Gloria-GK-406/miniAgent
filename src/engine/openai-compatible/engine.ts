@@ -26,6 +26,7 @@ export const OpenAICompatibleEngine: LLMEngineCtor = class implements LLMEngine 
   ): LLMStreamHandle<LLMResponse> {
     const params = buildCreateParams(messages, this.config, tools);
     const controller = createLLMStreamHandle<LLMResponse>();
+
     void (async () => {
       try {
         const stream = await this.client.chat.completions.create({
@@ -39,6 +40,7 @@ export const OpenAICompatibleEngine: LLMEngineCtor = class implements LLMEngine 
           emitChunk: (chunk) => {
             controller.emitChunk(chunk);
           },
+          shouldBreak: () => controller.isAborted(),
         });
         controller.resolve(response);
       } catch (error: unknown) {

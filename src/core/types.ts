@@ -142,6 +142,7 @@ export type LLMStreamChunk = z.infer<typeof LLMStreamChunkSchema>;
 
 export interface LLMStreamHandle<T> extends PromiseLike<T> {
   onChunk(listener: (chunk: LLMStreamChunk) => void): () => void;
+  abort(): void;
 }
 
 export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();

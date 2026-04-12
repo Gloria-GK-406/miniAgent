@@ -14,6 +14,7 @@ interface OpenAIToolCallBuffer {
 export interface ConsumeOpenAIStreamOptions {
   emitChunk: (chunk: LLMStreamChunk) => void;
   extractReasoningDelta?: (chunk: ChatCompletionChunk) => string | undefined;
+  shouldBreak?: () => boolean;
 }
 
 function getToolCallBuffer(
@@ -42,6 +43,10 @@ export async function consumeOpenAIStream(
   let tokenCount = emptyTokenCount();
 
   for await (const chunk of stream) {
+    if (options.shouldBreak?.()) {
+      break;
+    }
+
     if (chunk.usage) {
       tokenCount = createTokenCount(chunk.usage.prompt_tokens, chunk.usage.completion_tokens);
     }

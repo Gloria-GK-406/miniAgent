@@ -26,6 +26,7 @@ class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
   private promise: Promise<T>;
   private resolvePromise!: (value: T) => void;
   private rejectPromise!: (reason?: unknown) => void;
+  private aborted = false;
 
   constructor() {
     this.promise = new Promise<T>((resolve, reject) => {
@@ -42,6 +43,7 @@ class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
   }
 
   emitChunk(chunk: LLMStreamChunk): void {
+    if (this.aborted) return;
     for (const listener of this.listeners) {
       listener(chunk);
     }
@@ -53,6 +55,14 @@ class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
 
   reject(reason?: unknown): void {
     this.rejectPromise(reason);
+  }
+
+  abort(): void {
+    this.aborted = true;
+  }
+
+  isAborted(): boolean {
+    return this.aborted;
   }
 
   then<TResult1 = T, TResult2 = never>(
@@ -68,6 +78,7 @@ export interface LLMStreamController<T> {
   emitChunk(chunk: LLMStreamChunk): void;
   resolve(value: T): void;
   reject(reason?: unknown): void;
+  isAborted(): boolean;
 }
 
 export function createLLMStreamHandle<T>(): LLMStreamController<T> {
@@ -82,6 +93,9 @@ export function createLLMStreamHandle<T>(): LLMStreamController<T> {
     },
     reject(reason?: unknown): void {
       handle.reject(reason);
+    },
+    isAborted(): boolean {
+      return handle.isAborted();
     },
   };
 }

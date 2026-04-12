@@ -447,6 +447,9 @@ export class MiniAgent {
                     const stream = this.llm.streamInvoke(context, this.config.model, tools);
                     const unsubscribe = stream.onChunk((chunk) => {
                         this.emitter.emit("llm:chunk", { chunk });
+                        if (this.stopped) {
+                            stream.abort();
+                        }
                     });
                     let response;
                     try {
@@ -456,11 +459,6 @@ export class MiniAgent {
                     }
                     this.contextCount = addTokenCount(this.contextCount, response.tokenCount);
                     this.emitter.emit("llm:response", { response });
-
-                    if (this.stopped) {
-                        this.emitter.emit("turn:end", { turn });
-                        break;
-                    }
 
                     if (!Array.isArray(response.message)) {
                         await this.notify(response.message);
