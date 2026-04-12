@@ -21,7 +21,7 @@ export class SkillPlugin {
     private config: SkillPluginConfig | null = null;
     private capabilities: SkillCapabilitySelector = {};
 
-    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
         const raw = getCapabilityNamespace(capabilities, "skill");
         if (raw === undefined) {
             this.capabilities = {};

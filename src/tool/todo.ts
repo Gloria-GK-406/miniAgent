@@ -16,7 +16,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
     private todos: TodoItem[] = [];
     private capabilities: AgentCapabilitySelector = {};
 
-    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
         this.capabilities = capabilities;
     }
 

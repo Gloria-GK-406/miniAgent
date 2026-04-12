@@ -65,9 +65,9 @@ describe("AgentAssembler", () => {
         await rm(testDir, { recursive: true, force: true });
     });
 
-    it("filters static tools by name and forwards capability selectors to aware uses", async () => {
+    it("filters static tools by name and forwards capability selectors to capability consumers", async () => {
         const registry = new AgentBlueprintRegistry();
-        const awareSpy = vi.fn();
+        const capabilityConsumerSpy = vi.fn();
 
         registry.register("tool.echo", () => ({
             name: "echo",
@@ -78,15 +78,15 @@ describe("AgentAssembler", () => {
             execute: async (args: Record<string, unknown>): Promise<string> => String(args["text"]),
         }));
 
-        registry.register("context.aware", () => ({
+        registry.register("context.consumer", () => ({
             priority: 0,
-            setAgentCapabilities: async (capabilities: { tool?: { allow?: string[]; deny?: string[] } }): Promise<void> => {
-                awareSpy(capabilities);
+            consumeAgentCapabilities: async (capabilities: { tool?: { allow?: string[]; deny?: string[] } }): Promise<void> => {
+                capabilityConsumerSpy(capabilities);
             },
             collect: async (): Promise<Message[]> => [{
-                id: "aware-1",
+                id: "consumer-1",
                 type: MessageType.System,
-                content: "aware",
+                content: "consumer",
             }],
         }));
 
@@ -95,7 +95,7 @@ describe("AgentAssembler", () => {
             llm: createLLM(),
             config: createConfig(testDir),
             blueprint: {
-                uses: ["tool.echo", "context.aware"],
+                uses: ["tool.echo", "context.consumer"],
             },
             capabilities: {
                 tool: {
@@ -103,13 +103,13 @@ describe("AgentAssembler", () => {
                 },
             },
         });
-
+ 
         const tools = await agent.getToolList();
         const context = await agent.previewContext();
 
         expect(tools).toEqual([]);
-        expect(context.map((message) => message.id)).toEqual(["aware-1"]);
-        expect(awareSpy).toHaveBeenCalledWith({
+        expect(context.map((message) => message.id)).toEqual(["consumer-1"]);
+        expect(capabilityConsumerSpy).toHaveBeenCalledWith({
             tool: {
                 deny: ["echo"],
             },

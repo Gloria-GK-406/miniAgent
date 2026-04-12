@@ -183,7 +183,7 @@ describe("SubagentPlugin", () => {
         const plugin = new SubagentPlugin(async () => {
             throw new Error("not used");
         });
-        await plugin.setAgentCapabilities({
+        await plugin.consumeAgentCapabilities({
             subagent: {
                 allow: ["reviewer"],
             },

@@ -173,23 +173,23 @@ export const TurnContextSchema = z.object({
 
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 
-export const TurnContextAwareSchema = z.object({
-  setTurnContext: z.function(
+export const TurnContextConsumerSchema = z.object({
+  consumeTurnContext: z.function(
     z.tuple([TurnContextSchema]),
     z.promise(z.void()),
   ),
 });
 
-export type TurnContextAware = z.infer<typeof TurnContextAwareSchema>;
+export type TurnContextConsumer = z.infer<typeof TurnContextConsumerSchema>;
 
-export const TurnContextAppendSchema = z.object({
+export const TurnContextAppenderSchema = z.object({
   appendTurnContext: z.function(
     z.tuple([]),
     z.promise(z.array(MessageSchema)),
   ),
 });
 
-export type TurnContextAppend = z.infer<typeof TurnContextAppendSchema>;
+export type TurnContextAppender = z.infer<typeof TurnContextAppenderSchema>;
 
 export enum ActionType {
   Delete = "delete",

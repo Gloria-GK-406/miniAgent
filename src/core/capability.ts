@@ -16,14 +16,14 @@ type AgentCapabilitySelectorBase = z.infer<typeof AgentCapabilitySelectorSchema>
 
 export type AgentCapabilitySelector = AgentCapabilitySelectorBase & Record<string, unknown>;
 
-export const AgentCapabilityAwareSchema = z.object({
-    setAgentCapabilities: z.function(
+export const AgentCapabilityConsumerSchema = z.object({
+    consumeAgentCapabilities: z.function(
         z.tuple([AgentCapabilitySelectorSchema]),
         z.promise(z.void()),
     ),
 });
 
-export type AgentCapabilityAware = z.infer<typeof AgentCapabilityAwareSchema>;
+export type AgentCapabilityConsumer = z.infer<typeof AgentCapabilityConsumerSchema>;
 
 export function getCapabilityNamespace(
     selector: AgentCapabilitySelector,

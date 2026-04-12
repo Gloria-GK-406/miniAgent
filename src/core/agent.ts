@@ -10,8 +10,8 @@ import type {
     AfterTurnProcessor,
     ConfigNotifier,
     PersistRequire,
-    TurnContextAware,
-    TurnContextAppend,
+    TurnContextAppender,
+    TurnContextConsumer,
     AgentContextControl,
     ToolCallMessage,
     ToolResultMessage,
@@ -22,7 +22,7 @@ import {
     ContextProviderSchema, ContextProcessorSchema,
     MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
     ConfigNotifierSchema, PersistRequireSchema,
-    TurnContextAwareSchema, TurnContextAppendSchema,
+    TurnContextAppenderSchema, TurnContextConsumerSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider } from "../tool/types.js";
@@ -50,8 +50,8 @@ export class MiniAgent {
     private errorHandlers: ErrorHandler[] = [];
     private afterTurnProcessors: AfterTurnProcessor[] = [];
     private configNotifiers: ConfigNotifier[] = [];
-    private turnContextAwares: TurnContextAware[] = [];
-    private turnContextAppenders: TurnContextAppend[] = [];
+    private turnContextConsumers: TurnContextConsumer[] = [];
+    private turnContextAppenders: TurnContextAppender[] = [];
     private approvers: ToolApprover[] = [];
     private store: FileStore;
     private emitter = new EventEmitter();
@@ -152,8 +152,8 @@ export class MiniAgent {
     register(afterTurnProcessor: AfterTurnProcessor): void;
     register(configNotifier: ConfigNotifier): void;
     register(persistRequire: PersistRequire): void;
-    register(turnContextAware: TurnContextAware): void;
-    register(turnContextAppend: TurnContextAppend): void;
+    register(turnContextConsumer: TurnContextConsumer): void;
+    register(turnContextAppender: TurnContextAppender): void;
     register(approver: ToolApprover): void;
     register(module: AgentModule): void;
     register(item: AgentRegistrable | AgentModule): void {
@@ -216,16 +216,16 @@ export class MiniAgent {
             const req = candidate as PersistRequire;
             void req.setStore(this.store);
         }
-        if (TurnContextAwareSchema.safeParse(candidate).success) {
+        if (TurnContextConsumerSchema.safeParse(candidate).success) {
             matched = true;
-            if (!this.turnContextAwares.includes(candidate as TurnContextAware)) {
-                this.turnContextAwares.push(candidate as TurnContextAware);
+            if (!this.turnContextConsumers.includes(candidate as TurnContextConsumer)) {
+                this.turnContextConsumers.push(candidate as TurnContextConsumer);
             }
         }
-        if (TurnContextAppendSchema.safeParse(candidate).success) {
+        if (TurnContextAppenderSchema.safeParse(candidate).success) {
             matched = true;
-            if (!this.turnContextAppenders.includes(candidate as TurnContextAppend)) {
-                this.turnContextAppenders.push(candidate as TurnContextAppend);
+            if (!this.turnContextAppenders.includes(candidate as TurnContextAppender)) {
+                this.turnContextAppenders.push(candidate as TurnContextAppender);
             }
         }
         if (ToolApproverSchema.safeParse(candidate).success) {
@@ -354,9 +354,9 @@ export class MiniAgent {
         return [...addFirst, ...mirror, ...addLast];
     }
 
-    private async setTurnContext(turn: number, context: Message[]): Promise<void> {
-        for (const aware of this.turnContextAwares) {
-            await aware.setTurnContext({ turn, context });
+    private async consumeTurnContext(turn: number, context: Message[]): Promise<void> {
+        for (const consumer of this.turnContextConsumers) {
+            await consumer.consumeTurnContext({ turn, context });
         }
     }
 
@@ -440,7 +440,7 @@ export class MiniAgent {
                 this.emitter.emit("turn:start", { turn });
                 try {
                     const context = await this.buildContext();
-                    await this.setTurnContext(turn, context);
+                    await this.consumeTurnContext(turn, context);
                     await this.buildToolMap();
                     const tools = [...this.turnToolMap.values()];
                     this.emitter.emit("llm:request", { context, tools });

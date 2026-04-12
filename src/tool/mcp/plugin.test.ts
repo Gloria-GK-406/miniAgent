@@ -196,7 +196,7 @@ describe("McpPlugin", () => {
     });
 
     it("filters servers by capability selector", async () => {
-        await plugin.setAgentCapabilities({
+        await plugin.consumeAgentCapabilities({
             mcp: {
                 server: {
                     allow: ["good"],
@@ -228,7 +228,7 @@ describe("McpPlugin", () => {
             },
         ];
 
-        await plugin.setAgentCapabilities({
+        await plugin.consumeAgentCapabilities({
             mcp: {
                 tool: {
                     allow: ["mcp__fs__read_file"],

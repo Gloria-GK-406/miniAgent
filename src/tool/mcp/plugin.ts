@@ -13,7 +13,7 @@ export class McpPlugin {
     private config: McpPluginConfig | null = null;
     private capabilities: McpCapabilitySelector = {};
 
-    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
         const raw = getCapabilityNamespace(capabilities, "mcp");
         const nextCapabilities = raw === undefined
             ? {}

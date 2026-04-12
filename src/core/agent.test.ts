@@ -117,7 +117,7 @@ describe("MiniAgent", () => {
       ],
     });
     agent.register({
-      setTurnContext: async (context: TurnContext): Promise<void> => {
+      consumeTurnContext: async (context: TurnContext): Promise<void> => {
         seenContexts.push(context);
       },
     });

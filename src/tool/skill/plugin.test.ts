@@ -213,7 +213,7 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setAgentCapabilities({
+            await plugin.consumeAgentCapabilities({
                 skill: {
                     allow: ["skill-a"],
                 },

@@ -119,7 +119,7 @@ export class SubagentPlugin {
         this.factory = factory;
     }
 
-    async setAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
         const raw = getCapabilityNamespace(capabilities, "subagent");
         if (raw === undefined) {
             this.capabilities = {};

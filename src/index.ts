@@ -18,14 +18,14 @@ export type { AgentBlueprint } from "./core/blueprint.js";
 export {
     AgentCapabilityRuleSchema,
     AgentCapabilitySelectorSchema,
-    AgentCapabilityAwareSchema,
+    AgentCapabilityConsumerSchema,
     getCapabilityNamespace,
     isCapabilityEnabled,
 } from "./core/capability.js";
 export type {
     AgentCapabilityRule,
     AgentCapabilitySelector,
-    AgentCapabilityAware,
+    AgentCapabilityConsumer,
 } from "./core/capability.js";
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
@@ -54,8 +54,8 @@ export type {
     AgentContextControl,
     AfterTurnProcessor,
     TurnContext,
-    TurnContextAware,
-    TurnContextAppend,
+    TurnContextConsumer,
+    TurnContextAppender,
     TokenCount,
     PersistRequire,
     ConfigNotifier,

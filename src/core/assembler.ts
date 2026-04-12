@@ -4,8 +4,8 @@ import type { MiniAgent } from "./agent.js";
 import { ToolSchema } from "../tool/types.js";
 import type { AgentConfig } from "./config.js";
 import type { LLMRequest } from "./types.js";
-import { AgentCapabilityAwareSchema, AgentCapabilitySelectorSchema, isCapabilityEnabled } from "./capability.js";
-import type { AgentCapabilityAware, AgentCapabilitySelector } from "./capability.js";
+import { AgentCapabilityConsumerSchema, AgentCapabilitySelectorSchema, isCapabilityEnabled } from "./capability.js";
+import type { AgentCapabilityConsumer, AgentCapabilitySelector } from "./capability.js";
 import { AgentBlueprintSchema } from "./blueprint.js";
 import type { AgentBlueprint } from "./blueprint.js";
 import type { Tool } from "../tool/types.js";
@@ -84,8 +84,8 @@ export class AgentAssembler {
                 }
             }
 
-            if (AgentCapabilityAwareSchema.safeParse(item).success) {
-                await (item as AgentCapabilityAware).setAgentCapabilities(capabilities);
+            if (AgentCapabilityConsumerSchema.safeParse(item).success) {
+                await (item as AgentCapabilityConsumer).consumeAgentCapabilities(capabilities);
             }
 
             prepared.push(item);

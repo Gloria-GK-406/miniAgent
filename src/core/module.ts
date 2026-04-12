@@ -6,8 +6,8 @@ import type {
     ErrorHandler,
     MessageNotifier,
     PersistRequire,
-    TurnContextAppend,
-    TurnContextAware,
+    TurnContextAppender,
+    TurnContextConsumer,
 } from "./types.js";
 import type { ToolProvider, Tool } from "../tool/types.js";
 import type { ToolApprover } from "../tool/approver.js";
@@ -22,8 +22,8 @@ export type AgentRegistrable =
     | AfterTurnProcessor
     | ConfigNotifier
     | PersistRequire
-    | TurnContextAware
-    | TurnContextAppend
+    | TurnContextConsumer
+    | TurnContextAppender
     | ToolApprover;
 
 export type AgentModule = Record<string, unknown>;
