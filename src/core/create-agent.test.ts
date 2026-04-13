@@ -8,6 +8,8 @@ import { defineAgentModule } from "./module.js";
 import { MessageType } from "./types.js";
 import type { AgentConfig } from "./config.js";
 import type { LLMMessageResponse, LLMRequest, LLMResponse, LLMStreamHandle, Message } from "./types.js";
+import type { Store } from "../store/store.js";
+import type { MessageSource } from "../store/message-source.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {
@@ -151,5 +153,57 @@ describe("createMiniAgent", () => {
 
         const preview = await agent.previewContext();
         expect(preview.map((message) => message.id)).toEqual(["append-1", "provider-1"]);
+    });
+
+    it("accepts store and messageSource during creation", async () => {
+        const persisted: Message[] = [];
+        const customStore: Store = {
+            readFile: async () => "",
+            writeFile: async () => {},
+            writeJsonTo: async () => {},
+            readJsonFrom: async () => ({}),
+            appendFile: async () => {},
+        };
+        const customMessageSource: MessageSource = {
+            add: async (message: Message): Promise<void> => {
+                persisted.push(message);
+            },
+            append: async (messages: Message[]): Promise<void> => {
+                persisted.push(...messages);
+            },
+            setDiscardBefore: async (): Promise<void> => {},
+            clearDiscardBefore: async (): Promise<void> => {},
+            get: async (id: string): Promise<Message | undefined> => persisted.find((message) => message.id === id),
+            getAll: async (): Promise<Message[]> => [...persisted],
+        };
+        const receivedStores: Store[] = [];
+        const llm = createLLM(wrapResponse({
+            id: "assist-1",
+            type: MessageType.Assist,
+            content: "done",
+        }));
+
+        const agent = createMiniAgent({
+            llm,
+            config: createConfig(testDir),
+            store: customStore,
+            messageSource: customMessageSource,
+            use: [
+                {
+                    setStore: async (store: Store): Promise<void> => {
+                        receivedStores.push(store);
+                    },
+                },
+            ],
+        });
+
+        await agent.run({
+            id: "user-1",
+            type: MessageType.User,
+            content: "hello",
+        });
+
+        expect(receivedStores).toEqual([customStore]);
+        expect((await agent.getMessages()).map((message) => message.id)).toEqual(["user-1", "assist-1"]);
     });
 });

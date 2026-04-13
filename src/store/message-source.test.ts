@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { MessageType } from "./types.js";
-import type { Message } from "./types.js";
+import { MessageType } from "../core/types.js";
+import type { Message } from "../core/types.js";
 import { FileStore } from "./file-store.js";
-import { MessageSource } from "./message-source.js";
+import { FileMessageSource } from "./message-source.js";
 
 function userMsg(id: string, content: string): Message {
     return { id, type: MessageType.User, content };
@@ -26,7 +26,7 @@ describe("MessageSource", () => {
 
     describe("add / getAll", () => {
         it("adds and retrieves a single message", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             const msg = userMsg("m1", "hello");
             await ms.add(msg);
             const all = await ms.getAll();
@@ -36,7 +36,7 @@ describe("MessageSource", () => {
         });
 
         it("adds and retrieves multiple messages in order", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             await ms.add(userMsg("m1", "first"));
             await ms.add(userMsg("m2", "second"));
             await ms.add(userMsg("m3", "third"));
@@ -46,7 +46,7 @@ describe("MessageSource", () => {
         });
 
         it("returns empty array when no messages", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             const all = await ms.getAll();
             expect(all).toEqual([]);
         });
@@ -54,7 +54,7 @@ describe("MessageSource", () => {
 
     describe("append", () => {
         it("appends multiple messages at once", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             await ms.append([userMsg("m1", "a"), userMsg("m2", "b")]);
             const all = await ms.getAll();
             expect(all).toHaveLength(2);
@@ -63,14 +63,14 @@ describe("MessageSource", () => {
         });
 
         it("append empty array does nothing", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             await ms.append([]);
             const all = await ms.getAll();
             expect(all).toEqual([]);
         });
 
         it("append after add preserves order", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             await ms.add(userMsg("m1", "first"));
             await ms.append([userMsg("m2", "second"), userMsg("m3", "third")]);
             const all = await ms.getAll();
@@ -80,7 +80,7 @@ describe("MessageSource", () => {
 
     describe("get", () => {
         it("returns message by id", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             await ms.add(userMsg("m1", "hello"));
             await ms.add(userMsg("m2", "world"));
             const msg = await ms.get("m1");
@@ -89,7 +89,7 @@ describe("MessageSource", () => {
         });
 
         it("returns undefined for unknown id", async () => {
-            const ms = new MessageSource(store, "test.jsonl");
+            const ms = new FileMessageSource(store, "test.jsonl");
             await ms.add(userMsg("m1", "hello"));
             const msg = await ms.get("unknown");
             expect(msg).toBeUndefined();
@@ -103,7 +103,7 @@ describe("MessageSource", () => {
                 userMsg("m2", "b"),
             ]);
 
-            const ms = new MessageSource(store, "persist.jsonl");
+            const ms = new FileMessageSource(store, "persist.jsonl");
             const all = await ms.getAll();
             expect(all).toHaveLength(2);
             expect(all[0]!.id).toBe("m1");
@@ -115,7 +115,7 @@ describe("MessageSource", () => {
                 userMsg("m1", "old"),
             ]);
 
-            const ms = new MessageSource(store, "persist.jsonl");
+            const ms = new FileMessageSource(store, "persist.jsonl");
             await ms.add(userMsg("m2", "new"));
             const all = await ms.getAll();
             expect(all).toHaveLength(2);
@@ -126,7 +126,7 @@ describe("MessageSource", () => {
 
     describe("cache eviction", () => {
         it("evicts oldest when cache is full", async () => {
-            const ms = new MessageSource(store, "cache.jsonl", 3);
+            const ms = new FileMessageSource(store, "cache.jsonl", 3);
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
@@ -138,7 +138,7 @@ describe("MessageSource", () => {
         });
 
         it("evicts multiple messages beyond cache size", async () => {
-            const ms = new MessageSource(store, "cache.jsonl", 3);
+            const ms = new FileMessageSource(store, "cache.jsonl", 3);
             for (let i = 1; i <= 6; i++) {
                 await ms.add(userMsg(`m${i}`, `msg${i}`));
             }
@@ -149,12 +149,12 @@ describe("MessageSource", () => {
         });
 
         it("lazy loads historical from file when needed", async () => {
-            const ms = new MessageSource(store, "cache.jsonl", 3);
+            const ms = new FileMessageSource(store, "cache.jsonl", 3);
             for (let i = 1; i <= 5; i++) {
                 await ms.add(userMsg(`m${i}`, `msg${i}`));
             }
 
-            const ms2 = new MessageSource(store, "cache.jsonl", 3);
+            const ms2 = new FileMessageSource(store, "cache.jsonl", 3);
             const all = await ms2.getAll();
             expect(all).toHaveLength(5);
             expect(all.map((m) => m.id)).toEqual(["m1", "m2", "m3", "m4", "m5"]);
@@ -163,7 +163,7 @@ describe("MessageSource", () => {
 
     describe("discardBefore", () => {
         it("discards messages before the specified id", async () => {
-            const ms = new MessageSource(store, "discard.jsonl");
+            const ms = new FileMessageSource(store, "discard.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
@@ -174,7 +174,7 @@ describe("MessageSource", () => {
         });
 
         it("discards messages before middle id", async () => {
-            const ms = new MessageSource(store, "discard.jsonl");
+            const ms = new FileMessageSource(store, "discard.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
@@ -186,7 +186,7 @@ describe("MessageSource", () => {
         });
 
         it("returns empty when discarding last message", async () => {
-            const ms = new MessageSource(store, "discard.jsonl");
+            const ms = new FileMessageSource(store, "discard.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
 
@@ -196,7 +196,7 @@ describe("MessageSource", () => {
         });
 
         it("returns all when discard id not found", async () => {
-            const ms = new MessageSource(store, "discard.jsonl");
+            const ms = new FileMessageSource(store, "discard.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
 
@@ -206,7 +206,7 @@ describe("MessageSource", () => {
         });
 
         it("get returns undefined for discarded message", async () => {
-            const ms = new MessageSource(store, "discard.jsonl");
+            const ms = new FileMessageSource(store, "discard.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
@@ -217,7 +217,7 @@ describe("MessageSource", () => {
         });
 
         it("get returns message after discard point", async () => {
-            const ms = new MessageSource(store, "discard.jsonl");
+            const ms = new FileMessageSource(store, "discard.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
@@ -229,12 +229,12 @@ describe("MessageSource", () => {
         });
 
         it("short-circuits when discard hits cache without loading historical", async () => {
-            const ms = new MessageSource(store, "discard.jsonl", 3);
+            const ms = new FileMessageSource(store, "discard.jsonl", 3);
             for (let i = 1; i <= 6; i++) {
                 await ms.add(userMsg(`m${i}`, `msg${i}`));
             }
 
-            const ms2 = new MessageSource(store, "discard.jsonl", 3);
+            const ms2 = new FileMessageSource(store, "discard.jsonl", 3);
             await ms2.setDiscardBefore("m5");
             const all = await ms2.getAll();
             expect(all).toHaveLength(1);
@@ -253,31 +253,31 @@ describe("MessageSource", () => {
                 discardBeforeMessageId: "m1",
             });
 
-            const ms = new MessageSource(store, "persist-discard.jsonl");
+            const ms = new FileMessageSource(store, "persist-discard.jsonl");
             const all = await ms.getAll();
             expect(all.map((m) => m.id)).toEqual(["m2", "m3"]);
         });
 
         it("persists discardBeforeMessageId on setDiscardBefore", async () => {
-            const ms = new MessageSource(store, "persist-discard2.jsonl");
+            const ms = new FileMessageSource(store, "persist-discard2.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.add(userMsg("m3", "c"));
             await ms.setDiscardBefore("m1");
 
-            const ms2 = new MessageSource(store, "persist-discard2.jsonl");
+            const ms2 = new FileMessageSource(store, "persist-discard2.jsonl");
             const all = await ms2.getAll();
             expect(all.map((m) => m.id)).toEqual(["m2", "m3"]);
         });
 
         it("persists clearDiscardBefore", async () => {
-            const ms = new MessageSource(store, "persist-discard3.jsonl");
+            const ms = new FileMessageSource(store, "persist-discard3.jsonl");
             await ms.add(userMsg("m1", "a"));
             await ms.add(userMsg("m2", "b"));
             await ms.setDiscardBefore("m1");
             await ms.clearDiscardBefore();
 
-            const ms2 = new MessageSource(store, "persist-discard3.jsonl");
+            const ms2 = new FileMessageSource(store, "persist-discard3.jsonl");
             const all = await ms2.getAll();
             expect(all.map((m) => m.id)).toEqual(["m1", "m2"]);
         });

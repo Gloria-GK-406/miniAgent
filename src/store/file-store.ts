@@ -1,7 +1,8 @@
 import { promises as fs } from "node:fs";
 import { join, isAbsolute } from "node:path";
+import type { Store } from "./store.js";
 
-export class FileStore {
+export class FileStore implements Store {
   private basePath: string;
 
   constructor(basePath: string) {

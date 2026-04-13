@@ -2,7 +2,7 @@ import { z } from "zod";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { FileStore as FileStoreImpl } from "./file-store.js";
+import { FileStore as FileStoreImpl } from "../store/file-store.js";
 
 export const SessionMetaSchema = z.object({
     id: z.string(),

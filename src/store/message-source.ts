@@ -1,6 +1,15 @@
 import { join, dirname, basename } from "node:path";
-import type { Message } from "./types.js";
-import type { FileStore } from "./file-store.js";
+import type { Message } from "../core/types.js";
+import type { Store } from "./store.js";
+
+export interface MessageSource {
+  add(message: Message): Promise<void>;
+  append(messages: Message[]): Promise<void>;
+  setDiscardBefore(messageId: string): Promise<void>;
+  clearDiscardBefore(): Promise<void>;
+  get(id: string): Promise<Message | undefined>;
+  getAll(): Promise<Message[]>;
+}
 
 interface MessageSourceMeta {
   discardBeforeMessageId: string | null;
@@ -10,8 +19,8 @@ function metaPathFrom(filePath: string): string {
   return join(dirname(filePath), basename(filePath) + ".meta.json");
 }
 
-export class MessageSource {
-  private store: FileStore;
+export class FileMessageSource implements MessageSource {
+  private store: Store;
   private filePath: string;
   private metaFilePath: string;
   private cacheSize: number;
@@ -22,7 +31,7 @@ export class MessageSource {
   private initialized = false;
   private discardBeforeMessageId: string | null = null;
 
-  constructor(store: FileStore, filePath: string, cacheSize = 100) {
+  constructor(store: Store, filePath: string, cacheSize = 100) {
     this.store = store;
     this.filePath = filePath;
     this.metaFilePath = metaPathFrom(filePath);

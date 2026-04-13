@@ -26,9 +26,11 @@ import {
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider } from "../tool/types.js";
-import { MessageSource } from "./message-source.js";
+import type { MessageSource } from "../store/message-source.js";
+import { FileMessageSource } from "../store/message-source.js";
 import type { AgentConfig, ModelConfig } from "./config.js";
-import { FileStore } from "./file-store.js";
+import type { Store } from "../store/store.js";
+import { FileStore } from "../store/file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 import { StopException } from "./errors.js";
@@ -36,6 +38,11 @@ import { addTokenCount, emptyTokenCount } from "./llm.js";
 import type { ToolApprover } from "../tool/approver.js";
 import { ToolApproverSchema } from "../tool/approver.js";
 import type { AgentModule, AgentRegistrable } from "./module.js";
+
+export interface MiniAgentOptions {
+    store?: Store;
+    messageSource?: MessageSource;
+}
 
 export class MiniAgent {
     private messageSource: MessageSource;
@@ -53,18 +60,18 @@ export class MiniAgent {
     private turnContextConsumers: TurnContextConsumer[] = [];
     private turnContextAppenders: TurnContextAppender[] = [];
     private approvers: ToolApprover[] = [];
-    private store: FileStore;
+    private store: Store;
     private emitter = new EventEmitter();
     private running = false;
     private stopped = false;
     private contextCount: TokenCount = emptyTokenCount();
     private toolAbortController: AbortController | null = null;
 
-    constructor(llm: LLMRequest, config: AgentConfig) {
+    constructor(llm: LLMRequest, config: AgentConfig, options: MiniAgentOptions = {}) {
         this.llm = llm;
         this.config = config;
-        this.store = new FileStore(config.paths.sessiondir);
-        this.messageSource = new MessageSource(this.store, "messages.jsonl");
+        this.store = options.store ?? new FileStore(config.paths.sessiondir);
+        this.messageSource = options.messageSource ?? new FileMessageSource(this.store, "messages.jsonl");
     }
 
     on<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
@@ -257,11 +264,11 @@ export class MiniAgent {
     }
 
     async setDiscardBefore(messageId: string): Promise<void> {
-        this.messageSource.setDiscardBefore(messageId);
+        await this.messageSource.setDiscardBefore(messageId);
     }
 
     async clearDiscardBefore(): Promise<void> {
-        this.messageSource.clearDiscardBefore();
+        await this.messageSource.clearDiscardBefore();
     }
 
     async previewContext(): Promise<Message[]> {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AgentConfigSchema, ModelConfigSchema } from "./config.js";
 import { ToolSchema } from "../tool/types.js";
-import type { FileStore } from "./file-store.js";
+import type { Store } from "../store/store.js";
 
 export enum MessageType {
   System = "system",
@@ -307,7 +307,7 @@ export type ConfigNotifier = z.infer<typeof ConfigNotifierSchema>;
 
 export const PersistRequireSchema = z.object({
   setStore: z.function(
-    z.tuple([z.custom<FileStore>()]),
+    z.tuple([z.custom<Store>()]),
     z.promise(z.void()),
   ),
 });

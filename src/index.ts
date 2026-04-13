@@ -1,4 +1,5 @@
 export { MiniAgent } from "./core/agent.js";
+export type { MiniAgentOptions } from "./core/agent.js";
 export { createMiniAgent } from "./core/create-agent.js";
 export { defineAgentModule } from "./core/module.js";
 export { AgentAssembler, AgentBlueprintRegistry } from "./core/assembler.js";
@@ -80,8 +81,10 @@ export type {
     AgentConfig,
 } from "./core/config.js";
 
-export { MessageSource } from "./core/message-source.js";
-export { FileStore } from "./core/file-store.js";
+export type { MessageSource } from "./store/message-source.js";
+export { FileMessageSource } from "./store/message-source.js";
+export type { Store } from "./store/store.js";
+export { FileStore } from "./store/file-store.js";
 export { StopException } from "./core/errors.js";
 export { SessionManager } from "./core/session.js";
 export type { SessionMeta } from "./core/session.js";
