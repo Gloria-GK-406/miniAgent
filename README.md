@@ -4,49 +4,150 @@ A minimal, extensible TypeScript Agent framework. Simple by default, powerful wh
 
 [中文文档](./README_CN.md)
 
-## Design Philosophy
+## Quick Start
 
-MiniAgent is built around a few core ideas:
-
-- **Single Entry Point** — One `MiniAgent` class with a unified `register()` API. No complex configuration hierarchies, no boilerplate.
-- **Schema-Driven Types** — All data structures are defined as Zod schemas. TypeScript types are derived automatically. Runtime validation comes for free.
-- **Plugin Over Framework** — The core does one thing well (the agent loop). Everything else — tools, context providers, processors, MCP, skills, subagents — is a pluggable component registered through the same `register()` method.
-- **Auto-Detection** — Components are identified by Zod schema validation, not manual type tags. You register a tool, a provider, or a processor — the agent knows what it is.
-
-## Hooks
-
-The framework exposes extension hooks at every layer of the agent loop:
-
-### Component Registration
-
-Everything goes through `register()`. The agent auto-detects component types:
+```bash
+npm install @piaoxianguo/miniagent
+```
 
 ```typescript
-agent.register(tool);              // Tool
-agent.register(toolProvider);      // ToolProvider
-agent.register(contextProvider);   // ContextProvider
-agent.register(contextProcessor);  // ContextProcessor
-agent.register(messageNotifier);   // MessageNotifier
-agent.register(errorHandler);      // ErrorHandler
-agent.register(afterTurnProcessor);// AfterTurnProcessor
-agent.register(configNotifier);    // ConfigNotifier
-agent.register(persistRequire);    // PersistRequire
-agent.register(turnContextAware);  // TurnContextAware
-agent.register(turnContextAppend); // TurnContextAppend
-agent.register(approver);          // ToolApprover
-agent.register(agentModule);       // AgentModule
+import { MiniAgent, LLMEngineManager, MessageType } from "@piaoxianguo/miniagent";
+import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
+import { z } from "zod";
+
+// 1. Set up the LLM engine
+const engines = new LLMEngineManager();
+engines.register("anthropic", AnthropicEngine);
+
+// 2. Create the agent
+const agent = new MiniAgent(engines, {
+  model: {
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+    baseUrl: "",
+  },
+  models: new Map(),
+  plugins: new Map(),
+  paths: { sessiondir: "./sessions" },
+});
+
+// 3. Print streaming output
+agent.on("llm:chunk", ({ chunk }) => {
+  if (chunk.type === "text-delta") process.stdout.write(chunk.text);
+});
+
+// 4. Register a tool — that's it
+agent.register({
+  name: "get_weather",
+  description: "Get the current weather for a city",
+  parameters: z.object({
+    city: z.string().describe("City name"),
+  }),
+  execute: async (args) => `${args.city}: Sunny, 25°C`,
+});
+
+// 5. Run
+const messages = await agent.run({
+  id: crypto.randomUUID(),
+  type: MessageType.User,
+  content: "What's the weather in Beijing?",
+});
+```
+
+That's a fully working agent with streaming output and tool use. No boilerplate, no configuration files.
+
+## Design Philosophy
+
+MiniAgent is built on one principle: **a minimal core with free assembly**.
+
+The core does exactly one thing — the agent loop (collect context → call LLM → execute tools → repeat). Everything else is a pluggable component you register through the same `register()` method:
+
+```
+                    ┌─────────────────────────────────┐
+                    │           MiniAgent              │
+                    │                                  │
+   register() ───► │  Tool ───────────── execute()    │
+                  ◄ │  ContextProvider ── collect()    │
+                  ◄ │  ContextProcessor ─ process()    │
+                  ◄ │  MessageNotifier ── notify()     │
+                  ◄ │  ErrorHandler ───── handle()     │
+                  ◄ │  ToolApprover ───── approve()    │
+                  ◄ │  ...                             │
+                    │                                  │
+                    └─────────────────────────────────┘
+```
+
+- **Schema-Driven Types** — All data structures are defined as Zod schemas. TypeScript types are derived automatically. Runtime validation comes for free.
+- **Auto-Detection** — Components are identified by Zod schema validation, not manual type tags. You register a tool, a provider, or a processor — the agent knows what it is.
+- **Plugin Over Framework** — No inheritance hierarchies, no abstract base classes. Just plain objects that satisfy the right schema.
+
+## Tools and Interfaces
+
+### Tool
+
+A tool is the simplest thing to define — a name, a description, a Zod parameter schema, and an `execute` function:
+
+```typescript
+const myTool: Tool = {
+  name: "read_file",
+  description: "Read the contents of a file",
+  parameters: z.object({
+    path: z.string().describe("Absolute file path"),
+  }),
+  execute: async (args) => {
+    return fs.readFile(args.path, "utf-8");
+  },
+};
+
+agent.register(myTool);
+```
+
+### ToolProvider
+
+When you need to dynamically provide multiple tools (e.g. connecting to an MCP server), implement `ToolProvider`:
+
+```typescript
+const provider: ToolProvider = {
+  async getTools(): Promise<Tool[]> {
+    // Dynamically discover and return tools
+    return [tool1, tool2, tool3];
+  },
+};
+
+agent.register(provider);
+```
+
+### LLMRequire
+
+Some components need access to the LLM (e.g. a context compressor that summarizes old messages). Implement `LLMRequire` and the agent will inject the `LLMRequest` at registration time:
+
+```typescript
+const compressor = {
+  priority: -1000,
+  private llm: null,
+
+  async setLLMRequest(llm: LLMRequest) {
+    this.llm = llm;
+  },
+
+  async collect() {
+    // Use this.llm to summarize old messages...
+    return [summaryMessage];
+  },
+};
 ```
 
 ### ContextProvider
 
-Inject additional context messages (sorted by `priority`):
+Inject additional context messages into every turn. Sorted by `priority`:
 
 ```typescript
 const provider = {
   priority: 0,
   async collect() {
     return [
-      { id: crypto.randomUUID(), type: MessageType.System, content: "Custom context" },
+      { id: crypto.randomUUID(), type: MessageType.System, content: "You are a helpful assistant." },
     ];
   },
 };
@@ -54,11 +155,9 @@ const provider = {
 
 ### ContextProcessor
 
-Transform the message list before sending to the LLM. Return `Action` objects:
+Transform the message list before it's sent to the LLM. Return `Action` objects to delete, replace, or inject messages:
 
 ```typescript
-import { ActionType } from "@piaoxianguo/miniagent";
-
 const processor = {
   priority: 100,
   async process(messages) {
@@ -72,7 +171,204 @@ const processor = {
 };
 ```
 
-### Events
+### Other Interfaces
+
+| Interface | Purpose |
+|-----------|---------|
+| `MessageNotifier` | Called every time a new message is created |
+| `ErrorHandler` | Handle errors within the agent loop (retry, fallback, etc.) |
+| `ToolApprover` | Human-in-the-loop approval before tool execution |
+| `AfterTurnProcessor` | Run logic after each agent run completes |
+| `ConfigNotifier` | Notified when model config changes |
+| `PersistRequire` | Receive the `Store` instance for persistence |
+| `TurnContextConsumer` | Receive the full context of each turn |
+| `TurnContextAppender` | Prepend messages before other context providers |
+
+## LLMRequest and LLMEngine
+
+MiniAgent separates LLM interaction into two layers:
+
+- **`LLMRequest`** — The interface the agent calls: `streamInvoke(messages, modelConfig, tools) → LLMStreamHandle`. This is the contract.
+- **`LLMEngine`** — The interface an engine implements: `streamGenerate(messages, tools) → LLMStreamHandle`. The `ModelConfig` is bound at construction time.
+- **`LLMEngineManager`** — The default `LLMRequest` implementation. It manages engine constructors, creates engines per `ModelConfig`, and caches them with LRU eviction.
+
+```
+  MiniAgent ──calls──► LLMRequest (interface)
+                            │
+                   LLMEngineManager (default impl)
+                            │
+                     ┌──────┴──────┐
+                  LLMEngine     LLMEngine
+                  (Anthropic)   (OpenAI)  ...
+```
+
+### Built-in Engines
+
+```typescript
+import { LLMEngineManager } from "@piaoxianguo/miniagent";
+import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
+import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
+import { OpenAICompatibleEngine } from "@piaoxianguo/miniagent/engine/openai-compatible";
+import { GLMEngine } from "@piaoxianguo/miniagent/engine/glm";
+import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
+
+const engines = new LLMEngineManager();
+engines.register("anthropic", AnthropicEngine);
+engines.register("openai", OpenAIEngine);
+engines.register("openai-compatible", OpenAICompatibleEngine);
+engines.register("glm", GLMEngine);
+engines.register("glm-codeplan", GLMCodePlanEngine);
+```
+
+Implement the `LLMEngine` interface to add your own:
+
+```typescript
+interface LLMEngine {
+  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
+}
+```
+
+## Blueprint and Assembly
+
+For real-world applications, you don't want to register every component manually. MiniAgent provides a **Blueprint** system for declarative agent assembly.
+
+### Blueprint
+
+A blueprint is a declarative description of what an agent needs:
+
+```typescript
+interface AgentBlueprint {
+  uses: string[];  // List of component IDs to include
+}
+```
+
+### Registry and Assembler
+
+Register component factories, then assemble an agent from a blueprint:
+
+```typescript
+import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+
+// Register factories
+const registry = new AgentBlueprintRegistry();
+registry.register("tool.read", () => readTool);
+registry.register("tool.write", () => writeTool);
+registry.register("plugin.mcp", () => new McpPlugin());
+registry.register("plugin.skill", () => new SkillPlugin());
+
+// Assemble
+const assembler = new AgentAssembler(registry);
+const agent = await assembler.assemble({
+  llm: engines,
+  config: agentConfig,
+  blueprint: { uses: ["tool.read", "tool.write", "plugin.mcp", "plugin.skill"] },
+  capabilities: { tool: { deny: ["bash"] } },  // Optional: control visibility
+});
+```
+
+### Capability System
+
+Blueprints work with a capability system to control what tools, plugins, and subagents are visible:
+
+```typescript
+const capabilities = {
+  tool: { allow: ["read", "glob", "grep"], deny: ["bash"] },
+  mcp: {
+    server: { allow: ["filesystem"] },
+    tool: { deny: ["mcp__filesystem__write_file"] },
+  },
+  skill: { allow: ["*"] },
+  subagent: { deny: ["dangerous-agent"] },
+};
+```
+
+### Factory Function
+
+For simpler cases, use `createMiniAgent` with the `use` array — a flat list of tools, providers, modules, or setup functions:
+
+```typescript
+import { createMiniAgent } from "@piaoxianguo/miniagent";
+
+const agent = createMiniAgent({
+  llm: engines,
+  config: agentConfig,
+  use: [
+    readTool,
+    myToolProvider,
+    myContextProvider,
+    (agent) => {
+      agent.on("llm:chunk", ({ chunk }) => {
+        if (chunk.type === "text-delta") process.stdout.write(chunk.text);
+      });
+    },
+  ],
+});
+```
+
+## Built-in Tools
+
+| Tool | Description | Docs |
+|------|-------------|------|
+| `read` | Read file contents or list directory entries | [read.md](./document/tools/read.md) |
+| `write` | Write content to a file (creates parent dirs) | [write.md](./document/tools/write.md) |
+| `edit` | Exact string replacement in files | [edit.md](./document/tools/edit.md) |
+| `glob` | Find files by glob pattern (`**/*.ts`, etc.) | [glob.md](./document/tools/glob.md) |
+| `grep` | Search file contents with regex | [grep.md](./document/tools/grep.md) |
+| `bash` | Execute bash commands with timeout and working directory | [bash.md](./document/tools/bash.md) |
+| `todo` | Create, update, delete todo items | [todo.md](./document/tools/todo.md) |
+| `subagent` | Delegate tasks to file-defined sub-agents | [subagent.md](./document/tools/subagent.md) |
+| `agent-context` | Auto-load agent framework config files into context | [agent-context.md](./document/tools/agent-context.md) |
+| `mcp` | MCP client with stdio / SSE / Streamable HTTP transports | [mcp.md](./document/tools/mcp.md) |
+| `skill` | Load skill instructions from `SKILL.md` manifests | [skill.md](./document/tools/skill.md) |
+
+## Built-in CLI
+
+MiniAgent ships with an interactive REPL built with Ink (React for CLI):
+
+```bash
+npm run chat
+```
+
+On first run, a `.cliagent/config.json` template is generated. Configure your models and run again:
+
+```json
+{
+  "models": [
+    {
+      "name": "claude",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "apiKey": "sk-ant-..."
+    }
+  ],
+  "defaultModel": "claude",
+  "systemPrompt": "You are a helpful assistant."
+}
+```
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `/models` | List configured models |
+| `/model <provider/model>` | Switch active model |
+| `/tools` | List registered tools |
+| `/history [page]` | View conversation history |
+| `/context` | Preview context sent to LLM |
+| `/compress` | Trigger context compression |
+| `/session` | List all sessions |
+| `/session new` | Create a new session |
+| `/session switch <id>` | Switch to a session |
+| `/session delete <id>` | Delete a session |
+| `/session rename <id> <name>` | Rename a session |
+| `/hitl [on\|off]` | Toggle human-in-the-loop |
+| `/clear` | Clear current conversation |
+| `/system <text>` | Update system prompt |
+| `/quit` | Exit |
+
+→ [Full CLI Documentation](./document/cli/repl.md)
+
+## Events
 
 Full lifecycle events via `EventEmitter`:
 
@@ -91,170 +387,7 @@ agent.on("tool:result", ({ toolCall, result }) => { /* tool execution completed 
 agent.on("message:notify", ({ message }) => { /* new message created */ });
 ```
 
-### Tool Approval (HITL)
-
-Implement `ToolApprover` to add human confirmation before tool execution:
-
-```typescript
-const approver = {
-  async requestApproval(toolName, args) {
-    const answer = await askUser(`Allow ${toolName}?`);
-    if (answer === "always") return "approve_all";
-    return answer ? "approve" : "deny";
-  },
-};
-agent.register(approver);
-agent.setAutoApprovedTools(["read", "glob", "grep"]);
-```
-
-### Error Handling
-
-Register `ErrorHandler` components to handle errors within the agent loop:
-
-```typescript
-const handler = {
-  priority: 0,
-  canHandle(error) {
-    return error instanceof RateLimitError;
-  },
-  async handle(error) {
-    await delay(5000);
-  },
-};
-agent.register(handler);
-```
-
-Throw `StopException` to gracefully stop the agent loop:
-
-```typescript
-import { StopException } from "@piaoxianguo/miniagent";
-throw new StopException("Task complete");
-```
-
-### Blueprint Assembly
-
-Build agents from declarative blueprints:
-
-```typescript
-import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
-
-const registry = new AgentBlueprintRegistry();
-registry.register("tool.read", () => readTool);
-registry.register("plugin.mcp", () => new McpPlugin());
-
-const assembler = new AgentAssembler(registry);
-const agent = await assembler.assemble({
-  llm: engines,
-  config: agentConfig,
-  blueprint: { uses: ["tool.read", "plugin.mcp"] },
-  capabilities: { tool: { deny: ["bash"] } },
-});
-```
-
-### Capability System
-
-Control visibility of tools, plugins, and subagents with allow/deny patterns:
-
-```typescript
-const capabilities = {
-  tool: { allow: ["read", "glob", "grep"], deny: ["bash"] },
-  mcp: {
-    server: { allow: ["filesystem"] },
-    tool: { deny: ["mcp__filesystem__write_file"] },
-  },
-  skill: { allow: ["*"] },
-  subagent: { deny: ["dangerous-agent"] },
-};
-```
-
-## Getting Started
-
-### Installation
-
-```bash
-npm install @piaoxianguo/miniagent
-```
-
-### Using the Class Directly
-
-```typescript
-import { MiniAgent, LLMEngineManager, MessageType } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
-import { z } from "zod";
-
-const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
-
-const agent = new MiniAgent(engines, {
-  model: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-    baseUrl: "",
-  },
-  models: new Map(),
-  plugins: new Map(),
-  paths: {
-    sessiondir: "./sessions",
-  },
-});
-
-agent.on("llm:chunk", ({ chunk }) => {
-  if (chunk.type === "text-delta") process.stdout.write(chunk.text);
-});
-
-agent.register({
-  name: "get_weather",
-  description: "Get weather for a city",
-  parameters: z.object({
-    city: z.string().describe("City name"),
-  }),
-  execute: async (args) => `${args.city}: Sunny, 25°C`,
-});
-
-const messages = await agent.run({
-  id: crypto.randomUUID(),
-  type: MessageType.User,
-  content: "What's the weather in Beijing?",
-});
-```
-
-### Using the Factory Function
-
-```typescript
-import { createMiniAgent, LLMEngineManager } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
-
-const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
-
-const agent = createMiniAgent({
-  llm: engines,
-  config: {
-    model: {
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-      baseUrl: "",
-    },
-    models: new Map(),
-    plugins: new Map(),
-    paths: { sessiondir: "./sessions" },
-  },
-  use: [
-    myTool,
-    myToolProvider,
-    myContextProvider,
-    (agent) => {
-      agent.on("llm:chunk", ({ chunk }) => {
-        if (chunk.type === "text-delta") process.stdout.write(chunk.text);
-      });
-    },
-  ],
-});
-```
-
-### Agent Methods
+## Agent API
 
 | Method | Description |
 |--------|-------------|
@@ -272,71 +405,6 @@ const agent = createMiniAgent({
 | `setAutoApprovedTools(names)` | Set tools that bypass HITL approval. |
 | `getConfig()` | Get the current agent configuration. |
 | `getContextCount()` | Get cumulative token usage statistics. |
-
-## Built-in Tools
-
-| Tool | Description | Docs |
-|------|-------------|------|
-| `read` | Read file contents or list directory entries | [read.md](./document/tools/read.md) |
-| `write` | Write content to a file (creates parent dirs) | [write.md](./document/tools/write.md) |
-| `edit` | Exact string replacement in files | [edit.md](./document/tools/edit.md) |
-| `glob` | Find files by glob pattern (`**/*.ts`, etc.) | [glob.md](./document/tools/glob.md) |
-| `grep` | Search file contents with regex | [grep.md](./document/tools/grep.md) |
-| `bash` | Execute bash commands with timeout and working directory | [bash.md](./document/tools/bash.md) |
-| `todo` | Create, update, delete todo items | [todo.md](./document/tools/todo.md) |
-| `subagent` | File-based subagent management with `run_subagent` tool | [subagent.md](./document/tools/subagent.md) |
-| `agent-context` | Auto-load agent framework config files into context | [agent-context.md](./document/tools/agent-context.md) |
-| `mcp` | MCP client with stdio / SSE / Streamable HTTP transports | [mcp.md](./document/tools/mcp.md) |
-| `skill` | Load skill instructions from `SKILL.md` manifests | [skill.md](./document/tools/skill.md) |
-
-## CLI
-
-Interactive REPL with model switching, session management, HITL toggle, and more.
-
-```bash
-npm run chat
-```
-
-→ [CLI Documentation](./document/cli/repl.md)
-
-## LLM Engines
-
-Manage multiple LLM engines via `LLMEngineManager`:
-
-```typescript
-import { LLMEngineManager } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
-import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
-import { OpenAICompatibleEngine } from "@piaoxianguo/miniagent/engine/openai-compatible";
-import { GLMEngine } from "@piaoxianguo/miniagent/engine/glm";
-import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
-
-const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
-engines.register("openai", OpenAIEngine);
-engines.register("openai-compatible", OpenAICompatibleEngine);
-engines.register("glm", GLMEngine);
-engines.register("glm-codeplan", GLMCodePlanEngine);
-```
-
-Engines are LRU-cached by `ModelConfig`. Implement the `LLMEngine` interface to create custom engines.
-
-### ModelConfig
-
-```typescript
-interface ModelConfig {
-  provider: string;
-  model: string;
-  apiKey: string;
-  baseUrl?: string;
-  thinking?: boolean;
-  maxTokens?: number;
-  contextSize?: number;
-  maxOutputTokens?: number;
-  temperature?: number;
-  topP?: number;
-}
-```
 
 ## Tech Stack
 
