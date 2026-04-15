@@ -2,6 +2,8 @@ import { z } from "zod";
 import { readdir, stat, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import type { Tool } from "./types.js";
+import { isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 
 const GrepParamsSchema = z.object({
   pattern: z.string().describe("Regular expression pattern to search for"),
@@ -92,9 +94,15 @@ async function grepExecute(args: Record<string, unknown>): Promise<string> {
   return outputLines.join("\n");
 }
 
-export const grepTool: Tool = {
-  name: "grep",
-  description: "Search file contents using regular expressions. Supports include glob to filter files.",
-  parameters: GrepParamsSchema,
-  execute: grepExecute,
-};
+export class GrepTool implements Tool {
+  name = "grep" as const;
+  description = "Search file contents using regular expressions. Supports include glob to filter files.";
+  parameters = GrepParamsSchema;
+  execute = grepExecute;
+
+  async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
+    return isCapabilityEnabled(this.name, capabilities.tool);
+  }
+}
+
+export const grepTool: Tool & { consumeAgentCapabilities: (capabilities: AgentCapabilitySelector) => Promise<boolean> } = new GrepTool();

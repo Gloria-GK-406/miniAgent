@@ -2,6 +2,8 @@ import { z } from "zod";
 import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import type { Tool } from "./types.js";
+import { isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 
 const GlobParamsSchema = z.object({
   pattern: z.string().describe("Glob pattern to match (e.g. **/*.ts)"),
@@ -84,9 +86,15 @@ async function globExecute(args: Record<string, unknown>): Promise<string> {
   return matched.join("\n");
 }
 
-export const globTool: Tool = {
-  name: "glob",
-  description: "Find files matching a glob pattern. Supports **, *, and ? wildcards.",
-  parameters: GlobParamsSchema,
-  execute: globExecute,
-};
+export class GlobTool implements Tool {
+  name = "glob" as const;
+  description = "Find files matching a glob pattern. Supports **, *, and ? wildcards.";
+  parameters = GlobParamsSchema;
+  execute = globExecute;
+
+  async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
+    return isCapabilityEnabled(this.name, capabilities.tool);
+  }
+}
+
+export const globTool: Tool & { consumeAgentCapabilities: (capabilities: AgentCapabilitySelector) => Promise<boolean> } = new GlobTool();

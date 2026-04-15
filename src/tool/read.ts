@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { readFile, readdir, stat } from "node:fs/promises";
 import type { Tool } from "./types.js";
+import { isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 
 const ReadParamsSchema = z.object({
   path: z.string().describe("Absolute path to the file or directory"),
@@ -37,9 +39,15 @@ async function readExecute(args: Record<string, unknown>): Promise<string> {
   return content;
 }
 
-export const readTool: Tool = {
-  name: "read",
-  description: "Read a file or directory. For files, returns content with optional line range. For directories, returns entry names.",
-  parameters: ReadParamsSchema,
-  execute: readExecute,
-};
+export class ReadTool implements Tool {
+  name = "read" as const;
+  description = "Read a file or directory. For files, returns content with optional line range. For directories, returns entry names.";
+  parameters = ReadParamsSchema;
+  execute = readExecute;
+
+  async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
+    return isCapabilityEnabled(this.name, capabilities.tool);
+  }
+}
+
+export const readTool: Tool & { consumeAgentCapabilities: (capabilities: AgentCapabilitySelector) => Promise<boolean> } = new ReadTool();

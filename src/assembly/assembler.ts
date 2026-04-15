@@ -1,14 +1,12 @@
-import { createMiniAgent } from "./create-agent.js";
-import type { AgentUse } from "./create-agent.js";
-import type { MiniAgent } from "./agent.js";
-import { ToolSchema } from "../tool/types.js";
-import type { AgentConfig } from "./config.js";
-import type { LLMRequest } from "./types.js";
-import { AgentCapabilityConsumerSchema, AgentCapabilitySelectorSchema, isCapabilityEnabled } from "./capability.js";
+import { createMiniAgent } from "../core/create-agent.js";
+import type { AgentUse } from "../core/create-agent.js";
+import type { MiniAgent } from "../core/agent.js";
+import type { AgentConfig } from "../core/config.js";
+import type { LLMRequest } from "../core/types.js";
+import { AgentCapabilityConsumerSchema, AgentCapabilitySelectorSchema } from "./capability.js";
 import type { AgentCapabilityConsumer, AgentCapabilitySelector } from "./capability.js";
 import { AgentBlueprintSchema } from "./blueprint.js";
 import type { AgentBlueprint } from "./blueprint.js";
-import type { Tool } from "../tool/types.js";
 
 export type AgentUseFactoryResult = AgentUse | AgentUse[];
 export type AgentUseFactory = () => AgentUseFactoryResult | Promise<AgentUseFactoryResult>;
@@ -77,15 +75,12 @@ export class AgentAssembler {
         const prepared: AgentUse[] = [];
 
         for (const item of uses) {
-            if (ToolSchema.safeParse(item).success) {
-                const tool = item as Tool;
-                if (!isCapabilityEnabled(tool.name, capabilities.tool)) {
+            if (AgentCapabilityConsumerSchema.safeParse(item).success) {
+                const accepted = await (item as AgentCapabilityConsumer)
+                    .consumeAgentCapabilities(capabilities);
+                if (!accepted) {
                     continue;
                 }
-            }
-
-            if (AgentCapabilityConsumerSchema.safeParse(item).success) {
-                await (item as AgentCapabilityConsumer).consumeAgentCapabilities(capabilities);
             }
 
             prepared.push(item);

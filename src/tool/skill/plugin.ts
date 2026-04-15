@@ -6,8 +6,8 @@ import type { Tool } from "../types.js";
 import { MessageType } from "../../core/types.js";
 import type { Message } from "../../core/types.js";
 import type { AgentConfig } from "../../core/config.js";
-import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/capability.js";
-import type { AgentCapabilitySelector } from "../../core/capability.js";
+import { getCapabilityNamespace, isCapabilityEnabled } from "../../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../../assembly/capability.js";
 import { parseFrontmatter } from "../../utils/frontmatter.js";
 import { SkillCapabilitySelectorSchema, SkillPluginConfigSchema } from "./types.js";
 import type { SkillCapabilitySelector, SkillPluginConfig, SkillEntry } from "./types.js";
@@ -21,11 +21,11 @@ export class SkillPlugin {
     private config: SkillPluginConfig | null = null;
     private capabilities: SkillCapabilitySelector = {};
 
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
         const raw = getCapabilityNamespace(capabilities, "skill");
         if (raw === undefined) {
             this.capabilities = {};
-            return;
+            return true;
         }
 
         const parsed = SkillCapabilitySelectorSchema.safeParse(raw);
@@ -34,6 +34,7 @@ export class SkillPlugin {
         }
 
         this.capabilities = parsed.data;
+        return true;
     }
 
     async setConfig(agentConfig: AgentConfig): Promise<void> {

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
-import { AgentAssembler, AgentBlueprintRegistry } from "../core/assembler.js";
-import type { AgentBlueprint } from "../core/blueprint.js";
+import { AgentAssembler, AgentBlueprintRegistry } from "../assembly/assembler.js";
+import type { AgentBlueprint } from "../assembly/blueprint.js";
 import { defineAgentModule } from "../core/module.js";
 import { LLMEngineManager } from "../core/llm.js";
 import type { LLMEngineCtor } from "../core/llm.js";

@@ -2,8 +2,8 @@ import type { Tool } from "../types.js";
 import type { AgentConfig } from "../../core/config.js";
 import { McpClient } from "./client.js";
 import { convertMcpTool, prefixToolName } from "./convert.js";
-import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/capability.js";
-import type { AgentCapabilitySelector } from "../../core/capability.js";
+import { getCapabilityNamespace, isCapabilityEnabled } from "../../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../../assembly/capability.js";
 import { McpCapabilitySelectorSchema, McpPluginConfigSchema } from "./types.js";
 import type { McpCapabilitySelector, McpPluginConfig } from "./types.js";
 
@@ -13,7 +13,7 @@ export class McpPlugin {
     private config: McpPluginConfig | null = null;
     private capabilities: McpCapabilitySelector = {};
 
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
         const raw = getCapabilityNamespace(capabilities, "mcp");
         const nextCapabilities = raw === undefined
             ? {}
@@ -26,6 +26,8 @@ export class McpPlugin {
             await this.disconnectAll();
             await this.connectAll();
         }
+
+        return true;
     }
 
     async setConfig(agentConfig: AgentConfig): Promise<void> {

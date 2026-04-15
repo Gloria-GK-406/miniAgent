@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { readFile, writeFile } from "node:fs/promises";
 import type { Tool } from "./types.js";
+import { isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 
 const EditParamsSchema = z.object({
   path: z.string().describe("Absolute path to the file to edit"),
@@ -39,9 +41,15 @@ async function editExecute(args: Record<string, unknown>): Promise<string> {
   return `Successfully edited ${parsed.path}`;
 }
 
-export const editTool: Tool = {
-  name: "edit",
-  description: "Perform exact string replacement in a file. Fails if oldString is not found or found multiple times (unless replaceAll is true).",
-  parameters: EditParamsSchema,
-  execute: editExecute,
-};
+export class EditTool implements Tool {
+  name = "edit" as const;
+  description = "Perform exact string replacement in a file. Fails if oldString is not found or found multiple times (unless replaceAll is true).";
+  parameters = EditParamsSchema;
+  execute = editExecute;
+
+  async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
+    return isCapabilityEnabled(this.name, capabilities.tool);
+  }
+}
+
+export const editTool: Tool & { consumeAgentCapabilities: (capabilities: AgentCapabilitySelector) => Promise<boolean> } = new EditTool();

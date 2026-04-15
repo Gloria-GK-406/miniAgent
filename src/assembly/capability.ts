@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonValueSchema } from "./config.js";
+import { JsonValueSchema } from "../core/config.js";
 
 export const AgentCapabilityRuleSchema = z.object({
     allow: z.array(z.string()).optional(),
@@ -19,7 +19,7 @@ export type AgentCapabilitySelector = AgentCapabilitySelectorBase & Record<strin
 export const AgentCapabilityConsumerSchema = z.object({
     consumeAgentCapabilities: z.function(
         z.tuple([AgentCapabilitySelectorSchema]),
-        z.promise(z.void()),
+        z.promise(z.boolean()),
     ),
 });
 

@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import { AgentAssembler, AgentBlueprintRegistry } from "./assembler.js";
-import { MessageType } from "./types.js";
-import type { AgentConfig } from "./config.js";
-import type { LLMRequest, LLMResponse, LLMStreamHandle, Message } from "./types.js";
+import { MessageType } from "../core/types.js";
+import type { AgentConfig } from "../core/config.js";
+import type { LLMRequest, LLMResponse, LLMStreamHandle, Message } from "../core/types.js";
+import { isCapabilityEnabled } from "./capability.js";
+import type { AgentCapabilitySelector } from "./capability.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {
@@ -76,12 +78,16 @@ describe("AgentAssembler", () => {
                 text: z.string(),
             }),
             execute: async (args: Record<string, unknown>): Promise<string> => String(args["text"]),
+            consumeAgentCapabilities: async (capabilities: AgentCapabilitySelector): Promise<boolean> => {
+                return isCapabilityEnabled("echo", capabilities.tool);
+            },
         }));
 
         registry.register("context.consumer", () => ({
             priority: 0,
-            consumeAgentCapabilities: async (capabilities: { tool?: { allow?: string[]; deny?: string[] } }): Promise<void> => {
+            consumeAgentCapabilities: async (capabilities: { tool?: { allow?: string[]; deny?: string[] } }): Promise<boolean> => {
                 capabilityConsumerSpy(capabilities);
+                return true;
             },
             collect: async (): Promise<Message[]> => [{
                 id: "consumer-1",

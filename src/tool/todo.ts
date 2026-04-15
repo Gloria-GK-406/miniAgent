@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { Tool, ToolProvider } from "./types.js";
 import type { ContextProcessor, Action, Message } from "../core/types.js";
 import { ActionType, MessageType } from "../core/types.js";
-import { isCapabilityEnabled } from "../core/capability.js";
-import type { AgentCapabilitySelector } from "../core/capability.js";
+import { isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 
 interface TodoItem {
     id: string;
@@ -16,8 +16,9 @@ export class TodoManager implements ToolProvider, ContextProcessor {
     private todos: TodoItem[] = [];
     private capabilities: AgentCapabilitySelector = {};
 
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
         this.capabilities = capabilities;
+        return true;
     }
 
     async getTools(): Promise<Tool[]> {

@@ -2,6 +2,8 @@ import { z } from "zod";
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import type { Tool } from "./types.js";
+import { isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 
 const BashParamsSchema = z.object({
     command: z.string().describe("The bash command to execute"),
@@ -88,9 +90,15 @@ function bashExecute(args: Record<string, unknown>, signal?: AbortSignal): Promi
     });
 }
 
-export const bashTool: Tool = {
-    name: "bash",
-    description: "Execute a bash command in a persistent shell session. Returns stdout, stderr, and exit code. Supports timeout and working directory.",
-    parameters: BashParamsSchema,
-    execute: bashExecute,
-};
+export class BashTool implements Tool {
+    name = "bash" as const;
+    description = "Execute a bash command in a persistent shell session. Returns stdout, stderr, and exit code. Supports timeout and working directory.";
+    parameters = BashParamsSchema;
+    execute = bashExecute;
+
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
+        return isCapabilityEnabled(this.name, capabilities.tool);
+    }
+}
+
+export const bashTool: Tool & { consumeAgentCapabilities: (capabilities: AgentCapabilitySelector) => Promise<boolean> } = new BashTool();

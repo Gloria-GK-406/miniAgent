@@ -13,8 +13,8 @@ import {
     AgentCapabilitySelectorSchema,
     getCapabilityNamespace,
     isCapabilityEnabled,
-} from "../core/capability.js";
-import type { AgentCapabilitySelector } from "../core/capability.js";
+} from "../assembly/capability.js";
+import type { AgentCapabilitySelector } from "../assembly/capability.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 
 export type AgentFactory = (task: string, systemPrompt: string) => Promise<MiniAgent>;
@@ -133,11 +133,11 @@ export class SubagentPlugin {
         this.factory = factory;
     }
 
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<void> {
+    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
         const raw = getCapabilityNamespace(capabilities, "subagent");
         if (raw === undefined) {
             this.capabilities = {};
-            return;
+            return true;
         }
 
         const parsed = SubagentCapabilitySelectorSchema.safeParse(raw);
@@ -146,6 +146,7 @@ export class SubagentPlugin {
         }
 
         this.capabilities = parsed.data;
+        return true;
     }
 
     async setConfig(agentConfig: AgentConfig): Promise<void> {

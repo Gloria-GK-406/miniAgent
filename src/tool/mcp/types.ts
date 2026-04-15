@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AgentCapabilityRuleSchema } from "../../core/capability.js";
+import { AgentCapabilityRuleSchema } from "../../assembly/capability.js";
 
 export const McpStdioConfigSchema = z.object({
     transport: z.literal("stdio"),
