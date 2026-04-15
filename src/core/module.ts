@@ -4,6 +4,7 @@ import type {
     ContextProcessor,
     ContextProvider,
     ErrorHandler,
+    LLMRequire,
     MessageNotifier,
     PersistRequire,
     TurnContextAppender,
@@ -24,7 +25,8 @@ export type AgentRegistrable =
     | PersistRequire
     | TurnContextConsumer
     | TurnContextAppender
-    | ToolApprover;
+    | ToolApprover
+    | LLMRequire;
 
 export type AgentModule = Record<string, unknown>;
 

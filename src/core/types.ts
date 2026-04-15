@@ -313,3 +313,12 @@ export const PersistRequireSchema = z.object({
 });
 
 export type PersistRequire = z.infer<typeof PersistRequireSchema>;
+
+export const LLMRequireSchema = z.object({
+  setLLMRequest: z.function(
+    z.tuple([LLMRequestSchema]),
+    z.promise(z.void()),
+  ),
+});
+
+export type LLMRequire = z.infer<typeof LLMRequireSchema>;

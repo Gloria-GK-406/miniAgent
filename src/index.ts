@@ -60,6 +60,7 @@ export type {
     TokenCount,
     PersistRequire,
     ConfigNotifier,
+    LLMRequire,
 } from "./core/types.js";
 
 export { ModelConfigSchema, PathConfigSchema, AgentConfigSchema } from "./core/config.js";

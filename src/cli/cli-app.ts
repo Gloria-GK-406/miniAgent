@@ -153,7 +153,7 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
         session = await sessionManager.create("default");
     }
 
-    const compressor = new ContextCompressor(manager, toModelConfig(activeModel), {
+    const compressor = new ContextCompressor({
         maxMessages: 60,
         keepRecent: 15,
     });

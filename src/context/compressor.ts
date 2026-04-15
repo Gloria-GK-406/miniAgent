@@ -1,7 +1,6 @@
-import type { Message, ContextProvider } from "../core/types.js";
+import type { Message, ContextProvider, LLMRequest, LLMResponse, ConfigNotifier, LLMRequire } from "../core/types.js";
 import { MessageType } from "../core/types.js";
-import type { LLMRequest, LLMResponse } from "../core/types.js";
-import type { ModelConfig } from "../core/config.js";
+import type { ModelConfig, AgentConfig } from "../core/config.js";
 import type { Tool } from "../tool/types.js";
 
 const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the following conversation into a concise summary that preserves:
@@ -24,22 +23,28 @@ export interface CompressionConfig {
     keepRecent: number;
 }
 
-export class ContextCompressor implements ContextProvider {
+export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNotifier {
     priority = -1000;
-    private llm: LLMRequest;
-    private modelConfig: ModelConfig;
+    private llm: LLMRequest | null = null;
+    private modelConfig: ModelConfig | null = null;
     private config: CompressionConfig;
     private messages: Message[] = [];
     private summary: string | null = null;
     private compressedCount = 0;
 
-    constructor(llm: LLMRequest, modelConfig: ModelConfig, config: Partial<CompressionConfig> = {}) {
-        this.llm = llm;
-        this.modelConfig = modelConfig;
+    constructor(config: Partial<CompressionConfig> = {}) {
         this.config = {
             maxMessages: config.maxMessages ?? 50,
             keepRecent: config.keepRecent ?? 10,
         };
+    }
+
+    async setLLMRequest(llm: LLMRequest): Promise<void> {
+        this.llm = llm;
+    }
+
+    async setConfig(config: AgentConfig): Promise<void> {
+        this.modelConfig = config.model;
     }
 
     getCompressedCount(): number {
@@ -65,6 +70,8 @@ export class ContextCompressor implements ContextProvider {
     }
 
     private async compress(messages: Message[]): Promise<void> {
+        if (!this.llm || !this.modelConfig) return;
+
         const conversationText = messages
             .map((m) => {
                 return `[${m.type}]: ${extractText(m.content)}`;

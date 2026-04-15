@@ -16,12 +16,13 @@ import type {
     ToolCallMessage,
     ToolResultMessage,
     TokenCount,
+    LLMRequire,
 } from "./types.js";
 import {
     ActionType, MessageType, ToolResultMessageSchema,
     ContextProviderSchema, ContextProcessorSchema,
     MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
-    ConfigNotifierSchema, PersistRequireSchema,
+    ConfigNotifierSchema, PersistRequireSchema, LLMRequireSchema,
     TurnContextAppenderSchema, TurnContextConsumerSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
@@ -223,6 +224,11 @@ export class MiniAgent {
             matched = true;
             const req = candidate as PersistRequire;
             void req.setStore(this.store);
+        }
+        if (LLMRequireSchema.safeParse(candidate).success) {
+            matched = true;
+            const req = candidate as LLMRequire;
+            void req.setLLMRequest(this.llm);
         }
         if (TurnContextConsumerSchema.safeParse(candidate).success) {
             matched = true;
