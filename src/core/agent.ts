@@ -46,6 +46,8 @@ export interface MiniAgentOptions {
 }
 
 export class MiniAgent {
+    private readonly guid: string;
+    private name: string;
     private messageSource: MessageSource;
     private llm: LLMRequest;
     private config: AgentConfig;
@@ -69,10 +71,24 @@ export class MiniAgent {
     private toolAbortController: AbortController | null = null;
 
     constructor(llm: LLMRequest, config: AgentConfig, options: MiniAgentOptions = {}) {
+        this.guid = crypto.randomUUID();
+        this.name = "";
         this.llm = llm;
         this.config = config;
         this.store = options.store ?? new FileStore(config.paths.sessiondir);
         this.messageSource = options.messageSource ?? new FileMessageSource(this.store, "messages.jsonl");
+    }
+
+    getGuid(): string {
+        return this.guid;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    setName(name: string): void {
+        this.name = name;
     }
 
     on<K extends keyof AgentEventMap>(event: K, listener: AgentEventMap[K]): this {
