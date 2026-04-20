@@ -9,12 +9,19 @@ import { SubagentPluginConfigSchema } from "../tool/subagent.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 
+export const CLIProviderSchema = z.object({
+  name: z.string(),
+  provider: z.string(),
+  apiKey: z.string(),
+  baseUrl: z.string().optional(),
+});
+
+export type CLIProvider = z.infer<typeof CLIProviderSchema>;
+
 export const CLIModelSchema = z.object({
   name: z.string(),
   provider: z.string(),
   model: z.string(),
-  apiKey: z.string(),
-  baseUrl: z.string().optional(),
   thinking: z.boolean().optional(),
   maxTokens: z.number().int().positive().optional(),
   contextSize: z.number().int().positive().optional(),
@@ -26,6 +33,7 @@ export const CLIModelSchema = z.object({
 export type CLIModel = z.infer<typeof CLIModelSchema>;
 
 export const CLIConfigSchema = z.object({
+  providers: z.array(CLIProviderSchema),
   models: z.array(CLIModelSchema),
   defaultModel: z.string(),
   systemPrompt: z.string().optional(),
@@ -36,12 +44,20 @@ export const CLIConfigSchema = z.object({
 
 export type CLIConfig = z.infer<typeof CLIConfigSchema>;
 
-export function toModelConfig(m: CLIModel): ModelConfig {
+export function resolveProvider(config: CLIConfig, providerName: string): CLIProvider {
+  const provider = config.providers.find((p) => p.name === providerName);
+  if (!provider) {
+    throw new Error(`Provider "${providerName}" not found. Available: ${config.providers.map((p) => p.name).join(", ")}`);
+  }
+  return provider;
+}
+
+export function toModelConfig(m: CLIModel, provider: CLIProvider): ModelConfig {
   return {
-    provider: m.provider,
+    provider: provider.provider,
     model: m.model,
-    apiKey: m.apiKey,
-    ...(m.baseUrl !== undefined && { baseUrl: m.baseUrl }),
+    apiKey: provider.apiKey,
+    ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
     ...(m.thinking !== undefined && { thinking: m.thinking }),
     ...(m.maxTokens !== undefined && { maxTokens: m.maxTokens }),
     ...(m.contextSize !== undefined && { contextSize: m.contextSize }),
@@ -58,6 +74,7 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
   if (!existsSync(configPath)) {
     await mkdir(dir, { recursive: true });
     const template: CLIConfig = {
+      providers: [],
       models: [],
       defaultModel: "",
       systemPrompt: "You are a helpful assistant.",

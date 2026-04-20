@@ -26,7 +26,7 @@ import {
 import { McpPlugin } from "../tool/mcp/plugin.js";
 import { SkillPlugin } from "../tool/skill/plugin.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/subagent.js";
-import { CLIAGENT_DIR, loadConfig, findModel, toModelConfig } from "./config.js";
+import { CLIAGENT_DIR, loadConfig, findModel, resolveProvider, toModelConfig } from "./config.js";
 import type { CLIConfig, CLIModel } from "./config.js";
 
 const ENGINES: Record<string, LLMEngineCtor> = {
@@ -96,11 +96,12 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     function buildModelsMap(): Map<string, ModelGroup> {
         const map = new Map<string, ModelGroup>();
         for (const m of config.models) {
-            const group = map.get(m.provider);
+            const p = resolveProvider(config, m.provider);
+            const group = map.get(p.provider);
             if (group) {
-                group.models.push(toModelConfig(m));
+                group.models.push(toModelConfig(m, p));
             } else {
-                map.set(m.provider, { models: [toModelConfig(m)] });
+                map.set(p.provider, { models: [toModelConfig(m, p)] });
             }
         }
         return map;
@@ -206,12 +207,12 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
 
 function registerEngines(manager: LLMEngineManager, config: CLIConfig): void {
     const seen = new Set<string>();
-    for (const m of config.models) {
-        if (seen.has(m.provider)) continue;
-        const ctor = ENGINES[m.provider];
+    for (const p of config.providers) {
+        if (seen.has(p.provider)) continue;
+        const ctor = ENGINES[p.provider];
         if (!ctor) continue;
-        manager.register(m.provider, ctor);
-        seen.add(m.provider);
+        manager.register(p.provider, ctor);
+        seen.add(p.provider);
     }
 }
 
@@ -281,7 +282,7 @@ function createConfiguredSubagentFactory(
         const agentConfig: AgentConfig = {
             model: request.entry.model !== undefined
                 ? resolveModelConfig(request.entry.model)
-                : toModelConfig(getActiveModel()),
+                : toModelConfig(getActiveModel(), resolveProvider(config, getActiveModel().provider)),
             models: buildModelsMap(),
             plugins: subPlugins,
             paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
@@ -338,15 +339,16 @@ async function buildAgentInner(
         plugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
     }
     const agentConfig: AgentConfig = {
-        model: toModelConfig(activeModel),
+        model: toModelConfig(activeModel, resolveProvider(config, activeModel.provider)),
         models: (() => {
             const map = new Map<string, ModelGroup>();
             for (const m of config.models) {
-                const group = map.get(m.provider);
+                const p = resolveProvider(config, m.provider);
+                const group = map.get(p.provider);
                 if (group) {
-                    group.models.push(toModelConfig(m));
+                    group.models.push(toModelConfig(m, p));
                 } else {
-                    map.set(m.provider, { models: [toModelConfig(m)] });
+                    map.set(p.provider, { models: [toModelConfig(m, p)] });
                 }
             }
             return map;
