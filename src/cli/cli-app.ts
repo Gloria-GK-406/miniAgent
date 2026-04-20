@@ -18,6 +18,7 @@ import { OpenAIEngine } from "../engine/openai/index.js";
 import { OpenAICompatibleEngine } from "../engine/openai-compatible/index.js";
 import { GLMEngine } from "../engine/glm/index.js";
 import { GLMCodePlanEngine } from "../engine/glm-codeplan/index.js";
+import { NVIDIAEngine } from "../engine/nvidia/index.js";
 import {
     readTool, writeTool, editTool, globTool, grepTool, bashTool,
     TodoManager, SubagentPlugin, AgentContextProvider,
@@ -34,6 +35,7 @@ const ENGINES: Record<string, LLMEngineCtor> = {
     "openai-compatible": OpenAICompatibleEngine,
     glm: GLMEngine,
     "glm-codeplan": GLMCodePlanEngine,
+    nvidia: NVIDIAEngine,
 };
 
 const AUTO_APPROVE_TOOLS = ["read", "glob", "grep"];

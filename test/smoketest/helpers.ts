@@ -47,7 +47,8 @@ export type ProviderKey =
   | "OPENAI"
   | "OPENAI_COMPATIBLE"
   | "GLM"
-  | "GLM_CODEPLAN";
+  | "GLM_CODEPLAN"
+  | "NVIDIA";
 
 export function getProviderConfig(
   provider: ProviderKey,

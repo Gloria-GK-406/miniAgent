@@ -98,6 +98,13 @@ export { ToolSchema, ToolProviderSchema } from "./tool/types.js";
 export type { Tool, ToolProvider } from "./tool/types.js";
 export { ToolApproverSchema } from "./tool/approver.js";
 export type { ToolApprover } from "./tool/approver.js";
+export { readTool } from "./tool/read.js";
+export { writeTool } from "./tool/write.js";
+export { editTool } from "./tool/edit.js";
+export { globTool } from "./tool/glob.js";
+export { grepTool } from "./tool/grep.js";
+export { bashTool } from "./tool/bash.js";
+export { TodoManager } from "./tool/todo.js";
 export {
     SubAgentProvider,
     SubagentPlugin,
