@@ -13,18 +13,15 @@ import type { JsonValue } from "../core/config.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
 import { ContextCompressor } from "../context/compressor.js";
-import { AnthropicEngine } from "../engine/anthropic/index.js";
-import { OpenAIEngine } from "../engine/openai/index.js";
-import { OpenAICompatibleEngine } from "../engine/openai-compatible/index.js";
-import { GLMEngine } from "../engine/glm/index.js";
-import { GLMCodePlanEngine } from "../engine/glm-codeplan/index.js";
-import { NVIDIAEngine } from "../engine/nvidia/index.js";
+import {
+    AnthropicEngine, OpenAIEngine, OpenAICompatibleEngine,
+    GLMEngine, GLMCodePlanEngine, NVIDIAEngine,
+} from "../engine/index.js";
 import {
     readTool, writeTool, editTool, globTool, grepTool, bashTool,
     TodoManager, SubagentPlugin, AgentContextProvider,
+    McpPlugin, SkillPlugin,
 } from "../tool/index.js";
-import { McpPlugin } from "../tool/mcp/plugin.js";
-import { SkillPlugin } from "../tool/skill/plugin.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/subagent.js";
 import { CLIAGENT_DIR, loadConfig, findModel, resolveProvider, toModelConfig } from "./config.js";
 import type { CLIConfig, CLIModel } from "./config.js";

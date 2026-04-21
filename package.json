@@ -1,6 +1,6 @@
 {
   "name": "@piaoxianguo/miniagent",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "A minimal, extensible TypeScript Agent framework",
   "keywords": [
     "agent",
@@ -30,33 +30,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./engine/anthropic": {
-      "types": "./dist/engine/anthropic/index.d.ts",
-      "import": "./dist/engine/anthropic/index.js"
+    "./engine": {
+      "types": "./dist/engine/index.d.ts",
+      "import": "./dist/engine/index.js"
     },
-    "./engine/openai": {
-      "types": "./dist/engine/openai/index.d.ts",
-      "import": "./dist/engine/openai/index.js"
-    },
-    "./engine/openai-compatible": {
-      "types": "./dist/engine/openai-compatible/index.d.ts",
-      "import": "./dist/engine/openai-compatible/index.js"
-    },
-    "./engine/glm": {
-      "types": "./dist/engine/glm/index.d.ts",
-      "import": "./dist/engine/glm/index.js"
-    },
-    "./engine/glm-codeplan": {
-      "types": "./dist/engine/glm-codeplan/index.d.ts",
-      "import": "./dist/engine/glm-codeplan/index.js"
-    },
-    "./tool/mcp": {
-      "types": "./dist/tool/mcp/index.d.ts",
-      "import": "./dist/tool/mcp/index.js"
-    },
-    "./tool/skill": {
-      "types": "./dist/tool/skill/index.d.ts",
-      "import": "./dist/tool/skill/index.js"
+    "./tool": {
+      "types": "./dist/tool/index.d.ts",
+      "import": "./dist/tool/index.js"
     }
   },
   "files": [
