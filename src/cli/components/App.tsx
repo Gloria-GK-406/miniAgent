@@ -3,7 +3,8 @@ import { Box, Text, useStdout, useInput } from "ink";
 import type { Message, TokenCount } from "../../core/types.js";
 import { useAgent } from "../hooks/useAgent.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
-import { MessageList } from "./MessageList.js";
+import { buildRenderableLines } from "./MessageList.js";
+import type { RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
 import { CommandPalette } from "./CommandPalette.js";
 import { InputBox } from "./InputBox.js";
@@ -34,6 +35,46 @@ export interface AppProps {
 
 const BOTTOM_RESERVED = 6;
 
+export interface MessageWindow {
+  visibleLines: RenderLine[];
+  maxScrollFromBottom: number;
+  scrollFromBottom: number;
+}
+
+export function padMessageWindow(
+  lines: RenderLine[],
+  messageAreaHeight: number,
+): RenderLine[] {
+  const fillerCount = Math.max(0, messageAreaHeight - lines.length);
+  return [
+    ...Array.from({ length: fillerCount }, (_, index) => ({
+      key: `__pad__:${index}`,
+      text: "",
+    })),
+    ...lines,
+  ];
+}
+
+export function getMessageWindow(
+  lines: RenderLine[],
+  messageAreaHeight: number,
+  scrollFromBottom: number,
+): MessageWindow {
+  const maxScrollFromBottom = Math.max(0, lines.length - messageAreaHeight);
+  const clampedScrollFromBottom = Math.min(
+    Math.max(0, scrollFromBottom),
+    maxScrollFromBottom,
+  );
+  const end = lines.length - clampedScrollFromBottom;
+  const start = Math.max(0, end - messageAreaHeight);
+
+  return {
+    visibleLines: lines.slice(start, end),
+    maxScrollFromBottom,
+    scrollFromBottom: clampedScrollFromBottom,
+  };
+}
+
 export function App({
   agent,
   modelName,
@@ -55,42 +96,67 @@ export function App({
     applySelected,
   } = useSuggestion({ modelPaths });
   const { stdout } = useStdout();
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollFromBottom, setScrollFromBottom] = useState(0);
   const [panelData, setPanelData] = useState<PanelData | null>(null);
   const [isModelSelectOpen, setIsModelSelectOpen] = useState(false);
 
   const terminalHeight = stdout?.rows ?? 24;
+  const terminalWidth = stdout?.columns ?? 80;
   const messageAreaHeight = Math.max(1, terminalHeight - BOTTOM_RESERVED);
+  const messageAreaWidth = Math.max(20, terminalWidth - 2);
 
-  useEffect(() => {
-    setScrollOffset(0);
-  }, [state.messages.length]);
+  const renderableLines = buildRenderableLines(
+    state.messages,
+    state.streamingText,
+    state.reasoningText,
+    messageAreaWidth,
+  );
+  const {
+    visibleLines,
+    maxScrollFromBottom,
+    scrollFromBottom: clampedScrollFromBottom,
+  } = getMessageWindow(renderableLines, messageAreaHeight, scrollFromBottom);
+  const paddedVisibleLines = padMessageWindow(visibleLines, messageAreaHeight);
 
   useInput((_input, key) => {
     if (panelData || isModelSelectOpen) return;
-    if (state.isRunning) return;
-    if (key.pageUp) {
-      setScrollOffset((prev) => Math.max(0, prev - Math.max(1, Math.floor(messageAreaHeight / 2))));
+    const pageSize = Math.max(1, Math.floor(messageAreaHeight / 2));
+
+    if (key.upArrow) {
+      setScrollFromBottom((prev) => Math.min(maxScrollFromBottom, prev + 1));
+      return;
     }
-    if (key.pageDown) {
-      setScrollOffset((prev) => {
-        const next = prev + Math.max(1, Math.floor(messageAreaHeight / 2));
-        return Math.min(next, maxOffset);
-      });
+    if (key.downArrow) {
+      setScrollFromBottom((prev) => Math.max(0, prev - 1));
+      return;
+    }
+    if (key.pageUp || (key.ctrl && _input === "u")) {
+      setScrollFromBottom((prev) => Math.min(maxScrollFromBottom, prev + pageSize));
+      return;
+    }
+    if (key.pageDown || (key.ctrl && _input === "d")) {
+      setScrollFromBottom((prev) => Math.max(0, prev - pageSize));
+      return;
+    }
+    if (key.home) {
+      setScrollFromBottom(maxScrollFromBottom);
+      return;
+    }
+    if (key.end) {
+      setScrollFromBottom(0);
     }
   });
 
-  const allMessages = state.messages;
-  const totalHeight = allMessages.length;
-  const maxOffset = Math.max(0, totalHeight - messageAreaHeight);
-  const clampedOffset = Math.min(scrollOffset, maxOffset);
+  useEffect(() => {
+    setScrollFromBottom((prev) => Math.min(prev, maxScrollFromBottom));
+  }, [maxScrollFromBottom]);
 
-  const visibleMessages = allMessages.slice(clampedOffset, clampedOffset + messageAreaHeight);
-  const isScrolledUp = clampedOffset > 0;
-  const canScrollDown = clampedOffset < maxOffset;
+  const isScrolledUp = clampedScrollFromBottom > 0;
+  const canScrollUp = clampedScrollFromBottom < maxScrollFromBottom;
 
   const handleSubmit = useCallback(
     async (text: string) => {
+      setScrollFromBottom(0);
       if (text === "/history" || text.startsWith("/history ")) {
         const messages = await agent.getMessages();
         setPanelData({ title: "History", messages });
@@ -136,17 +202,24 @@ export function App({
   return (
     <Box flexDirection="column">
       <Box flexDirection="column" height={messageAreaHeight} overflow="hidden">
-        <MessageList
-          messages={visibleMessages}
-          {...(state.streamingText !== "" && { streamingText: state.streamingText })}
-          {...(state.reasoningText !== "" && { reasoningText: state.reasoningText })}
-        />
+        {paddedVisibleLines.map((line) => (
+          <Text
+            key={line.key}
+            {...(line.color !== undefined && { color: line.color })}
+            {...(line.dimColor === true && { dimColor: true })}
+          >
+            {line.text}
+          </Text>
+        ))}
       </Box>
       {isScrolledUp && (
-        <Text dimColor>↑ scrolled up ({clampedOffset}/{maxOffset}) — PgDn to scroll down</Text>
+        <Text dimColor>
+          ↑ older messages above · {clampedScrollFromBottom}/{maxScrollFromBottom} from bottom ·
+          ↓/PgDn/End to follow latest
+        </Text>
       )}
-      {canScrollDown && !isScrolledUp && allMessages.length > messageAreaHeight && (
-        <Text dimColor>↓ more messages below</Text>
+      {!isScrolledUp && canScrollUp && (
+        <Text dimColor>↑/PgUp/Home to browse history</Text>
       )}
       <StatusIndicator
         isRunning={state.isRunning}
@@ -163,7 +236,7 @@ export function App({
           onSubmit={handleSubmit}
           onChange={handleInputChange}
           disabled={state.isRunning}
-          focused={!isScrolledUp}
+          focused={true}
           hasSuggestions={hasSuggestions}
           onSuggestionNext={selectNext}
           onSuggestionPrev={selectPrev}

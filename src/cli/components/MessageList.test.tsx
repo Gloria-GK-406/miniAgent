@@ -1,10 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { renderToString } from "ink";
-import { MessageList } from "./MessageList.js";
+import { MessageList, buildRenderableMessages } from "./MessageList.js";
 import { MessageType } from "../../core/types.js";
 import type { Message } from "../../core/types.js";
 
 describe("MessageList", () => {
+  it("adds a temporary assist message for streaming text after a user message", () => {
+    const messages: Message[] = [
+      { id: "1", type: MessageType.User, content: "Hello" },
+    ];
+    const rendered = buildRenderableMessages(messages, "stream", "think");
+    expect(rendered).toHaveLength(2);
+    expect(rendered[1]).toMatchObject({
+      type: MessageType.Assist,
+      content: "",
+    });
+  });
+
   it("renders multiple messages", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "Hello" },
@@ -36,7 +48,7 @@ describe("MessageList", () => {
     expect(output).toContain("...more");
   });
 
-  it("does not pass streamingText to non-last messages", () => {
+  it("renders a temporary assist row when streaming after a non-assist message", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.Assist, content: "First" },
       { id: "2", type: MessageType.User, content: "Hello" },
@@ -45,7 +57,21 @@ describe("MessageList", () => {
       <MessageList messages={messages} streamingText="stream" />,
     );
     expect(output).toContain("First");
-    expect(output).not.toContain("stream");
+    expect(output).toContain("Hello");
+    expect(output).toContain("stream");
+  });
+
+  it("does not render a temporary assist row when no streaming content exists", () => {
+    const messages: Message[] = [
+      { id: "1", type: MessageType.Assist, content: "First" },
+      { id: "2", type: MessageType.User, content: "Hello" },
+    ];
+    const output = renderToString(
+      <MessageList messages={messages} />,
+    );
+    expect(output).toContain("First");
+    expect(output).toContain("Hello");
+    expect(output).not.toContain("__streaming_tail__");
   });
 
   it("renders tool call messages", () => {
@@ -75,5 +101,22 @@ describe("MessageList", () => {
     );
     expect(output).toContain("read");
     expect(output).toContain("file contents here");
+  });
+
+  it("truncates tool result to the first line preview", () => {
+    const messages: Message[] = [
+      {
+        id: "1",
+        type: MessageType.ToolResult,
+        content: "first line\nsecond line\nthird line",
+        toolCallId: "tc1",
+      },
+    ];
+    const output = renderToString(
+      <MessageList messages={messages} />,
+    );
+    expect(output).toContain("first line");
+    expect(output).not.toContain("second line");
+    expect(output).not.toContain("third line");
   });
 });

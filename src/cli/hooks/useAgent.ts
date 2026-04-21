@@ -41,7 +41,7 @@ export function useAgent(agent: AgentLike): UseAgentReturn {
     let cancelled = false;
     agent.getMessages().then((loaded) => {
       if (!cancelled) {
-        setMessages(loaded);
+        setMessages((prev) => (prev.length === 0 ? loaded : prev));
       }
     });
     return () => { cancelled = true; };
@@ -120,7 +120,12 @@ export function useAgent(agent: AgentLike): UseAgentReturn {
 
     handlers["message:notify"] = (payload: unknown) => {
       const p = payload as { message: Message };
-      setMessages((prev) => [...prev, p.message]);
+      setMessages((prev) => {
+        if (prev.some((message) => message.id === p.message.id)) {
+          return prev;
+        }
+        return [...prev, p.message];
+      });
     };
 
     for (const [event, handler] of Object.entries(handlers)) {

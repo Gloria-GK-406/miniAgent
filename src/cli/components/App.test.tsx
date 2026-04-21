@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { renderToString } from "ink";
-import { App } from "./App.js";
+import { App, getMessageWindow, padMessageWindow } from "./App.js";
+import { buildRenderableLines } from "./MessageList.js";
+import { MessageType } from "../../core/types.js";
 
 function createMockAgent() {
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -37,6 +39,51 @@ function createMockAgent() {
 }
 
 describe("App", () => {
+  it("anchors the message window to the bottom by default", () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      id: String(index + 1),
+      type: MessageType.Assist as const,
+      content: `message-${index + 1}`,
+    }));
+    const lines = buildRenderableLines(messages, undefined, undefined, 80);
+    const window = getMessageWindow(lines, 3, 0);
+    expect(window.visibleLines.map((line) => line.text)).toEqual([
+      "message-4",
+      "message-5",
+      "message-6",
+    ]);
+    expect(window.maxScrollFromBottom).toBe(3);
+  });
+
+  it("shows older messages when scrolled away from the bottom", () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      id: String(index + 1),
+      type: MessageType.Assist as const,
+      content: `message-${index + 1}`,
+    }));
+    const lines = buildRenderableLines(messages, undefined, undefined, 80);
+    const window = getMessageWindow(lines, 3, 2);
+    expect(window.visibleLines.map((line) => line.text)).toEqual([
+      "message-2",
+      "message-3",
+      "message-4",
+    ]);
+    expect(window.scrollFromBottom).toBe(2);
+  });
+
+  it("pads short windows so content stays bottom-aligned", () => {
+    const padded = padMessageWindow(
+      [
+        { key: "line-1", text: "hello" },
+        { key: "line-2", text: "world" },
+      ],
+      5,
+    );
+    expect(padded).toHaveLength(5);
+    expect(padded.slice(0, 3).map((line) => line.text)).toEqual(["", "", ""]);
+    expect(padded.slice(3).map((line) => line.text)).toEqual(["hello", "world"]);
+  });
+
   it("renders StatusBar with model name", () => {
     const agent = createMockAgent();
     const output = renderToString(

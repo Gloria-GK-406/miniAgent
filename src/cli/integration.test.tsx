@@ -76,7 +76,7 @@ describe("MessageList + MessageItem integration", () => {
     expect(output).toContain("...more");
   });
 
-  it("does not append streamingText to non-Assist last message", () => {
+  it("renders streamingText in a temporary Assist row after a non-Assist last message", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.Assist, content: "Done" },
       { id: "2", type: MessageType.User, content: "Next?" },
@@ -86,7 +86,23 @@ describe("MessageList + MessageItem integration", () => {
     );
     expect(output).toContain("Done");
     expect(output).toContain("Next?");
-    expect(output).not.toContain("stream");
+    expect(output).toContain("stream");
+  });
+
+  it("renders a temporary Assist row when streaming after a User message", () => {
+    const messages: Message[] = [
+      { id: "1", type: MessageType.User, content: "Tell me something" },
+    ];
+    const output = renderToString(
+      <MessageList
+        messages={messages}
+        streamingText="stream"
+        reasoningText="thinking"
+      />,
+    );
+    expect(output).toContain("Tell me something");
+    expect(output).toContain("stream");
+    expect(output).toContain("thinking");
   });
 
   it("renders tool call and result sequence", () => {
@@ -115,6 +131,24 @@ describe("MessageList + MessageItem integration", () => {
     expect(output).toContain("glob");
     expect(output).toContain("package.json");
     expect(output).toContain("Found package.json");
+  });
+
+  it("shows a shortened tool result preview in the main message flow", () => {
+    const messages: Message[] = [
+      { id: "1", type: MessageType.User, content: "Open result" },
+      {
+        id: "2",
+        type: MessageType.ToolResult,
+        content: "line one\nline two\nline three",
+        toolCallId: "tc1",
+      },
+    ];
+    const output = renderToString(
+      <MessageList messages={messages} />,
+    );
+    expect(output).toContain("line one");
+    expect(output).not.toContain("line two");
+    expect(output).not.toContain("line three");
   });
 });
 

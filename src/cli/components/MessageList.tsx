@@ -1,35 +1,279 @@
-import { Box } from "ink";
-import type { Message } from "../../core/types.js";
+import { Box, Text } from "ink";
+import type { Message, MessageContent } from "../../core/types.js";
 import { MessageType } from "../../core/types.js";
-import { MessageItem } from "./MessageItem.js";
+
+export interface RenderLine {
+  key: string;
+  text: string;
+  color?: string;
+  dimColor?: boolean;
+}
 
 interface MessageListProps {
   messages: Message[];
   streamingText?: string;
   reasoningText?: string;
+  width?: number;
+}
+
+function getContentText(content: MessageContent): string {
+  if (typeof content === "string") return content;
+  if (content.type === "text") return content.text;
+  return "[image]";
+}
+
+function charWidth(char: string): number {
+  const code = char.codePointAt(0);
+  if (code === undefined) {
+    return 0;
+  }
+  if (
+    code >= 0x1100
+    && (
+      code <= 0x115f
+      || code === 0x2329
+      || code === 0x232a
+      || (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f)
+      || (code >= 0xac00 && code <= 0xd7a3)
+      || (code >= 0xf900 && code <= 0xfaff)
+      || (code >= 0xfe10 && code <= 0xfe19)
+      || (code >= 0xfe30 && code <= 0xfe6f)
+      || (code >= 0xff00 && code <= 0xff60)
+      || (code >= 0xffe0 && code <= 0xffe6)
+      || (code >= 0x1f300 && code <= 0x1f64f)
+      || (code >= 0x1f900 && code <= 0x1f9ff)
+      || (code >= 0x20000 && code <= 0x3fffd)
+    )
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+function wrapLine(text: string, width: number): string[] {
+  if (width <= 0) {
+    return [text];
+  }
+  if (text === "") {
+    return [""];
+  }
+
+  const lines: string[] = [];
+  let current = "";
+  let currentWidth = 0;
+
+  for (const char of text) {
+    const nextWidth = charWidth(char);
+    if (current !== "" && currentWidth + nextWidth > width) {
+      lines.push(current);
+      current = char;
+      currentWidth = nextWidth;
+      continue;
+    }
+    current += char;
+    currentWidth += nextWidth;
+  }
+
+  if (current !== "") {
+    lines.push(current);
+  }
+
+  return lines.length > 0 ? lines : [""];
+}
+
+function wrapBlock(
+  text: string,
+  width: number,
+  options: {
+    firstPrefix?: string;
+    restPrefix?: string;
+  } = {},
+): string[] {
+  const rawLines = text === "" ? [""] : text.split("\n");
+  const rendered: string[] = [];
+
+  rawLines.forEach((rawLine, index) => {
+    const prefix = index === 0 ? (options.firstPrefix ?? "") : (options.restPrefix ?? "");
+    const continuationPrefix = options.restPrefix ?? "";
+    const contentWidth = Math.max(1, width - Array.from(prefix).reduce((sum, char) => sum + charWidth(char), 0));
+    const wrapped = wrapLine(rawLine, contentWidth);
+    wrapped.forEach((line, wrappedIndex) => {
+      rendered.push(`${wrappedIndex === 0 ? prefix : continuationPrefix}${line}`);
+    });
+  });
+
+  return rendered;
+}
+
+function truncatePreview(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
+}
+
+function summarizeToolResult(text: string): string {
+  const firstLine = text.split("\n")[0] ?? "";
+  return truncatePreview(firstLine, 120);
+}
+
+export function buildRenderableMessages(
+  messages: Message[],
+  streamingText?: string,
+  reasoningText?: string,
+): Message[] {
+  const lastMessage = messages[messages.length - 1];
+  const shouldRenderStreamingTail = lastMessage?.type !== MessageType.Assist
+    && ((streamingText?.length ?? 0) > 0 || (reasoningText?.length ?? 0) > 0);
+
+  if (!shouldRenderStreamingTail) {
+    return messages;
+  }
+
+  return [
+    ...messages,
+    {
+      id: "__streaming_tail__",
+      type: MessageType.Assist,
+      content: "",
+    },
+  ];
+}
+
+function messageToLines(
+  message: Message,
+  width: number,
+  options: {
+    streamingText?: string;
+    reasoningText?: string;
+  } = {},
+): RenderLine[] {
+  switch (message.type) {
+    case MessageType.User:
+      return wrapBlock(getContentText(message.content), width, {
+        firstPrefix: "❯ ",
+        restPrefix: "  ",
+      }).map((text, index) => ({
+        key: `${message.id}:user:${index}`,
+        text,
+        color: "green",
+      }));
+
+    case MessageType.Assist: {
+      const contentText = getContentText(message.content) + (options.streamingText ?? "");
+      const lines: RenderLine[] = wrapBlock(contentText, width).map((text, index) => ({
+        key: `${message.id}:assist:${index}`,
+        text,
+        color: "cyan",
+      }));
+
+      const reasoning = [
+        ...(message.reasoningContent ? wrapBlock(message.reasoningContent, width, {
+          firstPrefix: "· ",
+          restPrefix: "  ",
+        }) : []),
+        ...(options.reasoningText ? wrapBlock(options.reasoningText, width, {
+          firstPrefix: "· ",
+          restPrefix: "  ",
+        }) : []),
+      ];
+
+      return [
+        ...lines,
+        ...reasoning.map((text, index) => ({
+          key: `${message.id}:reason:${index}`,
+          text,
+          dimColor: true,
+        })),
+      ];
+    }
+
+    case MessageType.ToolCall: {
+      const lines: RenderLine[] = [];
+      const content = getContentText(message.content);
+      if (content !== "") {
+        lines.push(
+          ...wrapBlock(content, width).map((text, index) => ({
+            key: `${message.id}:toolcall-content:${index}`,
+            text,
+            color: "cyan",
+          })),
+        );
+      }
+      const argText = JSON.stringify(message.arguments);
+      lines.push(
+        ...wrapBlock(`${message.toolName} ${argText}`, width, {
+          firstPrefix: "⟳ ",
+          restPrefix: "  ",
+        }).map((text, index) => ({
+          key: `${message.id}:toolcall:${index}`,
+          text,
+          color: "yellow",
+        })),
+      );
+      return lines;
+    }
+
+    case MessageType.ToolResult:
+      return wrapBlock(summarizeToolResult(getContentText(message.content)), width, {
+        firstPrefix: "→ ",
+        restPrefix: "  ",
+      }).map((text, index) => ({
+        key: `${message.id}:toolresult:${index}`,
+        text,
+        dimColor: true,
+      }));
+
+    case MessageType.System:
+      return wrapBlock(getContentText(message.content), width).map((text, index) => ({
+        key: `${message.id}:system:${index}`,
+        text,
+        color: "magenta",
+      }));
+  }
+}
+
+export function buildRenderableLines(
+  messages: Message[],
+  streamingText: string | undefined,
+  reasoningText: string | undefined,
+  width: number,
+): RenderLine[] {
+  const renderableMessages = buildRenderableMessages(
+    messages,
+    streamingText,
+    reasoningText,
+  );
+
+  return renderableMessages.flatMap((message, index) => {
+    const isLast = index === renderableMessages.length - 1;
+    const isAssist = message.type === MessageType.Assist;
+    return messageToLines(message, width, {
+      streamingText: isLast && isAssist ? streamingText : undefined,
+      reasoningText: isLast && isAssist ? reasoningText : undefined,
+    });
+  });
 }
 
 export function MessageList({
   messages,
   streamingText,
   reasoningText,
+  width = 80,
 }: MessageListProps) {
+  const lines = buildRenderableLines(messages, streamingText, reasoningText, width);
+
   return (
     <Box flexDirection="column">
-      {messages.map((message, index) => {
-        const isLast = index === messages.length - 1;
-        const isAssist = message.type === MessageType.Assist;
-        const showStreaming = isLast && isAssist ? streamingText : undefined;
-        const showReasoning = isLast && isAssist ? reasoningText : undefined;
-        return (
-          <MessageItem
-            key={message.id}
-            message={message}
-            {...(showStreaming !== undefined && { streamingText: showStreaming })}
-            {...(showReasoning !== undefined && { reasoningText: showReasoning })}
-          />
-        );
-      })}
+      {lines.map((line) => (
+        <Text
+          key={line.key}
+          {...(line.color !== undefined && { color: line.color })}
+          {...(line.dimColor === true && { dimColor: true })}
+        >
+          {line.text}
+        </Text>
+      ))}
     </Box>
   );
 }
