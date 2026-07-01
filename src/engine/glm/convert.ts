@@ -149,7 +149,85 @@ export function buildCreateParams(
   };
 }
 
+type GLMReasoningEffort = "low" | "medium" | "high" | "max";
+
+const ORDERED_THINKING_LEVELS = [
+  ThinkingLevel.Low,
+  ThinkingLevel.Medium,
+  ThinkingLevel.High,
+  ThinkingLevel.Max,
+] as const;
+
+function selectSupportedThinkingLevel(
+  requested: ThinkingLevel,
+  supportedLevels: ThinkingLevel[],
+): ThinkingLevel | undefined {
+  if (requested === ThinkingLevel.None) {
+    return ThinkingLevel.None;
+  }
+  const supportedNonNone = ORDERED_THINKING_LEVELS.filter((level) =>
+    supportedLevels.includes(level),
+  );
+  if (supportedNonNone.length === 0) {
+    return undefined;
+  }
+  if (supportedNonNone.includes(requested)) {
+    return requested;
+  }
+
+  const requestedIndex = ORDERED_THINKING_LEVELS.indexOf(requested);
+  let nearest = supportedNonNone[0]!;
+  let nearestDistance = Math.abs(
+    ORDERED_THINKING_LEVELS.indexOf(nearest) - requestedIndex,
+  );
+  for (const level of supportedNonNone.slice(1)) {
+    const distance = Math.abs(
+      ORDERED_THINKING_LEVELS.indexOf(level) - requestedIndex,
+    );
+    if (distance < nearestDistance) {
+      nearest = level;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+function supportsReasoningEffort(model: string): boolean {
+  const match = /^glm-(\d+)\.(\d+)/i.exec(model);
+  if (!match) {
+    return false;
+  }
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > 5 || (major === 5 && minor >= 2);
+}
+
+function mapGLMReasoningEffort(
+  level: ThinkingLevel,
+  engine: string,
+): GLMReasoningEffort {
+  if (engine === "glm-codeplan") {
+    return level === ThinkingLevel.Max ? "max" : "high";
+  }
+  switch (level) {
+    case ThinkingLevel.Low:
+      return "low";
+    case ThinkingLevel.Medium:
+      return "medium";
+    case ThinkingLevel.High:
+      return "high";
+    case ThinkingLevel.Max:
+      return "max";
+    case ThinkingLevel.None:
+      return "high";
+  }
+}
+
 export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
+  const effectiveThinking = selectSupportedThinkingLevel(
+    request.generation.thinking,
+    request.model.thinkingLevels,
+  );
   const config: ModelConfig = {
     provider: request.model.engine,
     model: request.model.model,
@@ -157,7 +235,8 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
     ...(request.provider.baseUrl !== undefined && {
       baseUrl: request.provider.baseUrl,
     }),
-    thinking: request.generation.thinking !== ThinkingLevel.None,
+    thinking: effectiveThinking !== undefined
+      && effectiveThinking !== ThinkingLevel.None,
     ...(request.generation.maxOutputTokens !== undefined && {
       maxOutputTokens: request.generation.maxOutputTokens,
     }),
@@ -165,7 +244,17 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
     ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
   };
 
-  return buildCreateParams(request.messages, config, request.tools);
+  return {
+    ...buildCreateParams(request.messages, config, request.tools),
+    ...(effectiveThinking !== undefined
+      && effectiveThinking !== ThinkingLevel.None
+      && supportsReasoningEffort(request.model.model) && {
+        reasoning_effort: mapGLMReasoningEffort(
+          effectiveThinking,
+          request.model.engine,
+        ),
+      }),
+  };
 }
 
 export function convertResponse(

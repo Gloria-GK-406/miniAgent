@@ -96,13 +96,16 @@ export class GLMCodePlanEngine implements LLMEngine, ModelCatalogLLMEngine {
 
     void (async () => {
       try {
-        const stream = await client.chat.completions.create({
+        const body = {
           ...params,
           stream: true,
           stream_options: {
             include_usage: true,
           },
-        });
+        };
+        const stream = await client.chat.completions.create(
+          body as never,
+        ) as unknown as AsyncIterable<ChatCompletionChunk>;
         const response = await consumeOpenAIStream(stream, {
           emitChunk: (chunk) => {
             controller.emitChunk(chunk);

@@ -5,10 +5,15 @@ import {
   convertMessages,
   convertTools,
   buildCreateParams,
+  buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
 import type { Message, Tool, ImageContent } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+  type ModelConfig,
+} from "../../core/config.js";
 
 function sysMsg(content: string): Message {
   return { id: "sys-1", type: MessageType.System, content };
@@ -74,6 +79,43 @@ const baseConfig: ModelConfig = {
   apiKey: "test-key",
   baseUrl: "",
 };
+
+function request(
+  overrides: Partial<{
+    engine: string;
+    model: string;
+    thinking: ThinkingLevel;
+    thinkingLevels: ThinkingLevel[];
+  }> = {},
+): LLMGenerateRequest {
+  const engine = overrides.engine ?? "openai";
+  const model = overrides.model ?? "o3";
+  return {
+    messages: [userMsg("hi")],
+    tools: [],
+    provider: {
+      name: "provider",
+      engine,
+      apiKey: "test-key",
+    },
+    model: {
+      id: `provider/${model}`,
+      provider: "provider",
+      engine,
+      model,
+      thinkingLevels: overrides.thinkingLevels ?? [
+        ThinkingLevel.None,
+        ThinkingLevel.Low,
+        ThinkingLevel.Medium,
+        ThinkingLevel.High,
+      ],
+    },
+    generation: {
+      temperature: 0.7,
+      thinking: overrides.thinking ?? ThinkingLevel.High,
+    },
+  };
+}
 
 function makeTool(
   overrides: Partial<{ name: string; description: string }> = {},
@@ -247,6 +289,31 @@ describe("buildCreateParams", () => {
       [makeTool()],
     );
     expect(params.tools).toHaveLength(1);
+  });
+
+  it("omits reasoning_effort when request thinking is none", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.None,
+    }));
+
+    expect(params).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("downgrades unsupported OpenAI reasoning effort to nearest supported level", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Max,
+    }));
+
+    expect(params).toMatchObject({ reasoning_effort: "high" });
+  });
+
+  it("omits reasoning_effort when no non-none level is supported", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None],
+    }));
+
+    expect(params).not.toHaveProperty("reasoning_effort");
   });
 });
 

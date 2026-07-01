@@ -8,8 +8,18 @@ describe("GLM CodePlan model presets", () => {
       GLM_CODEPLAN_MODEL_PRESETS.some((model) => model.model === "glm-5.2"),
     ).toBe(true);
     expect(
+      GLM_CODEPLAN_MODEL_PRESETS.some((model) => model.model === "glm-5.2[1m]"),
+    ).toBe(true);
+    expect(
       GLM_CODEPLAN_MODEL_PRESETS.some((model) => model.model.startsWith("glm-4.7")),
     ).toBe(true);
+    expect(
+      GLM_CODEPLAN_MODEL_PRESETS.some((model) => model.model === "glm-4.7-1m"),
+    ).toBe(false);
+    expect(
+      GLM_CODEPLAN_MODEL_PRESETS.find((model) => model.model === "glm-4.7")
+        ?.contextSize,
+    ).toBe(200000);
     expect(
       GLM_CODEPLAN_MODEL_PRESETS.every((model) =>
         model.thinkingLevels.includes(ThinkingLevel.None),

@@ -140,8 +140,6 @@ export function buildCreateParams(
 
 function mapOpenAIReasoningEffort(level: ThinkingLevel): ChatCompletionReasoningEffort {
   switch (level) {
-    case ThinkingLevel.None:
-      return "none";
     case ThinkingLevel.Low:
       return "low";
     case ThinkingLevel.Medium:
@@ -150,15 +148,64 @@ function mapOpenAIReasoningEffort(level: ThinkingLevel): ChatCompletionReasoning
       return "high";
     case ThinkingLevel.Max:
       return "xhigh";
+    case ThinkingLevel.None:
+      return "none";
   }
 }
 
-function supportsOpenAIReasoning(request: LLMGenerateRequest): boolean {
-  return request.model.engine === "openai"
-    && request.model.thinkingLevels.some((level) => level !== ThinkingLevel.None);
+const ORDERED_THINKING_LEVELS = [
+  ThinkingLevel.Low,
+  ThinkingLevel.Medium,
+  ThinkingLevel.High,
+  ThinkingLevel.Max,
+] as const;
+
+function selectSupportedReasoningLevel(
+  requested: ThinkingLevel,
+  supportedLevels: ThinkingLevel[],
+): ThinkingLevel | undefined {
+  if (requested === ThinkingLevel.None) {
+    return undefined;
+  }
+  const supportedNonNone = ORDERED_THINKING_LEVELS.filter((level) =>
+    supportedLevels.includes(level),
+  );
+  if (supportedNonNone.length === 0) {
+    return undefined;
+  }
+  if (supportedNonNone.includes(requested)) {
+    return requested;
+  }
+
+  const requestedIndex = ORDERED_THINKING_LEVELS.indexOf(requested);
+  let nearest = supportedNonNone[0]!;
+  let nearestDistance = Math.abs(
+    ORDERED_THINKING_LEVELS.indexOf(nearest) - requestedIndex,
+  );
+  for (const level of supportedNonNone.slice(1)) {
+    const distance = Math.abs(
+      ORDERED_THINKING_LEVELS.indexOf(level) - requestedIndex,
+    );
+    if (distance < nearestDistance) {
+      nearest = level;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+function selectOpenAIReasoningLevel(request: LLMGenerateRequest): ThinkingLevel | undefined {
+  if (request.model.engine !== "openai") {
+    return undefined;
+  }
+  return selectSupportedReasoningLevel(
+    request.generation.thinking,
+    request.model.thinkingLevels,
+  );
 }
 
 export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
+  const reasoningLevel = selectOpenAIReasoningLevel(request);
   const config: ModelConfig = {
     provider: request.model.engine,
     model: request.model.model,
@@ -175,8 +222,8 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
 
   return {
     ...buildCreateParams(request.messages, config, request.tools),
-    ...(supportsOpenAIReasoning(request) && {
-      reasoning_effort: mapOpenAIReasoningEffort(request.generation.thinking),
+    ...(reasoningLevel !== undefined && {
+      reasoning_effort: mapOpenAIReasoningEffort(reasoningLevel),
     }),
   };
 }

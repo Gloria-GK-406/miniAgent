@@ -3,10 +3,15 @@ import { MessageType } from "../../core/types.js";
 import {
   convertMessages,
   buildCreateParams,
+  buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
 import type { Message } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+  type ModelConfig,
+} from "../../core/config.js";
 
 function sysMsg(content: string): Message {
   return { id: "sys-1", type: MessageType.System, content };
@@ -64,6 +69,44 @@ const baseConfig: ModelConfig = {
   apiKey: "test-key",
   baseUrl: "",
 };
+
+function request(
+  overrides: Partial<{
+    engine: string;
+    model: string;
+    thinking: ThinkingLevel;
+    thinkingLevels: ThinkingLevel[];
+  }> = {},
+): LLMGenerateRequest {
+  const engine = overrides.engine ?? "glm";
+  const model = overrides.model ?? "glm-5.2";
+  return {
+    messages: [userMsg("hi")],
+    tools: [],
+    provider: {
+      name: "provider",
+      engine,
+      apiKey: "test-key",
+    },
+    model: {
+      id: `provider/${model}`,
+      provider: "provider",
+      engine,
+      model,
+      thinkingLevels: overrides.thinkingLevels ?? [
+        ThinkingLevel.None,
+        ThinkingLevel.Low,
+        ThinkingLevel.Medium,
+        ThinkingLevel.High,
+        ThinkingLevel.Max,
+      ],
+    },
+    generation: {
+      temperature: 0.7,
+      thinking: overrides.thinking ?? ThinkingLevel.Low,
+    },
+  };
+}
 
 describe("GLM convertMessages", () => {
   it("converts AssistMessage without reasoningContent", () => {
@@ -137,6 +180,66 @@ describe("GLM buildCreateParams", () => {
   it("omits thinking when config.thinking is undefined", () => {
     const params = buildCreateParams([userMsg("hi")], baseConfig, []);
     expect(params).not.toHaveProperty("thinking");
+  });
+
+  it("includes level-aware reasoning effort for GLM-5.2 request mode", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Low,
+    }));
+
+    expect(params).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "low",
+    });
+  });
+
+  it("maps CodePlan low/medium/high efforts to high", () => {
+    const params = buildCreateParamsFromRequest(request({
+      engine: "glm-codeplan",
+      thinking: ThinkingLevel.Medium,
+    }));
+
+    expect(params).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "high",
+    });
+  });
+
+  it("maps CodePlan max effort to max", () => {
+    const params = buildCreateParamsFromRequest(request({
+      engine: "glm-codeplan",
+      thinking: ThinkingLevel.Max,
+    }));
+
+    expect(params).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "max",
+    });
+  });
+
+  it("omits reasoning_effort for boolean-only GLM thinking models", () => {
+    const params = buildCreateParamsFromRequest(request({
+      engine: "glm-codeplan",
+      model: "glm-4.7",
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    }));
+
+    expect(params).toMatchObject({
+      thinking: { type: "enabled" },
+    });
+    expect(params).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("disables thinking and omits reasoning_effort for none", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.None,
+    }));
+
+    expect(params).toMatchObject({
+      thinking: { type: "disabled" },
+    });
+    expect(params).not.toHaveProperty("reasoning_effort");
   });
 });
 
