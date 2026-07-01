@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { Message, Tool, LLMResponse, LLMStreamHandle } from "../../core/types.js";
-import type { LLMEngine, LLMEngineCtor } from "../../core/llm.js";
+import type { LegacyLLMEngine, LLMEngineCtor } from "../../core/llm.js";
 import { createLLMStreamHandle } from "../../core/llm.js";
 import type { ModelConfig } from "../../core/config.js";
 import {
@@ -10,7 +10,7 @@ import { consumeNVIDIAStream } from "./stream.js";
 
 const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1";
 
-export const NVIDIAEngine: LLMEngineCtor = class implements LLMEngine {
+export const NVIDIAEngine: LLMEngineCtor = class implements LegacyLLMEngine {
   private client: OpenAI;
   private config: ModelConfig;
 

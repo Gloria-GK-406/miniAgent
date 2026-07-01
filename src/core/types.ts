@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { AgentConfigSchema, ModelConfigSchema } from "./config.js";
-import { ToolSchema } from "../tool/types.js";
+import { AgentConfigSchema } from "./config.js";
+import type { LLMGenerateRequest, ModelConfig } from "./config.js";
 import type { Store } from "../store/store.js";
+import type { Tool } from "../tool/types.js";
 
 export enum MessageType {
   System = "system",
@@ -147,14 +148,23 @@ export interface LLMStreamHandle<T> extends PromiseLike<T> {
 
 export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();
 
-export const LLMRequestSchema = z.object({
-  streamInvoke: z.function(
-    z.tuple([z.array(MessageSchema), ModelConfigSchema, z.array(ToolSchema)]),
-    LLMStreamHandleSchema,
-  ),
-});
+export interface LLMRequest {
+  streamInvoke(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
+  streamInvoke(
+    messages: Message[],
+    config: ModelConfig,
+    tools: Tool[],
+  ): LLMStreamHandle<LLMResponse>;
+}
 
-export type LLMRequest = z.infer<typeof LLMRequestSchema>;
+export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "streamInvoke" in value &&
+    typeof (value as { streamInvoke?: unknown }).streamInvoke === "function"
+  );
+});
 
 export const ContextProviderSchema = z.object({
   priority: z.number().int(),

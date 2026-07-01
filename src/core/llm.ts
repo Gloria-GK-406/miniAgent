@@ -15,14 +15,6 @@ import type {
 import { LRUCache } from "lru-cache";
 
 export interface LLMEngine {
-  readonly name?: string;
-  getModels?(): ModelPreset[];
-  streamGenerate:
-    | ((request: LLMGenerateRequest) => LLMStreamHandle<LLMResponse>)
-    | ((messages: Message[], tools: Tool[]) => LLMStreamHandle<LLMResponse>);
-}
-
-export interface RegisteredLLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
@@ -114,13 +106,13 @@ export function createLLMStreamHandle<T>(): LLMStreamController<T> {
 }
 
 export class LLMEngineManager implements LLMRequest {
-  private engines = new Map<string, RegisteredLLMEngine>();
+  private engines = new Map<string, LLMEngine>();
   private legacyCtors = new Map<string, LLMEngineCtor>();
   private legacyCache = new LRUCache<ModelConfig, LegacyLLMEngine>({ max: 20 });
 
-  register(engine: RegisteredLLMEngine): void;
+  register(engine: LLMEngine): void;
   register(provider: string, ctor: LLMEngineCtor): void;
-  register(providerOrEngine: string | RegisteredLLMEngine, ctor?: LLMEngineCtor): void {
+  register(providerOrEngine: string | LLMEngine, ctor?: LLMEngineCtor): void {
     if (typeof providerOrEngine === "string") {
       if (!ctor) {
         throw new Error(`No LLM engine constructor provided for provider: ${providerOrEngine}`);

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { Message, Tool, LLMResponse, LLMStreamHandle } from "../../core/types.js";
-import type { LLMEngine, LLMEngineCtor } from "../../core/llm.js";
+import type { LegacyLLMEngine, LLMEngineCtor } from "../../core/llm.js";
 import { createLLMStreamHandle } from "../../core/llm.js";
 import type { ModelConfig } from "../../core/config.js";
 import type {
@@ -21,7 +21,7 @@ function extractReasoningDelta(chunk: ChatCompletionChunk): string | undefined {
   return (choice.delta as { reasoning_content?: string }).reasoning_content;
 }
 
-export const GLMCodePlanEngine: LLMEngineCtor = class implements LLMEngine {
+export const GLMCodePlanEngine: LLMEngineCtor = class implements LegacyLLMEngine {
   private client: OpenAI;
   private config: ModelConfig;
 
