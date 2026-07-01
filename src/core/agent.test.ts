@@ -8,6 +8,7 @@ import { StopException } from "./errors.js";
 import { MessageType } from "./types.js";
 import type {
   AgentContextControl,
+  ModelAwareLLMRequest,
   LLMRequest,
   LLMMessageResponse,
   LLMResponse,
@@ -17,7 +18,13 @@ import type {
   ToolResultMessage,
   TurnContext,
 } from "./types.js";
-import type { AgentConfig } from "./config.js";
+import { ThinkingLevel } from "./config.js";
+import type {
+  AgentConfig,
+  LLMGenerateRequest,
+  ModelConfig,
+  ModelPreset,
+} from "./config.js";
 import type { Tool } from "../tool/types.js";
 function createConfig(basepersistdir: string): AgentConfig {
   return {
@@ -33,9 +40,37 @@ function createConfig(basepersistdir: string): AgentConfig {
   };
 }
 
+function createProviderConfig(basepersistdir: string): AgentConfig {
+  return {
+    providers: [
+      {
+        name: "test-main",
+        engine: "test-engine",
+        apiKey: "test-key",
+        models: {
+          add: [
+            {
+              model: "custom-model",
+              contextSize: 32000,
+              maxOutputTokens: 4096,
+              thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+            },
+          ],
+        },
+      },
+    ],
+    defaultModel: { id: "test-main/custom-model" },
+    generation: { temperature: 0.2, thinking: ThinkingLevel.None },
+    models: new Map(),
+    plugins: new Map(),
+    paths: { sessiondir: basepersistdir },
+  };
+}
+
 function createResolvedHandle<T>(value: T): LLMStreamHandle<T> {
   return {
     onChunk: () => () => void 0,
+    abort: () => void 0,
     then<TResult1 = T, TResult2 = never>(
       onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
       onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
@@ -69,6 +104,36 @@ function createLLM(responses: LLMResponse[], onInvoke?: (messages: Message[]) =>
   };
 }
 
+function createModelAwareLLM(
+  responses: LLMResponse[],
+  catalogs: Record<string, ModelPreset[]>,
+  onRequest?: (request: LLMGenerateRequest) => void,
+): ModelAwareLLMRequest {
+  return {
+    getEngineModels(engineName: string): ModelPreset[] {
+      return catalogs[engineName]?.map((model) => ({
+        ...model,
+        thinkingLevels: [...model.thinkingLevels],
+      })) ?? [];
+    },
+    streamInvoke(
+      requestOrMessages: LLMGenerateRequest | Message[],
+      _config?: ModelConfig,
+      _tools?: Tool[],
+    ): LLMStreamHandle<LLMResponse> {
+      if (Array.isArray(requestOrMessages)) {
+        throw new Error("Expected request-object streamInvoke");
+      }
+      onRequest?.(requestOrMessages);
+      const next = responses.shift();
+      if (!next) {
+        throw new Error("No response queued");
+      }
+      return createResolvedHandle(next);
+    },
+  } as ModelAwareLLMRequest;
+}
+
 describe("MiniAgent", () => {
   let testDir: string;
 
@@ -78,6 +143,213 @@ describe("MiniAgent", () => {
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
+  });
+
+  it("aggregates provider-added models and exposes the current model", () => {
+    const agent = new MiniAgent(createLLM([]), createProviderConfig(testDir));
+
+    expect(agent.getModels()).toEqual([
+      {
+        id: "test-main/custom-model",
+        provider: "test-main",
+        engine: "test-engine",
+        model: "custom-model",
+        contextSize: 32000,
+        maxOutputTokens: 4096,
+        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+      },
+    ]);
+    expect(agent.getCurrentModel().id).toBe("test-main/custom-model");
+  });
+
+  it("aggregates engine catalog models and applies provider overrides", () => {
+    const agent = new MiniAgent(
+      createModelAwareLLM([], {
+        "test-engine": [
+          {
+            model: "catalog-a",
+            displayName: "Catalog A",
+            contextSize: 16000,
+            maxOutputTokens: 1024,
+            thinkingLevels: [ThinkingLevel.None],
+          },
+          {
+            model: "catalog-b",
+            displayName: "Catalog B",
+            contextSize: 32000,
+            maxOutputTokens: 2048,
+            thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+          },
+        ],
+      }),
+      {
+        providers: [
+          {
+            name: "test-main",
+            engine: "test-engine",
+            apiKey: "test-key",
+            models: {
+              add: [
+                {
+                  model: "custom-model",
+                  contextSize: 64000,
+                  thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
+                },
+              ],
+              override: {
+                "catalog-b": {
+                  displayName: "Catalog B Override",
+                  contextSize: 48000,
+                },
+              },
+            },
+          },
+        ],
+        defaultModel: { id: "test-main/catalog-b" },
+        models: new Map(),
+        plugins: new Map(),
+        paths: { sessiondir: testDir },
+      },
+    );
+
+    expect(agent.getModels()).toEqual([
+      {
+        id: "test-main/catalog-a",
+        provider: "test-main",
+        engine: "test-engine",
+        model: "catalog-a",
+        displayName: "Catalog A",
+        contextSize: 16000,
+        maxOutputTokens: 1024,
+        thinkingLevels: [ThinkingLevel.None],
+      },
+      {
+        id: "test-main/catalog-b",
+        provider: "test-main",
+        engine: "test-engine",
+        model: "catalog-b",
+        displayName: "Catalog B Override",
+        contextSize: 48000,
+        maxOutputTokens: 2048,
+        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+      },
+      {
+        id: "test-main/custom-model",
+        provider: "test-main",
+        engine: "test-engine",
+        model: "custom-model",
+        contextSize: 64000,
+        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
+      },
+    ]);
+    expect(agent.getCurrentModel().id).toBe("test-main/catalog-b");
+  });
+
+  it("sets model without changing generation config", () => {
+    const agent = new MiniAgent(createLLM([]), {
+      providers: [
+        {
+          name: "p",
+          engine: "test",
+          apiKey: "k",
+          models: {
+            add: [
+              { model: "a", thinkingLevels: [ThinkingLevel.None] },
+              { model: "b", thinkingLevels: [ThinkingLevel.None] },
+            ],
+          },
+        },
+      ],
+      defaultModel: { id: "p/a" },
+      generation: { temperature: 0.3, thinking: ThinkingLevel.High },
+      models: new Map(),
+      plugins: new Map(),
+      paths: { sessiondir: testDir },
+    });
+
+    agent.setModel({ id: "p/b" });
+
+    expect(agent.getCurrentModel().id).toBe("p/b");
+    expect(agent.getGenerationConfig()).toEqual({
+      temperature: 0.3,
+      thinking: ThinkingLevel.High,
+    });
+  });
+
+  it("merges generation config updates", () => {
+    const agent = new MiniAgent(createLLM([]), createProviderConfig(testDir));
+
+    agent.setGenerationConfig({ thinking: ThinkingLevel.Max });
+
+    expect(agent.getGenerationConfig()).toEqual({
+      temperature: 0.2,
+      thinking: ThinkingLevel.Max,
+    });
+    expect(agent.getCurrentModel().id).toBe("test-main/custom-model");
+  });
+
+  it("runs through request-object streamInvoke when the LLM is model-aware", async () => {
+    const seenRequests: LLMGenerateRequest[] = [];
+    const agent = new MiniAgent(
+      createModelAwareLLM(
+        [
+          wrapResponse({
+            id: "assist-1",
+            type: MessageType.Assist,
+            content: "done",
+          }),
+        ],
+        {
+          "test-engine": [
+            {
+              model: "catalog-model",
+              contextSize: 128000,
+              maxOutputTokens: 8192,
+              thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+            },
+          ],
+        },
+        (request) => {
+          seenRequests.push(request);
+        },
+      ),
+      {
+        providers: [
+          {
+            name: "test-main",
+            engine: "test-engine",
+            apiKey: "test-key",
+            baseUrl: "http://localhost",
+          },
+        ],
+        defaultModel: { id: "test-main/catalog-model" },
+        generation: { temperature: 0.4, thinking: ThinkingLevel.Medium },
+        models: new Map(),
+        plugins: new Map(),
+        paths: { sessiondir: testDir },
+      },
+    );
+
+    const messages = await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect(messages.map((message) => message.id)).toEqual(["user-1", "assist-1"]);
+    expect(seenRequests).toHaveLength(1);
+    expect(seenRequests[0]!.provider).toMatchObject({
+      name: "test-main",
+      engine: "test-engine",
+      apiKey: "test-key",
+      baseUrl: "http://localhost",
+    });
+    expect(seenRequests[0]!.model.id).toBe("test-main/catalog-model");
+    expect(seenRequests[0]!.generation).toEqual({
+      temperature: 0.4,
+      thinking: ThinkingLevel.Medium,
+    });
+    expect(seenRequests[0]!.messages.map((message) => message.id)).toEqual(["user-1"]);
   });
 
   it("publishes the real turn context after buildContext", async () => {

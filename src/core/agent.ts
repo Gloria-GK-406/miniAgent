@@ -17,6 +17,7 @@ import type {
     ToolResultMessage,
     TokenCount,
     LLMRequire,
+    ModelAwareLLMRequest,
 } from "./types.js";
 import {
     ActionType, MessageType, ToolResultMessageSchema,
@@ -24,13 +25,29 @@ import {
     MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
     ConfigNotifierSchema, PersistRequireSchema, LLMRequireSchema,
     TurnContextAppenderSchema, TurnContextConsumerSchema,
+    ModelAwareLLMRequestSchema,
 } from "./types.js";
 import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
 import type { ToolProvider } from "../tool/types.js";
 import type { MessageSource } from "../store/message-source.js";
 import { FileMessageSource } from "../store/message-source.js";
-import { AgentConfigSchema } from "./config.js";
-import type { AgentConfig, ModelConfig, NormalizedAgentConfig } from "./config.js";
+import {
+    AgentConfigSchema,
+    ModelPresetSchema,
+    ThinkingLevel,
+    normalizeGenerationConfig,
+} from "./config.js";
+import type {
+    AgentConfig,
+    GenerationConfig,
+    GenerationConfigInput,
+    ModelConfig,
+    ModelPreset,
+    ModelProviderConfig,
+    ModelSelector,
+    NormalizedAgentConfig,
+    ResolvedModel,
+} from "./config.js";
 import type { Store } from "../store/store.js";
 import { FileStore } from "../store/file-store.js";
 import { EventEmitter } from "eventemitter3";
@@ -46,12 +63,187 @@ export interface MiniAgentOptions {
     messageSource?: MessageSource;
 }
 
+function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
+    return {
+        id: model.id,
+        provider: model.provider,
+        engine: model.engine,
+        model: model.model,
+        ...(model.displayName !== undefined && { displayName: model.displayName }),
+        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
+        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
+        thinkingLevels: [...model.thinkingLevels],
+    };
+}
+
+function cloneModelPreset(model: ModelPreset): ModelPreset {
+    return {
+        model: model.model,
+        ...(model.displayName !== undefined && { displayName: model.displayName }),
+        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
+        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
+        thinkingLevels: [...model.thinkingLevels],
+    };
+}
+
+function getModelAwareLLM(llm: LLMRequest): ModelAwareLLMRequest | null {
+    const parsed = ModelAwareLLMRequestSchema.safeParse(llm);
+    return parsed.success ? parsed.data : null;
+}
+
+function addLegacyModelProvider(
+    providers: Map<string, ModelProviderConfig>,
+    model: ModelConfig,
+): void {
+    const existing = providers.get(model.provider);
+    const preset: ModelPreset = ModelPresetSchema.parse({
+        model: model.model,
+        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
+        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
+        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    });
+
+    if (!existing) {
+        providers.set(model.provider, {
+            name: model.provider,
+            engine: model.provider,
+            apiKey: model.apiKey,
+            ...(model.baseUrl !== undefined && { baseUrl: model.baseUrl }),
+            models: { add: [preset] },
+        });
+        return;
+    }
+
+    const additions = existing.models?.add ?? [];
+    if (additions.some((entry) => entry.model === model.model)) {
+        return;
+    }
+    existing.models = {
+        ...(existing.models ?? {}),
+        add: [...additions, preset],
+    };
+}
+
+function legacyProvidersFromConfig(config: NormalizedAgentConfig): ModelProviderConfig[] {
+    const providers = new Map<string, ModelProviderConfig>();
+    if (config.model) {
+        addLegacyModelProvider(providers, config.model);
+    }
+    for (const group of config.models.values()) {
+        for (const model of group.models) {
+            addLegacyModelProvider(providers, model);
+        }
+    }
+    return [...providers.values()];
+}
+
+function resolveProviderModels(
+    llm: ModelAwareLLMRequest | null,
+    provider: ModelProviderConfig,
+): ResolvedModel[] {
+    const presets = new Map<string, ModelPreset>();
+    const overrides = provider.models?.override ?? {};
+
+    for (const preset of llm?.getEngineModels(provider.engine) ?? []) {
+        const override = overrides[preset.model];
+        const merged = ModelPresetSchema.parse({
+            ...preset,
+            ...(override ?? {}),
+        });
+        presets.set(merged.model, cloneModelPreset(merged));
+    }
+
+    for (const added of provider.models?.add ?? []) {
+        presets.set(added.model, cloneModelPreset(added));
+    }
+
+    return [...presets.values()].map((preset): ResolvedModel => ({
+        id: `${provider.name}/${preset.model}`,
+        provider: provider.name,
+        engine: provider.engine,
+        model: preset.model,
+        ...(preset.displayName !== undefined && { displayName: preset.displayName }),
+        ...(preset.contextSize !== undefined && { contextSize: preset.contextSize }),
+        ...(preset.maxOutputTokens !== undefined && { maxOutputTokens: preset.maxOutputTokens }),
+        thinkingLevels: [...preset.thinkingLevels],
+    }));
+}
+
+function resolveModels(
+    llm: LLMRequest,
+    providers: ModelProviderConfig[],
+): ResolvedModel[] {
+    const modelAwareLLM = getModelAwareLLM(llm);
+    return providers.flatMap((provider) =>
+        resolveProviderModels(modelAwareLLM, provider),
+    );
+}
+
+function selectorDescription(selector: ModelSelector): string {
+    if ("id" in selector) {
+        return selector.id;
+    }
+    return `${selector.provider}/${selector.model}`;
+}
+
+function matchModels(models: ResolvedModel[], selector: ModelSelector): ResolvedModel[] {
+    if ("id" in selector) {
+        return models.filter((model) => model.id === selector.id);
+    }
+    return models.filter((model) =>
+        model.provider === selector.provider && model.model === selector.model,
+    );
+}
+
+function availableModelIds(models: ResolvedModel[]): string {
+    return models.map((model) => model.id).join(", ") || "(none)";
+}
+
+function selectModel(
+    models: ResolvedModel[],
+    selector: ModelSelector,
+    label = "Model",
+): ResolvedModel {
+    const matches = matchModels(models, selector);
+    if (matches.length === 0) {
+        throw new Error(`${label} not found: ${selectorDescription(selector)}. Available models: ${availableModelIds(models)}`);
+    }
+    if (matches.length > 1) {
+        throw new Error(`${label} selector is ambiguous: ${selectorDescription(selector)}. Use one of: ${matches.map((model) => model.id).join(", ")}`);
+    }
+    return matches[0]!;
+}
+
+function selectInitialModel(
+    config: NormalizedAgentConfig,
+    models: ResolvedModel[],
+): ResolvedModel {
+    if (config.defaultModel) {
+        return selectModel(models, config.defaultModel, "Default model");
+    }
+    if (config.model) {
+        return selectModel(models, {
+            provider: config.model.provider,
+            model: config.model.model,
+        }, "Default model");
+    }
+    const first = models[0];
+    if (!first) {
+        throw new Error("No models resolved. Configure provider models or register engine model catalogs.");
+    }
+    return first;
+}
+
 export class MiniAgent {
     private readonly guid: string;
     private name: string;
     private messageSource: MessageSource;
     private llm: LLMRequest;
     private config: NormalizedAgentConfig;
+    private providerConfigs: ModelProviderConfig[] = [];
+    private resolvedModels: ResolvedModel[] = [];
+    private currentModel!: ResolvedModel;
+    private generationConfig!: GenerationConfig;
     private tools: Map<string, Tool> = new Map();
     private toolProviders: ToolProvider[] = [];
     private turnToolMap: Map<string, Tool> = new Map();
@@ -76,6 +268,13 @@ export class MiniAgent {
         this.name = "";
         this.llm = llm;
         this.config = AgentConfigSchema.parse(config);
+        this.providerConfigs = this.config.providers ?? legacyProvidersFromConfig(this.config);
+        if (this.providerConfigs.length === 0) {
+            throw new Error("No model providers configured. Configure providers or a legacy model.");
+        }
+        this.resolvedModels = resolveModels(this.llm, this.providerConfigs);
+        this.currentModel = selectInitialModel(this.config, this.resolvedModels);
+        this.generationConfig = normalizeGenerationConfig(this.config.generation);
         this.store = options.store ?? new FileStore(config.paths.sessiondir);
         this.messageSource = options.messageSource ?? new FileMessageSource(this.store, "messages.jsonl");
     }
@@ -112,64 +311,72 @@ export class MiniAgent {
         return this;
     }
 
-    private applyConfig(config: AgentConfig): void {
-        this.config = AgentConfigSchema.parse(config);
-        for (const notifier of this.configNotifiers) {
-            void notifier.setConfig(this.config);
-        }
-    }
-
     getConfig(): NormalizedAgentConfig {
         return this.config;
     }
 
     private getLegacyModelConfig(): ModelConfig {
-        if (!this.config.model) {
-            throw new Error("Legacy model config is required for this operation");
-        }
-        return this.config.model;
+        const provider = this.getCurrentProviderConfig();
+        return {
+            provider: this.currentModel.engine,
+            model: this.currentModel.model,
+            apiKey: provider.apiKey,
+            ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
+            ...(this.currentModel.contextSize !== undefined && { contextSize: this.currentModel.contextSize }),
+            ...(this.generationConfig.maxOutputTokens !== undefined
+                ? { maxOutputTokens: this.generationConfig.maxOutputTokens }
+                : this.currentModel.maxOutputTokens !== undefined && {
+                    maxOutputTokens: this.currentModel.maxOutputTokens,
+                }),
+            temperature: this.generationConfig.temperature,
+            ...(this.generationConfig.topP !== undefined && { topP: this.generationConfig.topP }),
+            thinking: this.generationConfig.thinking !== ThinkingLevel.None,
+        };
     }
 
-    getModelList(): ModelConfig[] {
-        const all: ModelConfig[] = [];
-        for (const group of this.config.models.values()) {
-            all.push(...group.models);
+    private getCurrentProviderConfig(): ModelProviderConfig {
+        const provider = this.providerConfigs.find((entry) => entry.name === this.currentModel.provider);
+        if (!provider) {
+            throw new Error(`Provider not found for current model: ${this.currentModel.provider}`);
         }
-        return all;
+        return provider;
     }
 
+    getModels(): ResolvedModel[] {
+        return this.resolvedModels.map(cloneResolvedModel);
+    }
+
+    /** @deprecated Use getModels() instead. */
+    getModelList(): ResolvedModel[] {
+        return this.getModels();
+    }
+
+    /** @deprecated Use getModels().map((model) => model.id) instead. */
     getModelDisplayList(): string[] {
-        return this.getModelList().map((m) => `${m.provider}/${m.model}`);
+        return this.getModels().map((model) => model.id);
     }
 
-    getCurrentModel(): ModelConfig {
-        return this.getLegacyModelConfig();
+    getCurrentModel(): ResolvedModel {
+        return cloneResolvedModel(this.currentModel);
     }
 
-    setModel(config: ModelConfig): void {
-        this.applyConfig({
-            ...this.config,
-            model: config,
+    setModel(selector: ModelSelector): void {
+        this.currentModel = selectModel(this.resolvedModels, selector);
+    }
+
+    getGenerationConfig(): GenerationConfig {
+        return { ...this.generationConfig };
+    }
+
+    setGenerationConfig(update: GenerationConfigInput): void {
+        this.generationConfig = normalizeGenerationConfig({
+            ...this.generationConfig,
+            ...update,
         });
     }
 
     setModelByPath(path: string): void {
-        const sep = path.indexOf("/");
-        if (sep === -1) {
-            throw new Error(`Invalid model path: "${path}". Expected format: provider/model`);
-        }
-        const provider = path.slice(0, sep);
-        const model = path.slice(sep + 1);
-        const group = this.config.models.get(provider);
-        if (!group) {
-            const available = [...this.config.models.keys()];
-            throw new Error(`No models found for provider: "${provider}". Available providers: ${available.join(", ")}`);
-        }
-        const found = group.models.find((m) => m.model === model);
-        if (!found) {
-            throw new Error(`Model "${model}" not found for provider: "${provider}". Available: ${group.models.map((m) => m.model).join(", ")}`);
-        }
-        this.setModel(found);
+        this.setModel({ id: path });
     }
 
     getContextCount(): TokenCount {
@@ -487,7 +694,16 @@ export class MiniAgent {
                     await this.buildToolMap();
                     const tools = [...this.turnToolMap.values()];
                     this.emitter.emit("llm:request", { context, tools });
-                    const stream = this.llm.streamInvoke(context, this.getLegacyModelConfig(), tools);
+                    const modelAwareLLM = getModelAwareLLM(this.llm);
+                    const stream = modelAwareLLM
+                        ? modelAwareLLM.streamInvoke({
+                            messages: context,
+                            tools,
+                            provider: this.getCurrentProviderConfig(),
+                            model: this.currentModel,
+                            generation: this.generationConfig,
+                        })
+                        : this.llm.streamInvoke(context, this.getLegacyModelConfig(), tools);
                     const unsubscribe = stream.onChunk((chunk) => {
                         this.emitter.emit("llm:chunk", { chunk });
                         if (this.stopped) {
