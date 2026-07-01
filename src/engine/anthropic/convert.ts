@@ -188,9 +188,51 @@ export function buildCreateParams(
   };
 }
 
-function mapAnthropicEffort(level: ThinkingLevel): "low" | "medium" | "high" | "max" {
+type AnthropicEffort = "low" | "medium" | "high" | "max";
+
+const ORDERED_THINKING_LEVELS = [
+  ThinkingLevel.Low,
+  ThinkingLevel.Medium,
+  ThinkingLevel.High,
+  ThinkingLevel.Max,
+] as const;
+
+function selectSupportedThinkingLevel(
+  requested: ThinkingLevel,
+  supportedLevels: ThinkingLevel[],
+): ThinkingLevel | undefined {
+  if (requested === ThinkingLevel.None) {
+    return undefined;
+  }
+  const supportedNonNone = ORDERED_THINKING_LEVELS.filter((level) =>
+    supportedLevels.includes(level),
+  );
+  if (supportedNonNone.length === 0) {
+    return undefined;
+  }
+  if (supportedNonNone.includes(requested)) {
+    return requested;
+  }
+
+  const requestedIndex = ORDERED_THINKING_LEVELS.indexOf(requested);
+  let nearest = supportedNonNone[0]!;
+  let nearestDistance = Math.abs(
+    ORDERED_THINKING_LEVELS.indexOf(nearest) - requestedIndex,
+  );
+  for (const level of supportedNonNone.slice(1)) {
+    const distance = Math.abs(
+      ORDERED_THINKING_LEVELS.indexOf(level) - requestedIndex,
+    );
+    if (distance < nearestDistance) {
+      nearest = level;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+function mapAnthropicEffort(level: ThinkingLevel): AnthropicEffort {
   switch (level) {
-    case ThinkingLevel.None:
     case ThinkingLevel.Low:
       return "low";
     case ThinkingLevel.Medium:
@@ -199,11 +241,9 @@ function mapAnthropicEffort(level: ThinkingLevel): "low" | "medium" | "high" | "
       return "high";
     case ThinkingLevel.Max:
       return "max";
+    case ThinkingLevel.None:
+      return "low";
   }
-}
-
-function supportsAnthropicThinking(request: LLMGenerateRequest): boolean {
-  return request.model.thinkingLevels.some((level) => level !== ThinkingLevel.None);
 }
 
 export function buildCreateParamsFromRequest(
@@ -220,20 +260,18 @@ export function buildCreateParamsFromRequest(
     ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
   };
   const params = buildCreateParams(request.messages, config, request.tools);
+  const effectiveThinking = selectSupportedThinkingLevel(
+    request.generation.thinking,
+    request.model.thinkingLevels,
+  );
 
-  if (!supportsAnthropicThinking(request)) {
+  if (effectiveThinking === undefined) {
     return params;
-  }
-  if (request.generation.thinking === ThinkingLevel.None) {
-    return {
-      ...params,
-      thinking: { type: "disabled" },
-    };
   }
   return {
     ...params,
     output_config: {
-      effort: mapAnthropicEffort(request.generation.thinking),
+      effort: mapAnthropicEffort(effectiveThinking),
     },
   };
 }

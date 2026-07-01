@@ -21,6 +21,18 @@ describe("GLM CodePlan model presets", () => {
         ?.contextSize,
     ).toBe(200000);
     expect(
+      GLM_CODEPLAN_MODEL_PRESETS.find((model) => model.model === "glm-5.2")
+        ?.maxOutputTokens,
+    ).toBe(131072);
+    expect(
+      GLM_CODEPLAN_MODEL_PRESETS.find((model) => model.model === "glm-5.2[1m]")
+        ?.maxOutputTokens,
+    ).toBe(131072);
+    expect(
+      GLM_CODEPLAN_MODEL_PRESETS.find((model) => model.model === "glm-4.7")
+        ?.maxOutputTokens,
+    ).toBe(131072);
+    expect(
       GLM_CODEPLAN_MODEL_PRESETS.every((model) =>
         model.thinkingLevels.includes(ThinkingLevel.None),
       ),

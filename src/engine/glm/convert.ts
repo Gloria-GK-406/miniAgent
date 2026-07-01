@@ -228,6 +228,9 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
     request.generation.thinking,
     request.model.thinkingLevels,
   );
+  const supportsThinking = request.model.thinkingLevels.some(
+    (level) => level !== ThinkingLevel.None,
+  );
   const config: ModelConfig = {
     provider: request.model.engine,
     model: request.model.model,
@@ -235,8 +238,10 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
     ...(request.provider.baseUrl !== undefined && {
       baseUrl: request.provider.baseUrl,
     }),
-    thinking: effectiveThinking !== undefined
-      && effectiveThinking !== ThinkingLevel.None,
+    ...(supportsThinking && {
+      thinking: effectiveThinking !== undefined
+        && effectiveThinking !== ThinkingLevel.None,
+    }),
     ...(request.generation.maxOutputTokens !== undefined && {
       maxOutputTokens: request.generation.maxOutputTokens,
     }),

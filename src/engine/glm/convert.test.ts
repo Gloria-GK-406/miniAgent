@@ -241,6 +241,16 @@ describe("GLM buildCreateParams", () => {
     });
     expect(params).not.toHaveProperty("reasoning_effort");
   });
+
+  it("omits thinking and reasoning_effort for no-thinking models", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None],
+    }));
+
+    expect(params).not.toHaveProperty("thinking");
+    expect(params).not.toHaveProperty("reasoning_effort");
+  });
 });
 
 describe("GLM convertResponse", () => {

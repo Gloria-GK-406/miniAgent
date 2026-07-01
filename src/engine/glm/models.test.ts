@@ -7,6 +7,14 @@ describe("GLM model presets", () => {
     expect(GLM_MODEL_PRESETS.some((model) => model.model === "glm-5.2")).toBe(true);
     expect(GLM_MODEL_PRESETS.some((model) => model.model === "glm-4.5-air")).toBe(true);
     expect(
+      GLM_MODEL_PRESETS.find((model) => model.model === "glm-5.2")
+        ?.maxOutputTokens,
+    ).toBe(131072);
+    expect(
+      GLM_MODEL_PRESETS.find((model) => model.model === "glm-4.5-air")
+        ?.maxOutputTokens,
+    ).toBe(98304);
+    expect(
       GLM_MODEL_PRESETS.every((model) =>
         model.thinkingLevels.includes(ThinkingLevel.None),
       ),

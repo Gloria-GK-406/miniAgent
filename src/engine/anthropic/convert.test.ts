@@ -5,10 +5,15 @@ import {
   convertMessages,
   convertTools,
   buildCreateParams,
+  buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
 import type { Message, Tool, ImageContent } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+  type ModelConfig,
+} from "../../core/config.js";
 
 function sysMsg(content: string): Message {
   return { id: "sys-1", type: MessageType.System, content };
@@ -74,6 +79,38 @@ const baseConfig: ModelConfig = {
   apiKey: "test-key",
   baseUrl: "",
 };
+
+function request(
+  overrides: Partial<{
+    thinking: ThinkingLevel;
+    thinkingLevels: ThinkingLevel[];
+  }> = {},
+): LLMGenerateRequest {
+  return {
+    messages: [userMsg("hi")],
+    tools: [],
+    provider: {
+      name: "anthropic-main",
+      engine: "anthropic",
+      apiKey: "test-key",
+    },
+    model: {
+      id: "anthropic-main/claude-sonnet-4-5",
+      provider: "anthropic-main",
+      engine: "anthropic",
+      model: "claude-sonnet-4-5",
+      thinkingLevels: overrides.thinkingLevels ?? [
+        ThinkingLevel.None,
+        ThinkingLevel.Low,
+        ThinkingLevel.Medium,
+      ],
+    },
+    generation: {
+      temperature: 0.7,
+      thinking: overrides.thinking ?? ThinkingLevel.Low,
+    },
+  };
+}
 
 function makeTool(
   overrides: Partial<{ name: string; description: string }> = {},
@@ -266,6 +303,60 @@ describe("buildCreateParams", () => {
     expect(params.tools).toHaveLength(1);
     expect(params.temperature).toBe(0.5);
     expect(params.top_p).toBe(0.8);
+  });
+
+  it("uses supported partial thinking effort in request mode", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Low,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Low, ThinkingLevel.Medium],
+    }));
+
+    expect(params).toMatchObject({
+      output_config: { effort: "low" },
+    });
+    expect(params).not.toHaveProperty("thinking");
+  });
+
+  it("downgrades unsupported high effort to nearest supported effort", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Low, ThinkingLevel.Medium],
+    }));
+
+    expect(params).toMatchObject({
+      output_config: { effort: "medium" },
+    });
+  });
+
+  it("downgrades unsupported max effort to nearest supported effort", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Max,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
+    }));
+
+    expect(params).toMatchObject({
+      output_config: { effort: "high" },
+    });
+  });
+
+  it("omits thinking and effort when no non-none level is supported", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None],
+    }));
+
+    expect(params).not.toHaveProperty("thinking");
+    expect(params).not.toHaveProperty("output_config");
+  });
+
+  it("omits thinking and effort when requested thinking is none", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.None,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Low],
+    }));
+
+    expect(params).not.toHaveProperty("thinking");
+    expect(params).not.toHaveProperty("output_config");
   });
 });
 
