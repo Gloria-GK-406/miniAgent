@@ -65,17 +65,37 @@ export type {
     LLMRequire,
 } from "./core/types.js";
 
-export { ModelConfigSchema, PathConfigSchema, AgentConfigSchema } from "./core/config.js";
 export {
+    ThinkingLevel,
     JsonValueSchema,
+    ModelConfigSchema,
+    ThinkingLevelSchema,
+    ModelPresetSchema,
+    ProviderModelOverridesSchema,
+    ModelProviderConfigSchema,
+    ResolvedModelSchema,
+    ModelSelectorSchema,
+    GenerationConfigSchema,
+    LLMGenerateRequestSchema,
     ModelGroupSchema,
+    PathConfigSchema,
     PersistConfigFileSchema,
     PersistConfigSchema,
     RuntimeConfigSchema,
+    AgentConfigSchema,
+    normalizeGenerationConfig,
 } from "./core/config.js";
 export type {
     JsonValue,
     ModelConfig,
+    ModelPreset,
+    ProviderModelOverrides,
+    ModelProviderConfig,
+    ResolvedModel,
+    ModelSelector,
+    GenerationConfig,
+    GenerationConfigInput,
+    LLMGenerateRequest,
     ModelGroup,
     PathConfig,
     PersistConfigFile,
