@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { Message, Tool, LLMResponse, LLMStreamHandle } from "../../core/types.js";
-import type { LegacyLLMEngine, LLMEngineCtor } from "../../core/llm.js";
+import type { LLMEngine, LLMEngineCtor } from "../../core/llm.js";
 import { createLLMStreamHandle } from "../../core/llm.js";
 import type { ModelConfig } from "../../core/config.js";
 import {
@@ -8,7 +8,7 @@ import {
 } from "./convert.js";
 import { consumeOpenAIStream } from "./stream.js";
 
-export const OpenAICompatibleEngine: LLMEngineCtor = class implements LegacyLLMEngine {
+export const OpenAICompatibleEngine: LLMEngineCtor = class implements LLMEngine {
   private client: OpenAI;
   private config: ModelConfig;
 

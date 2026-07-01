@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Tool } from "../tool/types.js";
-import { LLMEngineManager, createLLMStreamHandle, type LLMEngine } from "./llm.js";
-import { LLMRequestSchema, MessageType, type LLMRequest, type LLMResponse, type Message } from "./types.js";
+import {
+  LLMEngineManager,
+  createLLMStreamHandle,
+  type LLMEngine,
+  type ModelCatalogLLMEngine,
+} from "./llm.js";
+import {
+  LLMRequestSchema,
+  ModelAwareLLMRequestSchema,
+  MessageType,
+  type LLMRequest,
+  type LLMResponse,
+  type Message,
+  type ModelAwareLLMRequest,
+} from "./types.js";
 import { ThinkingLevel, type LLMGenerateRequest, type ModelPreset } from "./config.js";
 
 function resolvedResponse(text: string) {
@@ -35,10 +48,24 @@ function generateRequest(engine: string, model: string): LLMGenerateRequest {
 }
 
 describe("LLMEngineManager", () => {
+  it("keeps LLMEngine compatible with legacy engines", async () => {
+    const engine: LLMEngine = {
+      streamGenerate(messages: Message[], tools: Tool[]) {
+        return resolvedResponse(`${messages.length}:${tools.length}`);
+      },
+    };
+
+    const response = await engine.streamGenerate(
+      [{ id: "u", type: MessageType.User, content: "hi" }],
+      [],
+    );
+    expect(response.message).toMatchObject({ content: "1:0" });
+  });
+
   it("registers engine instances by their name", async () => {
     const seen: LLMGenerateRequest[] = [];
     const manager = new LLMEngineManager();
-    manager.register({
+    const engine: ModelCatalogLLMEngine = {
       name: "test-engine",
       getModels(): ModelPreset[] {
         return [{ model: "m", thinkingLevels: [ThinkingLevel.None] }];
@@ -47,7 +74,8 @@ describe("LLMEngineManager", () => {
         seen.push(request);
         return resolvedResponse(request.model.model);
       },
-    });
+    };
+    manager.register(engine);
 
     const request = generateRequest("test-engine", "m");
 
@@ -56,9 +84,9 @@ describe("LLMEngineManager", () => {
     expect(seen).toHaveLength(1);
   });
 
-  it("accepts public LLMEngine objects for instance registration", async () => {
+  it("accepts model catalog engine adapters for instance registration", async () => {
     const manager = new LLMEngineManager();
-    const engine: LLMEngine = {
+    const engine: ModelCatalogLLMEngine = {
       name: "public-engine",
       getModels(): ModelPreset[] {
         return [{ model: "public-model", thinkingLevels: [ThinkingLevel.None] }];
@@ -74,15 +102,35 @@ describe("LLMEngineManager", () => {
     expect(response.message).toMatchObject({ content: "public-model" });
   });
 
-  it("implements LLMRequest with request-object streamInvoke support", async () => {
+  it("keeps LLMRequest compatible with legacy request implementations", async () => {
+    const llmRequest: LLMRequest = {
+      streamInvoke(messages: Message[], config, tools: Tool[]) {
+        return resolvedResponse(`${config.model}:${messages.length}:${tools.length}`);
+      },
+    };
+    const parsedRequest = LLMRequestSchema.parse(llmRequest);
+
+    const response = await parsedRequest.streamInvoke(
+      [{ id: "u", type: MessageType.User, content: "hi" }],
+      {
+        provider: "legacy-provider",
+        model: "legacy-model",
+        apiKey: "key",
+      },
+      [],
+    );
+    expect(response.message).toMatchObject({ content: "legacy-model:1:0" });
+  });
+
+  it("implements ModelAwareLLMRequest with request-object streamInvoke support", async () => {
     const manager = new LLMEngineManager();
     manager.register({
       name: "request-engine",
       getModels: () => [{ model: "request-model", thinkingLevels: [ThinkingLevel.None] }],
       streamGenerate: (request: LLMGenerateRequest) => resolvedResponse(request.model.model),
     });
-    const llmRequest: LLMRequest = manager;
-    const parsedRequest = LLMRequestSchema.parse(llmRequest);
+    const llmRequest: ModelAwareLLMRequest = manager;
+    const parsedRequest = ModelAwareLLMRequestSchema.parse(llmRequest);
 
     const response = await parsedRequest.streamInvoke(generateRequest("request-engine", "request-model"));
     expect(response.message).toMatchObject({ content: "request-model" });

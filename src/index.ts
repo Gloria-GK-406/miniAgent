@@ -4,7 +4,7 @@ export { createMiniAgent } from "./core/create-agent.js";
 export { defineAgentModule } from "./core/module.js";
 export { AgentAssembler, AgentBlueprintRegistry } from "./assembly/assembler.js";
 export { LLMEngineManager } from "./core/llm.js";
-export type { LLMEngine, LLMEngineCtor } from "./core/llm.js";
+export type { LLMEngine, LegacyLLMEngine, LLMEngineCtor, ModelCatalogLLMEngine } from "./core/llm.js";
 export { createLLMStreamHandle } from "./core/llm.js";
 export type { LLMStreamController } from "./core/llm.js";
 export { emptyTokenCount, createTokenCount, addTokenCount } from "./core/llm.js";
@@ -30,6 +30,7 @@ export type {
 } from "./assembly/capability.js";
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
+export { ModelAwareLLMRequestSchema } from "./core/types.js";
 export type {
     Message,
     MessageContent,
@@ -46,6 +47,7 @@ export type {
     ReasoningDeltaChunk,
     ToolCallArgumentsDeltaChunk,
     LLMRequest,
+    ModelAwareLLMRequest,
     LLMStreamHandle,
     ContextProvider,
     ContextProcessor,

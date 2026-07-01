@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AgentConfigSchema } from "./config.js";
-import type { LLMGenerateRequest, ModelConfig } from "./config.js";
+import type { LLMGenerateRequest, ModelConfig, ModelPreset } from "./config.js";
 import type { Store } from "../store/store.js";
 import type { Tool } from "../tool/types.js";
 
@@ -149,6 +149,15 @@ export interface LLMStreamHandle<T> extends PromiseLike<T> {
 export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();
 
 export interface LLMRequest {
+  streamInvoke(
+    messages: Message[],
+    config: ModelConfig,
+    tools: Tool[],
+  ): LLMStreamHandle<LLMResponse>;
+}
+
+export interface ModelAwareLLMRequest extends LLMRequest {
+  getEngineModels(engineName: string): ModelPreset[];
   streamInvoke(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
   streamInvoke(
     messages: Message[],
@@ -163,6 +172,17 @@ export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
     value !== null &&
     "streamInvoke" in value &&
     typeof (value as { streamInvoke?: unknown }).streamInvoke === "function"
+  );
+});
+
+export const ModelAwareLLMRequestSchema = z.custom<ModelAwareLLMRequest>((value) => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "streamInvoke" in value &&
+    "getEngineModels" in value &&
+    typeof (value as { streamInvoke?: unknown }).streamInvoke === "function" &&
+    typeof (value as { getEngineModels?: unknown }).getEngineModels === "function"
   );
 });
 

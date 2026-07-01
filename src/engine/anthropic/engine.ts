@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Message, Tool, LLMResponse, LLMStreamHandle } from "../../core/types.js";
-import type { LegacyLLMEngine, LLMEngineCtor } from "../../core/llm.js";
+import type { LLMEngine, LLMEngineCtor } from "../../core/llm.js";
 import { createLLMStreamHandle } from "../../core/llm.js";
 import type { ModelConfig } from "../../core/config.js";
 import {
@@ -8,7 +8,7 @@ import {
 } from "./convert.js";
 import { consumeAnthropicStream } from "./stream.js";
 
-export const AnthropicEngine: LLMEngineCtor = class implements LegacyLLMEngine {
+export const AnthropicEngine: LLMEngineCtor = class implements LLMEngine {
   private client: Anthropic;
   private config: ModelConfig;
 

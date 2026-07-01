@@ -2,6 +2,7 @@ import type {
   Message,
   Tool,
   LLMRequest,
+  ModelAwareLLMRequest,
   LLMResponse,
   TokenCount,
   LLMStreamChunk,
@@ -15,14 +16,16 @@ import type {
 import { LRUCache } from "lru-cache";
 
 export interface LLMEngine {
+  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
+}
+
+export type LegacyLLMEngine = LLMEngine;
+
+export interface ModelCatalogLLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
 }
-
-export type LegacyLLMEngine = {
-  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
-};
 
 export type LLMEngineCtor = new (config: ModelConfig) => LegacyLLMEngine;
 
@@ -105,14 +108,14 @@ export function createLLMStreamHandle<T>(): LLMStreamController<T> {
   };
 }
 
-export class LLMEngineManager implements LLMRequest {
-  private engines = new Map<string, LLMEngine>();
+export class LLMEngineManager implements LLMRequest, ModelAwareLLMRequest {
+  private engines = new Map<string, ModelCatalogLLMEngine>();
   private legacyCtors = new Map<string, LLMEngineCtor>();
   private legacyCache = new LRUCache<ModelConfig, LegacyLLMEngine>({ max: 20 });
 
-  register(engine: LLMEngine): void;
+  register(engine: ModelCatalogLLMEngine): void;
   register(provider: string, ctor: LLMEngineCtor): void;
-  register(providerOrEngine: string | LLMEngine, ctor?: LLMEngineCtor): void {
+  register(providerOrEngine: string | ModelCatalogLLMEngine, ctor?: LLMEngineCtor): void {
     if (typeof providerOrEngine === "string") {
       if (!ctor) {
         throw new Error(`No LLM engine constructor provided for provider: ${providerOrEngine}`);
