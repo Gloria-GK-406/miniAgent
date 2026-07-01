@@ -44,7 +44,7 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
     }
 
     async setConfig(config: AgentConfig): Promise<void> {
-        this.modelConfig = config.model;
+        this.modelConfig = config.model ?? null;
     }
 
     getCompressedCount(): number {

@@ -38,6 +38,81 @@ export const ModelConfigSchema = z.object({
 
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
+export enum ThinkingLevel {
+    None = "none",
+    Low = "low",
+    Medium = "medium",
+    High = "high",
+    Max = "max",
+}
+
+export const ThinkingLevelSchema = z.nativeEnum(ThinkingLevel);
+
+export const ModelPresetSchema = z.object({
+    model: z.string(),
+    displayName: z.string().optional(),
+    contextSize: z.number().int().positive().optional(),
+    maxOutputTokens: z.number().int().positive().optional(),
+    thinkingLevels: z.array(ThinkingLevelSchema).min(1).default([ThinkingLevel.None]),
+});
+
+export type ModelPreset = z.infer<typeof ModelPresetSchema>;
+
+export const ProviderModelOverridesSchema = z.object({
+    add: z.array(ModelPresetSchema).optional(),
+    override: z.record(ModelPresetSchema.partial().omit({ model: true })).optional(),
+});
+
+export type ProviderModelOverrides = z.infer<typeof ProviderModelOverridesSchema>;
+
+export const ModelProviderConfigSchema = z.object({
+    name: z.string(),
+    engine: z.string(),
+    apiKey: z.string(),
+    baseUrl: z.string().optional(),
+    models: ProviderModelOverridesSchema.optional(),
+});
+
+export type ModelProviderConfig = z.infer<typeof ModelProviderConfigSchema>;
+
+export const ResolvedModelSchema = z
+    .object({
+        id: z.string(),
+        provider: z.string(),
+        engine: z.string(),
+        model: z.string(),
+        displayName: z.string().optional(),
+        contextSize: z.number().int().positive().optional(),
+        maxOutputTokens: z.number().int().positive().optional(),
+        thinkingLevels: z.array(ThinkingLevelSchema).min(1),
+    })
+    .strict();
+
+export type ResolvedModel = z.infer<typeof ResolvedModelSchema>;
+
+export const ModelSelectorSchema = z.union([
+    z.object({ id: z.string() }),
+    z.object({ provider: z.string(), model: z.string() }),
+]);
+
+export type ModelSelector = z.infer<typeof ModelSelectorSchema>;
+
+export const GenerationConfigSchema = z.object({
+    temperature: z.number().min(0).max(2).default(0.7),
+    topP: z.number().min(0).max(1).optional(),
+    maxOutputTokens: z.number().int().positive().optional(),
+    thinking: ThinkingLevelSchema.default(ThinkingLevel.Medium),
+});
+
+export type GenerationConfig = z.infer<typeof GenerationConfigSchema>;
+export type GenerationConfigInput = Partial<z.input<typeof GenerationConfigSchema>>;
+
+export function normalizeGenerationConfig(
+    input?: GenerationConfigInput,
+): GenerationConfig {
+    return GenerationConfigSchema.parse(input ?? {});
+}
+
 export const ModelGroupSchema = z.object({
     models: z.array(ModelConfigSchema).min(1),
 });
@@ -69,10 +144,14 @@ export const RuntimeConfigSchema = z.object({
 export type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>;
 
 export const AgentConfigSchema = z.object({
-    model: ModelConfigSchema,
-    models: z.map(z.string(), ModelGroupSchema),
+    model: ModelConfigSchema.optional(),
+    models: z.map(z.string(), ModelGroupSchema).default(() => new Map()),
+    providers: z.array(ModelProviderConfigSchema).optional(),
+    defaultModel: ModelSelectorSchema.optional(),
+    generation: GenerationConfigSchema.partial().optional(),
     plugins: z.map(z.string(), JsonValueSchema),
     paths: PathConfigSchema,
 });
 
-export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+export type AgentConfig = z.input<typeof AgentConfigSchema>;
+export type NormalizedAgentConfig = z.output<typeof AgentConfigSchema>;
