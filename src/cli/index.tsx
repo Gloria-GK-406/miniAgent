@@ -51,23 +51,27 @@ async function main(): Promise<void> {
         let currentAgent = ctx.agent;
         let currentHitl = ctx.hitlEnabled;
         let currentSession = ctx.session;
-        let currentActiveModel = ctx.activeModel;
         let currentSystemPrompt = ctx.config.systemPrompt ?? "You are a helpful assistant.";
 
         const inkHolder: { current: ReturnType<typeof render> | undefined } = { current: undefined };
 
         function getModelName(): string {
-            return `${currentActiveModel.provider}/${currentActiveModel.model}`;
+            return currentAgent.getCurrentResolvedModel().id;
+        }
+
+        function getModelPaths(): string[] {
+            const resolvedModels = currentAgent.getResolvedModels();
+            if (resolvedModels.length > 0) {
+                return resolvedModels.map((model) => model.id);
+            }
+            return currentAgent.getModelDisplayList();
         }
 
         async function handleSelectModelAsync(path: string): Promise<void> {
-            currentAgent.setModelByPath(path);
-            const current = currentAgent.getCurrentModel();
-            const found = ctx.config.models.find(
-                (m) => m.provider === current.provider && m.model === current.model,
-            );
-            if (found) {
-                currentActiveModel = found;
+            try {
+                currentAgent.setResolvedModel({ id: path });
+            } catch {
+                currentAgent.setModelByPath(path);
             }
             rerenderApp();
         }
@@ -78,7 +82,7 @@ async function main(): Promise<void> {
                 <App
                     agent={currentAgent}
                     modelName={getModelName()}
-                    modelPaths={currentAgent.getModelDisplayList()}
+                    modelPaths={getModelPaths()}
                     sessionName={currentSession.name}
                     hitlEnabled={currentHitl}
                     tokenUsage={{ input: 0, output: 0, total: 0 }}
@@ -106,9 +110,8 @@ async function main(): Promise<void> {
                 }
 
                 case "/models": {
-                    const displayList = currentAgent.getModelDisplayList();
-                    const current = currentAgent.getCurrentModel();
-                    const currentPath = `${current.provider}/${current.model}`;
+                    const displayList = getModelPaths();
+                    const currentPath = getModelName();
                     console.log(`${A.bold}Models:${A.reset}`);
                     for (const p of displayList) {
                         const marker = p === currentPath ? ` ${A.green}← active${A.reset}` : "";
@@ -119,21 +122,19 @@ async function main(): Promise<void> {
 
                 case "/model": {
                     if (!arg) {
-                        const current = currentAgent.getCurrentModel();
                         console.log(
-                            `Current: ${A.bold}${current.provider}/${current.model}${A.reset}`,
+                            `Current: ${A.bold}${getModelName()}${A.reset}`,
                         );
                         break;
                     }
                     try {
-                        currentAgent.setModelByPath(arg);
-                        const current = currentAgent.getCurrentModel();
-                        const found = ctx.config.models.find(
-                            (m) => m.provider === current.provider && m.model === current.model,
-                        );
-                        if (found) currentActiveModel = found;
+                        try {
+                            currentAgent.setResolvedModel({ id: arg });
+                        } catch {
+                            currentAgent.setModelByPath(arg);
+                        }
                         console.log(
-                            `Switched to ${A.bold}${current.provider}/${current.model}${A.reset}`,
+                            `Switched to ${A.bold}${getModelName()}${A.reset}`,
                         );
                         rerenderApp();
                     } catch (e: unknown) {
@@ -331,7 +332,7 @@ async function main(): Promise<void> {
             <App
                 agent={currentAgent}
                 modelName={getModelName()}
-                modelPaths={currentAgent.getModelDisplayList()}
+                modelPaths={getModelPaths()}
                 sessionName={currentSession.name}
                 hitlEnabled={currentHitl}
                 tokenUsage={{ input: 0, output: 0, total: 0 }}

@@ -4,7 +4,7 @@ import { AgentAssembler, AgentBlueprintRegistry } from "../assembly/assembler.js
 import type { AgentBlueprint } from "../assembly/blueprint.js";
 import { defineAgentModule } from "../core/module.js";
 import { LLMEngineManager } from "../core/llm.js";
-import type { LLMEngineCtor } from "../core/llm.js";
+import type { ModelCatalogLLMEngine } from "../core/llm.js";
 import { MessageType } from "../core/types.js";
 import type { Message } from "../core/types.js";
 import type { MiniAgent } from "../core/agent.js";
@@ -23,16 +23,27 @@ import {
     McpPlugin, SkillPlugin,
 } from "../tool/index.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/subagent.js";
-import { CLIAGENT_DIR, loadConfig, findModel, resolveProvider, toModelConfig } from "./config.js";
+import {
+    CLIAGENT_DIR,
+    findModel,
+    findProviderByEngineOrName,
+    loadConfig,
+    parseDefaultModel,
+    parseModelSelector,
+    resolveProvider,
+    toAgentGenerationConfig,
+    toAgentProviders,
+    toModelConfig,
+} from "./config.js";
 import type { CLIConfig, CLIModel } from "./config.js";
 
-const ENGINES: Record<string, LLMEngineCtor> = {
-    anthropic: AnthropicEngine,
-    openai: OpenAIEngine,
-    "openai-compatible": OpenAICompatibleEngine,
-    glm: GLMEngine,
-    "glm-codeplan": GLMCodePlanEngine,
-    nvidia: NVIDIAEngine,
+const ENGINE_FACTORIES: Record<string, () => ModelCatalogLLMEngine> = {
+    anthropic: () => new AnthropicEngine(),
+    openai: () => new OpenAIEngine(),
+    "openai-compatible": () => new OpenAICompatibleEngine(),
+    glm: () => new GLMEngine(),
+    "glm-codeplan": () => new GLMCodePlanEngine(),
+    nvidia: () => new NVIDIAEngine(),
 };
 
 const AUTO_APPROVE_TOOLS = ["read", "glob", "grep"];
@@ -56,7 +67,7 @@ const SHARED_BLUEPRINT: AgentBlueprint = {
 export interface CLIAppResult {
     agent: MiniAgent;
     config: CLIConfig;
-    activeModel: CLIModel;
+    activeModel: CLIModel | undefined;
     sessionManager: SessionManager;
     session: SessionMeta;
     baseDir: string;
@@ -75,15 +86,6 @@ export interface CLIAppResult {
 export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     const config = await loadConfig(baseDir);
 
-    if (config.models.length === 0) {
-        throw new Error("No models configured. Edit .cliagent/config.json");
-    }
-
-    const defaultModel = findModel(config);
-    if (!defaultModel) {
-        throw new Error(`Default model "${config.defaultModel}" not found`);
-    }
-
     const persistDir = join(baseDir, CLIAGENT_DIR);
     const manager = new LLMEngineManager();
 
@@ -94,11 +96,11 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
         const map = new Map<string, ModelGroup>();
         for (const m of config.models) {
             const p = resolveProvider(config, m.provider);
-            const group = map.get(p.provider);
+            const group = map.get(p.engine);
             if (group) {
                 group.models.push(toModelConfig(m, p));
             } else {
-                map.set(p.provider, { models: [toModelConfig(m, p)] });
+                map.set(p.engine, { models: [toModelConfig(m, p)] });
             }
         }
         return map;
@@ -109,15 +111,17 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
         if (sep === -1) {
             throw new Error(`Invalid model path: "${path}". Expected format: provider/model`);
         }
-        const provider = path.slice(0, sep);
+        const providerOrEngine = path.slice(0, sep);
         const model = path.slice(sep + 1);
-        const group = buildModelsMap().get(provider);
+        const provider = findProviderByEngineOrName(config, providerOrEngine);
+        const engine = provider?.engine ?? providerOrEngine;
+        const group = buildModelsMap().get(engine);
         if (!group) {
-            throw new Error(`No models found for provider: "${provider}"`);
+            throw new Error(`No models found for provider: "${providerOrEngine}"`);
         }
         const found = group.models.find((entry) => entry.model === model);
         if (!found) {
-            throw new Error(`Model "${model}" not found for provider: "${provider}"`);
+            throw new Error(`Model "${model}" not found for provider: "${providerOrEngine}"`);
         }
         return found;
     }
@@ -127,7 +131,6 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     const blueprintRegistry = createBlueprintRegistry(
         baseDir,
         () => createConfiguredSubagentFactory(
-            () => activeModel,
             sessionManager,
             assembler,
             manager,
@@ -139,7 +142,7 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     );
     const assembler = new AgentAssembler(blueprintRegistry);
 
-    const activeModel = defaultModel;
+    const activeModel = findModel(config);
 
     const sessionManager = new SessionManager(persistDir);
     await sessionManager.load();
@@ -205,11 +208,11 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
 function registerEngines(manager: LLMEngineManager, config: CLIConfig): void {
     const seen = new Set<string>();
     for (const p of config.providers) {
-        if (seen.has(p.provider)) continue;
-        const ctor = ENGINES[p.provider];
-        if (!ctor) continue;
-        manager.register(p.provider, ctor);
-        seen.add(p.provider);
+        if (seen.has(p.engine)) continue;
+        const createEngine = ENGINE_FACTORIES[p.engine];
+        if (!createEngine) continue;
+        manager.register(createEngine());
+        seen.add(p.engine);
     }
 }
 
@@ -251,7 +254,6 @@ function createBlueprintRegistry(
 }
 
 function createConfiguredSubagentFactory(
-    getActiveModel: () => CLIModel,
     sessionManager: SessionManager,
     assembler: AgentAssembler,
     manager: LLMEngineManager,
@@ -276,11 +278,19 @@ function createConfiguredSubagentFactory(
             subPlugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
         }
 
+        const modelSelector = request.entry.model !== undefined
+            ? parseModelSelector(config, request.entry.model)
+            : parseDefaultModel(config);
+        const generation = toAgentGenerationConfig(config, request.entry.model);
+        const legacyModel = request.entry.model !== undefined
+            ? tryResolveModelConfig(resolveModelConfig, request.entry.model)
+            : undefined;
         const agentConfig: AgentConfig = {
-            model: request.entry.model !== undefined
-                ? resolveModelConfig(request.entry.model)
-                : toModelConfig(getActiveModel(), resolveProvider(config, getActiveModel().provider)),
-            models: buildModelsMap(),
+            ...(legacyModel !== undefined && { model: legacyModel }),
+            models: new Map(),
+            providers: toAgentProviders(config),
+            ...(modelSelector !== undefined && { defaultModel: modelSelector }),
+            ...(generation !== undefined && { generation }),
             plugins: subPlugins,
             paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
         };
@@ -313,10 +323,21 @@ function createConfiguredSubagentFactory(
     };
 }
 
+function tryResolveModelConfig(
+    resolveModelConfig: (path: string) => ModelConfig,
+    path: string,
+): ModelConfig | undefined {
+    try {
+        return resolveModelConfig(path);
+    } catch {
+        return undefined;
+    }
+}
+
 async function buildAgentInner(
     sessionId: string,
     baseDir: string,
-    activeModel: CLIModel,
+    _activeModel: CLIModel | undefined,
     config: CLIConfig,
     manager: LLMEngineManager,
     assembler: AgentAssembler,
@@ -335,21 +356,13 @@ async function buildAgentInner(
     if (config.subagent) {
         plugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
     }
+    const defaultModel = parseDefaultModel(config);
+    const generation = toAgentGenerationConfig(config);
     const agentConfig: AgentConfig = {
-        model: toModelConfig(activeModel, resolveProvider(config, activeModel.provider)),
-        models: (() => {
-            const map = new Map<string, ModelGroup>();
-            for (const m of config.models) {
-                const p = resolveProvider(config, m.provider);
-                const group = map.get(p.provider);
-                if (group) {
-                    group.models.push(toModelConfig(m, p));
-                } else {
-                    map.set(p.provider, { models: [toModelConfig(m, p)] });
-                }
-            }
-            return map;
-        })(),
+        models: new Map(),
+        providers: toAgentProviders(config),
+        ...(defaultModel !== undefined && { defaultModel }),
+        ...(generation !== undefined && { generation }),
         plugins,
         paths: { sessiondir: persistDir },
     };

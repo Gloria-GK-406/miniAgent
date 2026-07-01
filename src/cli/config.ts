@@ -2,19 +2,49 @@ import { z } from "zod";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { ModelConfig } from "../core/config.js";
+import {
+  GenerationConfigSchema,
+  type GenerationConfigInput,
+  ModelPresetSchema,
+  ProviderModelOverridesSchema,
+  ThinkingLevel,
+  type ModelConfig,
+  type ModelProviderConfig,
+  type ModelSelector,
+} from "../core/config.js";
 import { McpPluginConfigSchema } from "../tool/mcp/types.js";
 import { SkillPluginConfigSchema } from "../tool/skill/types.js";
 import { SubagentPluginConfigSchema } from "../tool/subagent.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 
-export const CLIProviderSchema = z.object({
+const CLIProviderBaseSchema = z.object({
   name: z.string(),
-  provider: z.string(),
+  engine: z.string().optional(),
+  provider: z.string().optional(),
   apiKey: z.string(),
   baseUrl: z.string().optional(),
+  models: ProviderModelOverridesSchema.optional(),
 });
+
+export const CLIProviderSchema = CLIProviderBaseSchema
+  .superRefine((provider, ctx) => {
+    if (provider.engine === undefined && provider.provider === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["engine"],
+        message: "Either engine or legacy provider is required",
+      });
+    }
+  })
+  .transform((provider) => ({
+    name: provider.name,
+    engine: provider.engine ?? provider.provider!,
+    ...(provider.provider !== undefined && { provider: provider.provider }),
+    apiKey: provider.apiKey,
+    ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
+    ...(provider.models !== undefined && { models: provider.models }),
+  }));
 
 export type CLIProvider = z.infer<typeof CLIProviderSchema>;
 
@@ -33,9 +63,10 @@ export const CLIModelSchema = z.object({
 export type CLIModel = z.infer<typeof CLIModelSchema>;
 
 export const CLIConfigSchema = z.object({
-  providers: z.array(CLIProviderSchema),
-  models: z.array(CLIModelSchema),
-  defaultModel: z.string(),
+  providers: z.array(CLIProviderSchema).default([]),
+  models: z.array(CLIModelSchema).default([]),
+  defaultModel: z.string().default(""),
+  generation: GenerationConfigSchema.partial().optional(),
   systemPrompt: z.string().optional(),
   mcp: McpPluginConfigSchema.optional(),
   skill: SkillPluginConfigSchema.optional(),
@@ -54,7 +85,7 @@ export function resolveProvider(config: CLIConfig, providerName: string): CLIPro
 
 export function toModelConfig(m: CLIModel, provider: CLIProvider): ModelConfig {
   return {
-    provider: provider.provider,
+    provider: provider.engine,
     model: m.model,
     apiKey: provider.apiKey,
     ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
@@ -65,6 +96,105 @@ export function toModelConfig(m: CLIModel, provider: CLIProvider): ModelConfig {
     ...(m.temperature !== undefined && { temperature: m.temperature }),
     ...(m.topP !== undefined && { topP: m.topP }),
   };
+}
+
+function toLegacyModelPreset(m: CLIModel) {
+  return ModelPresetSchema.parse({
+    model: m.model,
+    displayName: m.name,
+    ...(m.contextSize !== undefined && { contextSize: m.contextSize }),
+    ...(m.maxOutputTokens !== undefined && { maxOutputTokens: m.maxOutputTokens }),
+    thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+  });
+}
+
+export function toAgentProviders(config: CLIConfig): ModelProviderConfig[] {
+  return config.providers.map((provider) => {
+    const legacyAdditions = config.models
+      .filter((model) => model.provider === provider.name)
+      .map(toLegacyModelPreset);
+    const configuredAdditions = provider.models?.add ?? [];
+    const additions = [...configuredAdditions];
+    for (const model of legacyAdditions) {
+      if (!additions.some((entry) => entry.model === model.model)) {
+        additions.push(model);
+      }
+    }
+    const models = {
+      ...(additions.length > 0 && { add: additions }),
+      ...(provider.models?.override !== undefined && { override: provider.models.override }),
+    };
+
+    return {
+      name: provider.name,
+      engine: provider.engine,
+      apiKey: provider.apiKey,
+      ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
+      ...(Object.keys(models).length > 0 && { models }),
+    };
+  });
+}
+
+export function findProviderByEngineOrName(
+  config: CLIConfig,
+  providerOrEngine: string,
+): CLIProvider | undefined {
+  return config.providers.find((provider) =>
+    provider.name === providerOrEngine || provider.engine === providerOrEngine,
+  );
+}
+
+export function parseModelSelector(
+  config: CLIConfig,
+  value: string | undefined,
+): ModelSelector | undefined {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+  const legacyModel = findModel(config, value);
+  if (legacyModel) {
+    return { provider: legacyModel.provider, model: legacyModel.model };
+  }
+
+  const sep = value.indexOf("/");
+  if (sep !== -1) {
+    const providerOrEngine = value.slice(0, sep);
+    const model = value.slice(sep + 1);
+    const provider = findProviderByEngineOrName(config, providerOrEngine);
+    if (provider && provider.name !== providerOrEngine) {
+      return { provider: provider.name, model };
+    }
+  }
+
+  return { id: value };
+}
+
+export function parseDefaultModel(config: CLIConfig): ModelSelector | undefined {
+  return parseModelSelector(config, config.defaultModel);
+}
+
+export function toAgentGenerationConfig(
+  config: CLIConfig,
+  modelName?: string,
+): GenerationConfigInput | undefined {
+  if (config.generation !== undefined) {
+    return config.generation;
+  }
+
+  const legacyModel = findModel(config, modelName);
+  if (!legacyModel) {
+    return undefined;
+  }
+
+  const generation: GenerationConfigInput = {
+    ...(legacyModel.temperature !== undefined && { temperature: legacyModel.temperature }),
+    ...(legacyModel.topP !== undefined && { topP: legacyModel.topP }),
+    ...(legacyModel.maxOutputTokens !== undefined && { maxOutputTokens: legacyModel.maxOutputTokens }),
+    ...(legacyModel.thinking !== undefined && {
+      thinking: legacyModel.thinking ? ThinkingLevel.Medium : ThinkingLevel.None,
+    }),
+  };
+  return Object.keys(generation).length > 0 ? generation : undefined;
 }
 
 export async function loadConfig(baseDir: string): Promise<CLIConfig> {
