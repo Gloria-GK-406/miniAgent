@@ -12,21 +12,48 @@ npm run chat
 
 ```json
 {
-  "models": [
+  "providers": [
     {
-      "name": "claude",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "name": "anthropic-main",
+      "engine": "anthropic",
       "apiKey": "sk-ant-..."
+    },
+    {
+      "name": "local-qwen",
+      "engine": "openai-compatible",
+      "apiKey": "local",
+      "baseUrl": "http://localhost:8000/v1",
+      "models": {
+        "add": [
+          {
+            "model": "qwen3-coder",
+            "contextSize": 128000,
+            "maxOutputTokens": 32768,
+            "thinkingLevels": ["none", "medium"]
+          }
+        ]
+      }
     }
   ],
-  "defaultModel": "claude",
+  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "generation": {
+    "temperature": 0.7,
+    "thinking": "medium"
+  },
   "systemPrompt": "You are a helpful assistant.",
   "subagent": {
     "path": "./.cliagent/subagent/"
   }
 }
 ```
+
+Provider-mode model config uses `providers[].name` as the user-facing profile,
+`providers[].engine` as the built-in engine adapter, and optional
+`providers[].models.add` / `providers[].models.override` for custom model
+presets. `defaultModel` should be a resolved id such as
+`anthropic-main/claude-sonnet-4-5`. `generation.thinking` accepts `none`,
+`low`, `medium`, `high`, or `max`; unsupported levels downgrade inside the
+engine. Legacy top-level `models` entries still load during migration.
 
 ## 命令
 

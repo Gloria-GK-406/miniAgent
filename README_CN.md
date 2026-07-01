@@ -11,26 +11,40 @@ npm install @piaoxianguo/miniagent
 ```
 
 ```typescript
-import { MiniAgent, LLMEngineManager, MessageType } from "@piaoxianguo/miniagent";
+import {
+  MiniAgent,
+  LLMEngineManager,
+  MessageType,
+  ThinkingLevel,
+} from "@piaoxianguo/miniagent";
 import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
 import { z } from "zod";
 
 // 1. 配置 LLM 引擎
 const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
+engines.register(new AnthropicEngine());
 
 // 2. 创建 Agent
 const agent = new MiniAgent(engines, {
-  model: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-    baseUrl: "",
+  providers: [
+    {
+      name: "anthropic-main",
+      engine: "anthropic",
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+    },
+  ],
+  defaultModel: { id: "anthropic-main/claude-sonnet-4-5" },
+  generation: {
+    temperature: 0.7,
+    thinking: ThinkingLevel.Medium,
   },
   models: new Map(),
   plugins: new Map(),
   paths: { sessiondir: "./sessions" },
 });
+
+console.log(agent.getModels().map((model) => model.id));
+agent.setGenerationConfig({ temperature: 0.2, thinking: ThinkingLevel.None });
 
 // 3. 打印流式输出
 agent.on("llm:chunk", ({ chunk }) => {
@@ -213,18 +227,22 @@ import { GLMEngine } from "@piaoxianguo/miniagent/engine/glm";
 import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
 
 const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
-engines.register("openai", OpenAIEngine);
-engines.register("openai-compatible", OpenAICompatibleEngine);
-engines.register("glm", GLMEngine);
-engines.register("glm-codeplan", GLMCodePlanEngine);
+engines.register(new AnthropicEngine());
+engines.register(new OpenAIEngine());
+engines.register(new OpenAICompatibleEngine());
+engines.register(new GLMEngine());
+engines.register(new GLMCodePlanEngine());
 ```
 
 实现 `LLMEngine` 接口即可添加自定义引擎：
 
+Provider-mode engines expose a model catalog and receive a per-request provider/model/generation object:
+
 ```typescript
-interface LLMEngine {
-  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
+interface ModelCatalogLLMEngine {
+  readonly name: string;
+  getModels(): ModelPreset[];
+  streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
 }
 ```
 
@@ -333,15 +351,34 @@ npm run chat
 
 ```json
 {
-  "models": [
+  "providers": [
     {
-      "name": "claude",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "name": "anthropic-main",
+      "engine": "anthropic",
       "apiKey": "sk-ant-..."
+    },
+    {
+      "name": "local-qwen",
+      "engine": "openai-compatible",
+      "apiKey": "local",
+      "baseUrl": "http://localhost:8000/v1",
+      "models": {
+        "add": [
+          {
+            "model": "qwen3-coder",
+            "contextSize": 128000,
+            "maxOutputTokens": 32768,
+            "thinkingLevels": ["none", "medium"]
+          }
+        ]
+      }
     }
   ],
-  "defaultModel": "claude",
+  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "generation": {
+    "temperature": 0.7,
+    "thinking": "medium"
+  },
   "systemPrompt": "你是一个有用的助手。"
 }
 ```
@@ -388,6 +425,15 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 ```
 
 ## Agent API
+
+Current model APIs:
+
+- `getModels()` / `getResolvedModels()`
+- `getCurrentResolvedModel()`
+- `setResolvedModel({ id })` or `setResolvedModel({ provider, model })`
+- `getGenerationConfig()`
+- `setGenerationConfig(update)`
+- Legacy: `setModel(config)` and `setModelByPath(path)`
 
 | 方法 | 说明 |
 |------|------|

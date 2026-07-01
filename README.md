@@ -11,26 +11,40 @@ npm install @piaoxianguo/miniagent
 ```
 
 ```typescript
-import { MiniAgent, LLMEngineManager, MessageType } from "@piaoxianguo/miniagent";
+import {
+  MiniAgent,
+  LLMEngineManager,
+  MessageType,
+  ThinkingLevel,
+} from "@piaoxianguo/miniagent";
 import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
 import { z } from "zod";
 
 // 1. Set up the LLM engine
 const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
+engines.register(new AnthropicEngine());
 
 // 2. Create the agent
 const agent = new MiniAgent(engines, {
-  model: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-    baseUrl: "",
+  providers: [
+    {
+      name: "anthropic-main",
+      engine: "anthropic",
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+    },
+  ],
+  defaultModel: { id: "anthropic-main/claude-sonnet-4-5" },
+  generation: {
+    temperature: 0.7,
+    thinking: ThinkingLevel.Medium,
   },
   models: new Map(),
   plugins: new Map(),
   paths: { sessiondir: "./sessions" },
 });
+
+console.log(agent.getModels().map((model) => model.id));
+agent.setGenerationConfig({ temperature: 0.2, thinking: ThinkingLevel.None });
 
 // 3. Print streaming output
 agent.on("llm:chunk", ({ chunk }) => {
@@ -188,9 +202,12 @@ const processor = {
 
 MiniAgent separates LLM interaction into two layers:
 
-- **`LLMRequest`** — The interface the agent calls: `streamInvoke(messages, modelConfig, tools) → LLMStreamHandle`. This is the contract.
-- **`LLMEngine`** — The interface an engine implements: `streamGenerate(messages, tools) → LLMStreamHandle`. The `ModelConfig` is bound at construction time.
-- **`LLMEngineManager`** — The default `LLMRequest` implementation. It manages engine constructors, creates engines per `ModelConfig`, and caches them with LRU eviction.
+In provider mode, `MiniAgent` sends a resolved provider, resolved model, tools, messages, and `GenerationConfig` to a registered engine instance. The legacy `ModelConfig` call path still exists for migration.
+
+- **`LLMRequest`** — The interface the agent calls. It supports request-mode generation and the legacy `streamInvoke(messages, modelConfig, tools)` form.
+- **`ModelCatalogLLMEngine`** — The request-mode engine interface. Engines expose `name`, `getModels()`, and `streamGenerate(request)`.
+- **`LLMEngine`** — The legacy engine interface with constructor-bound `ModelConfig`.
+- **`LLMEngineManager`** — The default `LLMRequest` implementation. It registers engine instances for model catalogs and still supports constructor-based legacy registration during migration.
 
 ```
   MiniAgent ──calls──► LLMRequest (interface)
@@ -213,20 +230,24 @@ import { GLMEngine } from "@piaoxianguo/miniagent/engine/glm";
 import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
 
 const engines = new LLMEngineManager();
-engines.register("anthropic", AnthropicEngine);
-engines.register("openai", OpenAIEngine);
-engines.register("openai-compatible", OpenAICompatibleEngine);
-engines.register("glm", GLMEngine);
-engines.register("glm-codeplan", GLMCodePlanEngine);
+engines.register(new AnthropicEngine());
+engines.register(new OpenAIEngine());
+engines.register(new OpenAICompatibleEngine());
+engines.register(new GLMEngine());
+engines.register(new GLMCodePlanEngine());
 ```
 
-Implement the `LLMEngine` interface to add your own:
+Provider-mode engines expose a model catalog and receive a per-request provider/model/generation object:
 
 ```typescript
-interface LLMEngine {
-  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
+interface ModelCatalogLLMEngine {
+  readonly name: string;
+  getModels(): ModelPreset[];
+  streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
 }
 ```
+
+The older `engines.register("anthropic", AnthropicEngine)` constructor form remains available for legacy `ModelConfig` callers.
 
 ## Blueprint and Assembly
 
@@ -333,15 +354,34 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 ```json
 {
-  "models": [
+  "providers": [
     {
-      "name": "claude",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "name": "anthropic-main",
+      "engine": "anthropic",
       "apiKey": "sk-ant-..."
+    },
+    {
+      "name": "local-qwen",
+      "engine": "openai-compatible",
+      "apiKey": "local",
+      "baseUrl": "http://localhost:8000/v1",
+      "models": {
+        "add": [
+          {
+            "model": "qwen3-coder",
+            "contextSize": 128000,
+            "maxOutputTokens": 32768,
+            "thinkingLevels": ["none", "medium"]
+          }
+        ]
+      }
     }
   ],
-  "defaultModel": "claude",
+  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "generation": {
+    "temperature": 0.7,
+    "thinking": "medium"
+  },
   "systemPrompt": "You are a helpful assistant."
 }
 ```
@@ -350,8 +390,8 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 | Command | Description |
 |---------|-------------|
-| `/models` | List configured models |
-| `/model <provider/model>` | Switch active model |
+| `/models` | List resolved provider/model ids |
+| `/model <provider/model>` | Switch active model by resolved id |
 | `/tools` | List registered tools |
 | `/history [page]` | View conversation history |
 | `/context` | Preview context sent to LLM |
@@ -400,8 +440,13 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 | `getToolList()` | Get all currently available tools. |
 | `previewContext()` | Preview the context that will be sent to the LLM. |
 | `setDiscardBefore(id)` | Set a watermark to discard messages before the given ID. |
-| `setModel(config)` | Switch to a different model at runtime. |
-| `setModelByPath(path)` | Switch model by `provider/model` path string. |
+| `getModels()` / `getResolvedModels()` | Get resolved provider/model catalog entries. |
+| `getCurrentResolvedModel()` | Get the active resolved model. |
+| `setResolvedModel(selector)` | Switch active model by `{ id }` or `{ provider, model }`. |
+| `getGenerationConfig()` | Get generation preferences such as temperature and thinking level. |
+| `setGenerationConfig(update)` | Update generation preferences without changing the active model. |
+| `setModel(config)` | Legacy: switch using a full `ModelConfig`. |
+| `setModelByPath(path)` | Legacy: switch model by `provider/model` path string. |
 | `setAutoApprovedTools(names)` | Set tools that bypass HITL approval. |
 | `getConfig()` | Get the current agent configuration. |
 | `getContextCount()` | Get cumulative token usage statistics. |

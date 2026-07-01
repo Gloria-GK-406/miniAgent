@@ -43,7 +43,7 @@ The key split is:
 their own names:
 
 ```ts
-interface LLMEngine {
+interface ModelCatalogLLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
@@ -178,11 +178,12 @@ output. Engines may clamp or omit request caps according to provider rules.
 
 ```ts
 agent.getModels(): ResolvedModel[];
+agent.getResolvedModels(): ResolvedModel[];
 
-agent.getCurrentModel(): ResolvedModel;
+agent.getCurrentResolvedModel(): ResolvedModel;
 
-agent.setModel({ id: "glm-main/glm-5.2" });
-agent.setModel({ provider: "glm-main", model: "glm-5.2" });
+agent.setResolvedModel({ id: "glm-main/glm-5.2" });
+agent.setResolvedModel({ provider: "glm-main", model: "glm-5.2" });
 
 agent.getGenerationConfig(): GenerationConfig;
 
@@ -192,12 +193,15 @@ agent.setGenerationConfig({
 });
 ```
 
-`setModel()` only changes the active model. It accepts explicit selectors, not
+`setResolvedModel()` only changes the active model. It accepts explicit selectors, not
 arbitrary `Partial<ResolvedModel>` objects, so model selection remains
 unambiguous.
 
 `setGenerationConfig()` only changes generation preferences. It does not change
 the active model.
+
+Legacy `getCurrentModel()`, `setModel(ModelConfig)`, and `setModelByPath()` are
+kept as migration wrappers for callers still using `ModelConfig`.
 
 ## Thinking Compatibility
 
@@ -293,7 +297,7 @@ Prefer small `models.ts` files per engine over embedding catalog data in
 4. MiniAgent applies provider `models.override` and `models.add`.
 5. MiniAgent produces stable `ResolvedModel.id` values using
    `${provider.name}/${model}`.
-6. `setModel()` selects one `ResolvedModel`.
+6. `setResolvedModel()` selects one `ResolvedModel`.
 7. `setGenerationConfig()` mutates the current generation preferences.
 8. Each turn sends an `LLMGenerateRequest` containing:
    - messages
@@ -331,8 +335,8 @@ CLI migration:
 - Provider resolves to zero models: throw only if it is selected as the default;
   otherwise it can remain unavailable until the user adds models.
 - `defaultModel` not found: throw with available model ids.
-- `setModel()` selector matches zero models: throw with available model ids.
-- `setModel()` selector matches multiple models: throw and require `id`.
+- `setResolvedModel()` selector matches zero models: throw with available model ids.
+- `setResolvedModel()` selector matches multiple models: throw and require `id`.
 - Unsupported thinking level for a model: do not throw; engine downgrades.
 
 ## Testing Requirements
@@ -342,7 +346,7 @@ Add focused tests for:
 - Engine model preset exposure per built-in engine.
 - Provider aggregation into stable `ResolvedModel` ids.
 - Provider model addition and override behavior.
-- `setModel()` selector success, no-match, and ambiguous-match behavior.
+- `setResolvedModel()` selector success, no-match, and ambiguous-match behavior.
 - `setGenerationConfig()` merging and default behavior.
 - Thinking downgrade/mapping for boolean, level-capable, and unsupported engines.
 - CLI config migration/resolution from old and new shapes.
@@ -363,7 +367,7 @@ Docs should explain:
 - provider name vs engine name
 - engine-provided model presets
 - user-added models for OpenAI-compatible endpoints
-- `setModel()` vs `setGenerationConfig()`
+- `setResolvedModel()` vs `setGenerationConfig()`
 - thinking downgrade behavior
 
 ## Architecture Impact
@@ -384,7 +388,7 @@ cross a recorded invariant because no recorded invariant exists yet.
   model list for built-in engines that have catalogs.
 - `agent.getModels()` returns resolved model ids with provider, engine, model,
   context size, max output, and supported thinking levels.
-- `agent.setModel()` changes only the current model.
+- `agent.setResolvedModel()` changes only the current model.
 - `agent.setGenerationConfig()` changes only generation preferences.
 - Default generation config is `temperature: 0.7` and `thinking: "medium"`.
 - Engines silently downgrade unsupported thinking settings.

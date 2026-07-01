@@ -12,15 +12,34 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 ```json
 {
-  "models": [
+  "providers": [
     {
-      "name": "claude",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "name": "anthropic-main",
+      "engine": "anthropic",
       "apiKey": "sk-ant-..."
+    },
+    {
+      "name": "local-qwen",
+      "engine": "openai-compatible",
+      "apiKey": "local",
+      "baseUrl": "http://localhost:8000/v1",
+      "models": {
+        "add": [
+          {
+            "model": "qwen3-coder",
+            "contextSize": 128000,
+            "maxOutputTokens": 32768,
+            "thinkingLevels": ["none", "medium"]
+          }
+        ]
+      }
     }
   ],
-  "defaultModel": "claude",
+  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "generation": {
+    "temperature": 0.7,
+    "thinking": "medium"
+  },
   "systemPrompt": "You are a helpful assistant.",
   "subagent": {
     "path": "./.cliagent/subagent/"
@@ -32,8 +51,8 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 | Command | Description |
 |---------|-------------|
-| `/models` | List configured models |
-| `/model <provider/model>` | Switch active model |
+| `/models` | List resolved provider/model ids |
+| `/model <provider/model>` | Switch active model by resolved id |
 | `/tools` | List registered tools |
 | `/history [page]` | View conversation history |
 | `/context` | Preview context sent to LLM |
@@ -83,12 +102,18 @@ Use `/compress` to manually trigger compression.
 
 ## Model Configuration
 
-Models are configured in `.cliagent/config.json`. Each model entry requires:
+Models are resolved from provider profiles and engine model catalogs in `.cliagent/config.json`.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `name` | Yes | Display name for the model |
-| `provider` | Yes | Engine provider (`anthropic`, `openai`, `openai-compatible`, `glm`, `glm-codeplan`) |
-| `model` | Yes | Model identifier |
-| `apiKey` | Yes | API key |
-| `baseUrl` | No | Custom base URL (required for `openai-compatible`) |
+| `providers[].name` | Yes | User-facing provider/profile name, used in resolved model ids |
+| `providers[].engine` | Yes | Engine adapter (`anthropic`, `openai`, `openai-compatible`, `glm`, `glm-codeplan`, `nvidia`) |
+| `providers[].apiKey` | Yes | API key |
+| `providers[].baseUrl` | No | Custom base URL, usually for `openai-compatible` |
+| `providers[].models.add` | No | Custom model presets for endpoints without a built-in catalog |
+| `providers[].models.override` | No | Per-provider overrides for engine-provided presets |
+| `defaultModel` | No | Resolved model id such as `anthropic-main/claude-sonnet-4-5` |
+| `generation.temperature` | No | Default `0.7` |
+| `generation.thinking` | No | `none`, `low`, `medium`, `high`, or `max`; unsupported levels downgrade inside the engine |
+
+Legacy top-level `models` entries still load during migration. Their generation fields are converted into generation config, and `/model` switches keep legacy per-model generation settings when no top-level `generation` is configured.

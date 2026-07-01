@@ -357,7 +357,7 @@ Use `import type { Message } from "./types.js";` and `import type { Tool } from 
 In `src/core/llm.ts`, change the engine interface to:
 
 ```ts
-export interface LLMEngine {
+export interface ModelCatalogLLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
@@ -727,7 +727,7 @@ it("aggregates provider-added models and exposes the current model", async () =>
       thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
     },
   ]);
-  expect(agent.getCurrentModel().id).toBe("test-main/custom-model");
+  expect(agent.getCurrentResolvedModel().id).toBe("test-main/custom-model");
 });
 
 it("sets model without changing generation config", async () => {
@@ -752,8 +752,8 @@ it("sets model without changing generation config", async () => {
     paths: { sessiondir: testDir },
   });
 
-  agent.setModel({ id: "p/b" });
-  expect(agent.getCurrentModel().id).toBe("p/b");
+  agent.setResolvedModel({ id: "p/b" });
+  expect(agent.getCurrentResolvedModel().id).toBe("p/b");
   expect(agent.getGenerationConfig()).toEqual({
     temperature: 0.3,
     thinking: ThinkingLevel.High,
@@ -831,11 +831,11 @@ getModels(): ResolvedModel[] {
   return this.resolvedModels.map((model) => ({ ...model, thinkingLevels: [...model.thinkingLevels] }));
 }
 
-getCurrentModel(): ResolvedModel {
+getCurrentResolvedModel(): ResolvedModel {
   return { ...this.currentModel, thinkingLevels: [...this.currentModel.thinkingLevels] };
 }
 
-setModel(selector: ModelSelector): void {
+setResolvedModel(selector: ModelSelector): void {
   const matches = "id" in selector
     ? this.resolvedModels.filter((model) => model.id === selector.id)
     : this.resolvedModels.filter((model) => model.provider === selector.provider && model.model === selector.model);
@@ -1066,8 +1066,8 @@ Update `/models` and `/model` to use:
 
 ```ts
 const models = currentAgent.getModels();
-currentAgent.setModel({ id: arg });
-const current = currentAgent.getCurrentModel();
+currentAgent.setResolvedModel({ id: arg });
+const current = currentAgent.getCurrentResolvedModel();
 ```
 
 - [ ] **Step 5: Run CLI tests**
@@ -1168,7 +1168,7 @@ Document:
 
 ```ts
 agent.getModels();
-agent.setModel({ id: "anthropic-main/claude-sonnet-4-5" });
+agent.setResolvedModel({ id: "anthropic-main/claude-sonnet-4-5" });
 agent.setGenerationConfig({ temperature: 0.2, thinking: ThinkingLevel.None });
 ```
 
@@ -1246,6 +1246,19 @@ Expected:
 - build passes
 - tests pass
 - only pre-existing unrelated `package.json` and `package-lock.json` modifications remain unstaged if they were present before this work
+
+## Implementation Notes
+
+- The final public API keeps legacy `getCurrentModel()`, `setModel(ModelConfig)`,
+  and `setModelByPath()` while adding `getCurrentResolvedModel()` and
+  `setResolvedModel(selector)` for catalog-backed selection.
+- `LLMEngine` remains the legacy constructor-bound interface. Request-mode
+  catalog engines use `ModelCatalogLLMEngine`, and request-capable LLM callers
+  use `ModelAwareLLMRequest`.
+- CLI legacy `maxTokens` is mapped to `GenerationConfig.maxOutputTokens` when
+  `maxOutputTokens` is absent. Legacy per-model generation settings continue to
+  follow `/model` switches unless top-level `generation` is configured.
+- Unknown CLI provider engines fail at startup with a provider-specific error.
 
 ## Architecture Gate
 
