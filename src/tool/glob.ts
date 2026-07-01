@@ -10,6 +10,10 @@ const GlobParamsSchema = z.object({
   path: z.string().describe("Base directory to search from"),
 });
 
+function toPosixPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/");
+}
+
 function matchGlob(pattern: string, filePath: string): boolean {
   const parts = pattern.split("/");
   const fileParts = filePath.split("/");
@@ -66,7 +70,7 @@ async function walkDir(dir: string, baseDir: string, results: string[]): Promise
     if (s.isDirectory()) {
       await walkDir(fullPath, baseDir, results);
     } else {
-      results.push(relative(baseDir, fullPath));
+      results.push(toPosixPath(relative(baseDir, fullPath)));
     }
   }
 }
