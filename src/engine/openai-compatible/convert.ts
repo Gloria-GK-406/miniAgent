@@ -9,12 +9,17 @@ import type {
   LLMMessageResponse,
   LLMResponse,
 } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+  type ModelConfig,
+} from "../../core/config.js";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionFunctionTool,
-  ChatCompletion
+  ChatCompletion,
+  ChatCompletionReasoningEffort,
 } from "openai/resources/chat/completions/completions.js";
 import { MessageType } from "../../core/types.js";
 import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
@@ -132,6 +137,50 @@ export function buildCreateParams(
     ...(config.topP !== undefined && { top_p: config.topP }),
   };
 }
+
+function mapOpenAIReasoningEffort(level: ThinkingLevel): ChatCompletionReasoningEffort {
+  switch (level) {
+    case ThinkingLevel.None:
+      return "none";
+    case ThinkingLevel.Low:
+      return "low";
+    case ThinkingLevel.Medium:
+      return "medium";
+    case ThinkingLevel.High:
+      return "high";
+    case ThinkingLevel.Max:
+      return "xhigh";
+  }
+}
+
+function supportsOpenAIReasoning(request: LLMGenerateRequest): boolean {
+  return request.model.engine === "openai"
+    && request.model.thinkingLevels.some((level) => level !== ThinkingLevel.None);
+}
+
+export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
+  const config: ModelConfig = {
+    provider: request.model.engine,
+    model: request.model.model,
+    apiKey: request.provider.apiKey,
+    ...(request.provider.baseUrl !== undefined && {
+      baseUrl: request.provider.baseUrl,
+    }),
+    ...(request.generation.maxOutputTokens !== undefined && {
+      maxOutputTokens: request.generation.maxOutputTokens,
+    }),
+    temperature: request.generation.temperature,
+    ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
+  };
+
+  return {
+    ...buildCreateParams(request.messages, config, request.tools),
+    ...(supportsOpenAIReasoning(request) && {
+      reasoning_effort: mapOpenAIReasoningEffort(request.generation.thinking),
+    }),
+  };
+}
+
 export function convertResponse(
   response: ChatCompletion
 ): LLMResponse {

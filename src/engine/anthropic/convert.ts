@@ -8,7 +8,11 @@ import type {
   LLMMessageResponse,
   LLMResponse,
 } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+  type ModelConfig,
+} from "../../core/config.js";
 import type {
   MessageParam,
   ContentBlockParam,
@@ -181,6 +185,56 @@ export function buildCreateParams(
       temperature: config.temperature,
     }),
     ...(config.topP !== undefined && { top_p: config.topP }),
+  };
+}
+
+function mapAnthropicEffort(level: ThinkingLevel): "low" | "medium" | "high" | "max" {
+  switch (level) {
+    case ThinkingLevel.None:
+    case ThinkingLevel.Low:
+      return "low";
+    case ThinkingLevel.Medium:
+      return "medium";
+    case ThinkingLevel.High:
+      return "high";
+    case ThinkingLevel.Max:
+      return "max";
+  }
+}
+
+function supportsAnthropicThinking(request: LLMGenerateRequest): boolean {
+  return request.model.thinkingLevels.some((level) => level !== ThinkingLevel.None);
+}
+
+export function buildCreateParamsFromRequest(
+  request: LLMGenerateRequest,
+): Anthropic.MessageCreateParamsNonStreaming {
+  const config: ModelConfig = {
+    provider: request.model.engine,
+    model: request.model.model,
+    apiKey: request.provider.apiKey,
+    ...(request.generation.maxOutputTokens !== undefined && {
+      maxOutputTokens: request.generation.maxOutputTokens,
+    }),
+    temperature: request.generation.temperature,
+    ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
+  };
+  const params = buildCreateParams(request.messages, config, request.tools);
+
+  if (!supportsAnthropicThinking(request)) {
+    return params;
+  }
+  if (request.generation.thinking === ThinkingLevel.None) {
+    return {
+      ...params,
+      thinking: { type: "disabled" },
+    };
+  }
+  return {
+    ...params,
+    output_config: {
+      effort: mapAnthropicEffort(request.generation.thinking),
+    },
   };
 }
 

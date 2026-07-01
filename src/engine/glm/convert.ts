@@ -9,7 +9,11 @@ import type {
   LLMMessageResponse,
   LLMResponse,
 } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+  type ModelConfig,
+} from "../../core/config.js";
 import type {
   ChatCompletionMessageParam,
   ChatCompletion,
@@ -143,6 +147,25 @@ export function buildCreateParams(
     }),
     ...(config.topP !== undefined && { top_p: config.topP }),
   };
+}
+
+export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
+  const config: ModelConfig = {
+    provider: request.model.engine,
+    model: request.model.model,
+    apiKey: request.provider.apiKey,
+    ...(request.provider.baseUrl !== undefined && {
+      baseUrl: request.provider.baseUrl,
+    }),
+    thinking: request.generation.thinking !== ThinkingLevel.None,
+    ...(request.generation.maxOutputTokens !== undefined && {
+      maxOutputTokens: request.generation.maxOutputTokens,
+    }),
+    temperature: request.generation.temperature,
+    ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
+  };
+
+  return buildCreateParams(request.messages, config, request.tools);
 }
 
 export function convertResponse(
