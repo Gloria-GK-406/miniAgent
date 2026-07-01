@@ -1,5 +1,5 @@
 import { render } from "ink";
-import { createCLIApp } from "./cli-app.js";
+import { applyLegacyGenerationForModel, createCLIApp } from "./cli-app.js";
 import { App } from "./components/App.js";
 
 const A = {
@@ -73,6 +73,7 @@ async function main(): Promise<void> {
             } catch {
                 currentAgent.setModelByPath(path);
             }
+            applyLegacyGenerationForModel(currentAgent, ctx.config, path);
             rerenderApp();
         }
 
@@ -133,6 +134,7 @@ async function main(): Promise<void> {
                         } catch {
                             currentAgent.setModelByPath(arg);
                         }
+                        applyLegacyGenerationForModel(currentAgent, ctx.config, arg);
                         console.log(
                             `Switched to ${A.bold}${getModelName()}${A.reset}`,
                         );

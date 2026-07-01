@@ -99,11 +99,12 @@ export function toModelConfig(m: CLIModel, provider: CLIProvider): ModelConfig {
 }
 
 function toLegacyModelPreset(m: CLIModel) {
+  const maxOutputTokens = m.maxOutputTokens ?? m.maxTokens;
   return ModelPresetSchema.parse({
     model: m.model,
     displayName: m.name,
     ...(m.contextSize !== undefined && { contextSize: m.contextSize }),
-    ...(m.maxOutputTokens !== undefined && { maxOutputTokens: m.maxOutputTokens }),
+    ...(maxOutputTokens !== undefined && { maxOutputTokens }),
     thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
   });
 }
@@ -173,23 +174,52 @@ export function parseDefaultModel(config: CLIConfig): ModelSelector | undefined 
   return parseModelSelector(config, config.defaultModel);
 }
 
+export function findLegacyModel(config: CLIConfig, selector?: string): CLIModel | undefined {
+  const target = selector ?? config.defaultModel;
+  if (target.trim().length === 0) {
+    return undefined;
+  }
+
+  const byName = config.models.find((model) => model.name === target);
+  if (byName) {
+    return byName;
+  }
+
+  const sep = target.indexOf("/");
+  if (sep === -1) {
+    return undefined;
+  }
+
+  const providerOrEngine = target.slice(0, sep);
+  const modelName = target.slice(sep + 1);
+  const provider = findProviderByEngineOrName(config, providerOrEngine);
+  return config.models.find((model) =>
+    model.model === modelName
+      && (
+        model.provider === providerOrEngine
+        || (provider !== undefined && model.provider === provider.name)
+      ),
+  );
+}
+
 export function toAgentGenerationConfig(
   config: CLIConfig,
-  modelName?: string,
+  selector?: string,
 ): GenerationConfigInput | undefined {
   if (config.generation !== undefined) {
     return config.generation;
   }
 
-  const legacyModel = findModel(config, modelName);
+  const legacyModel = findLegacyModel(config, selector);
   if (!legacyModel) {
     return undefined;
   }
 
+  const maxOutputTokens = legacyModel.maxOutputTokens ?? legacyModel.maxTokens;
   const generation: GenerationConfigInput = {
     ...(legacyModel.temperature !== undefined && { temperature: legacyModel.temperature }),
     ...(legacyModel.topP !== undefined && { topP: legacyModel.topP }),
-    ...(legacyModel.maxOutputTokens !== undefined && { maxOutputTokens: legacyModel.maxOutputTokens }),
+    ...(maxOutputTokens !== undefined && { maxOutputTokens }),
     ...(legacyModel.thinking !== undefined && {
       thinking: legacyModel.thinking ? ThinkingLevel.Medium : ThinkingLevel.None,
     }),

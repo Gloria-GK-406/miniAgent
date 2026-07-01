@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { ThinkingLevel } from "../core/config.js";
 import {
   CLIConfigSchema,
+  findLegacyModel,
   parseDefaultModel,
+  toAgentGenerationConfig,
   toAgentProviders,
 } from "./config.js";
 
@@ -99,5 +101,87 @@ describe("CLI config model providers", () => {
         },
       },
     ]);
+  });
+
+  it("maps legacy maxTokens to request caps when maxOutputTokens is absent", () => {
+    const config = CLIConfigSchema.parse({
+      providers: [
+        {
+          name: "main",
+          provider: "openai-compatible",
+          apiKey: "legacy-key",
+        },
+      ],
+      models: [
+        {
+          name: "fast",
+          provider: "main",
+          model: "custom-fast",
+          maxTokens: 1234,
+        },
+      ],
+      defaultModel: "fast",
+    });
+
+    expect(toAgentGenerationConfig(config)).toEqual({ maxOutputTokens: 1234 });
+    expect(toAgentProviders(config)[0]?.models?.add?.[0]?.maxOutputTokens).toBe(1234);
+  });
+
+  it("prefers legacy maxOutputTokens over maxTokens", () => {
+    const config = CLIConfigSchema.parse({
+      providers: [
+        {
+          name: "main",
+          provider: "openai-compatible",
+          apiKey: "legacy-key",
+        },
+      ],
+      models: [
+        {
+          name: "fast",
+          provider: "main",
+          model: "custom-fast",
+          maxTokens: 1234,
+          maxOutputTokens: 4096,
+        },
+      ],
+      defaultModel: "fast",
+    });
+
+    expect(toAgentGenerationConfig(config)).toEqual({ maxOutputTokens: 4096 });
+    expect(toAgentProviders(config)[0]?.models?.add?.[0]?.maxOutputTokens).toBe(4096);
+  });
+
+  it("finds legacy model generation by resolved id and engine alias", () => {
+    const config = CLIConfigSchema.parse({
+      providers: [
+        {
+          name: "main",
+          provider: "openai-compatible",
+          apiKey: "legacy-key",
+        },
+      ],
+      models: [
+        {
+          name: "fast",
+          provider: "main",
+          model: "custom-fast",
+          temperature: 0.25,
+          thinking: false,
+        },
+      ],
+      defaultModel: "fast",
+    });
+
+    expect(findLegacyModel(config, "main/custom-fast")?.name).toBe("fast");
+    expect(findLegacyModel(config, "openai-compatible/custom-fast")?.name).toBe("fast");
+    expect(toAgentGenerationConfig(config, "main/custom-fast")).toEqual({
+      temperature: 0.25,
+      thinking: ThinkingLevel.None,
+    });
+    expect(toAgentGenerationConfig(config, "openai-compatible/custom-fast")).toEqual({
+      temperature: 0.25,
+      thinking: ThinkingLevel.None,
+    });
   });
 });

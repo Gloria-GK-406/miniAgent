@@ -8,7 +8,7 @@ import type { ModelCatalogLLMEngine } from "../core/llm.js";
 import { MessageType } from "../core/types.js";
 import type { Message } from "../core/types.js";
 import type { MiniAgent } from "../core/agent.js";
-import type { AgentConfig, ModelConfig, ModelGroup } from "../core/config.js";
+import { ThinkingLevel, type AgentConfig, type GenerationConfigInput, type ModelConfig, type ModelGroup } from "../core/config.js";
 import type { JsonValue } from "../core/config.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
@@ -26,6 +26,7 @@ import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/suba
 import {
     CLIAGENT_DIR,
     findModel,
+    findLegacyModel,
     findProviderByEngineOrName,
     loadConfig,
     parseDefaultModel,
@@ -210,10 +211,55 @@ function registerEngines(manager: LLMEngineManager, config: CLIConfig): void {
     for (const p of config.providers) {
         if (seen.has(p.engine)) continue;
         const createEngine = ENGINE_FACTORIES[p.engine];
-        if (!createEngine) continue;
+        if (!createEngine) {
+            throw new Error(
+                `Unsupported engine "${p.engine}" for provider "${p.name}". `
+                + `Known engines: ${Object.keys(ENGINE_FACTORIES).join(", ")}`,
+            );
+        }
         manager.register(createEngine());
         seen.add(p.engine);
     }
+}
+
+export function applyLegacyGenerationForModel(
+    agent: MiniAgent,
+    config: CLIConfig,
+    selector: string,
+): void {
+    if (config.generation !== undefined) {
+        return;
+    }
+
+    const generation = toSwitchGenerationConfig(config, selector);
+    if (generation !== undefined) {
+        agent.setGenerationConfig(generation);
+    }
+}
+
+type ResettableGenerationConfigInput = GenerationConfigInput & {
+    topP?: number | undefined;
+    maxOutputTokens?: number | undefined;
+};
+
+function toSwitchGenerationConfig(
+    config: CLIConfig,
+    selector: string,
+): GenerationConfigInput | undefined {
+    const legacyModel = findLegacyModel(config, selector);
+    if (!legacyModel) {
+        return undefined;
+    }
+
+    const generation: ResettableGenerationConfigInput = {
+        temperature: legacyModel.temperature ?? 0.7,
+        topP: legacyModel.topP,
+        maxOutputTokens: legacyModel.maxOutputTokens ?? legacyModel.maxTokens,
+        thinking: legacyModel.thinking === undefined
+            ? ThinkingLevel.Medium
+            : legacyModel.thinking ? ThinkingLevel.Medium : ThinkingLevel.None,
+    };
+    return generation;
 }
 
 function createCLIApprover(getHitlEnabled: () => boolean) {
