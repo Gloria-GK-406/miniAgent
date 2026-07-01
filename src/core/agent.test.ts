@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { z } from "zod";
 import { MiniAgent } from "./agent.js";
 import { StopException } from "./errors.js";
+import { LLMEngineManager } from "./llm.js";
 import { MessageType } from "./types.js";
 import type {
   AgentContextControl,
@@ -91,10 +92,17 @@ function wrapResponse(message: LLMMessageResponse, input = 0, output = 0): LLMRe
   };
 }
 
-function createLLM(responses: LLMResponse[], onInvoke?: (messages: Message[]) => void): LLMRequest {
+function createLLM(
+  responses: LLMResponse[],
+  onInvoke?: (messages: Message[], config?: ModelConfig, tools?: Tool[]) => void,
+): LLMRequest {
   return {
-    streamInvoke(messages: Message[]): LLMStreamHandle<LLMResponse> {
-      onInvoke?.(messages);
+    streamInvoke(
+      messages: Message[],
+      config?: ModelConfig,
+      tools?: Tool[],
+    ): LLMStreamHandle<LLMResponse> {
+      onInvoke?.(messages, config, tools);
       const next = responses.shift();
       if (!next) {
         throw new Error("No response queued");
@@ -102,6 +110,27 @@ function createLLM(responses: LLMResponse[], onInvoke?: (messages: Message[]) =>
       return createResolvedHandle(next);
     },
   };
+}
+
+class LegacyEngine {
+  static seenConfigs: ModelConfig[] = [];
+  static seenRequests: Message[][] = [];
+
+  private readonly config: ModelConfig;
+
+  constructor(config: ModelConfig) {
+    this.config = config;
+    LegacyEngine.seenConfigs.push(config);
+  }
+
+  streamGenerate(messages: Message[], _tools: Tool[]): LLMStreamHandle<LLMResponse> {
+    LegacyEngine.seenRequests.push(messages);
+    return createResolvedHandle(wrapResponse({
+      id: "assist-legacy",
+      type: MessageType.Assist,
+      content: this.config.model,
+    }));
+  }
 }
 
 function createModelAwareLLM(
@@ -143,12 +172,14 @@ describe("MiniAgent", () => {
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
+    LegacyEngine.seenConfigs = [];
+    LegacyEngine.seenRequests = [];
   });
 
   it("aggregates provider-added models and exposes the current model", () => {
     const agent = new MiniAgent(createLLM([]), createProviderConfig(testDir));
 
-    expect(agent.getModels()).toEqual([
+    const expected = [
       {
         id: "test-main/custom-model",
         provider: "test-main",
@@ -158,8 +189,10 @@ describe("MiniAgent", () => {
         maxOutputTokens: 4096,
         thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
       },
-    ]);
-    expect(agent.getCurrentModel().id).toBe("test-main/custom-model");
+    ];
+    expect(agent.getModels()).toEqual(expected);
+    expect(agent.getResolvedModels()).toEqual(expected);
+    expect(agent.getCurrentResolvedModel().id).toBe("test-main/custom-model");
   });
 
   it("aggregates engine catalog models and applies provider overrides", () => {
@@ -212,7 +245,7 @@ describe("MiniAgent", () => {
       },
     );
 
-    expect(agent.getModels()).toEqual([
+    expect(agent.getResolvedModels()).toEqual([
       {
         id: "test-main/catalog-a",
         provider: "test-main",
@@ -242,10 +275,10 @@ describe("MiniAgent", () => {
         thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
       },
     ]);
-    expect(agent.getCurrentModel().id).toBe("test-main/catalog-b");
+    expect(agent.getCurrentResolvedModel().id).toBe("test-main/catalog-b");
   });
 
-  it("sets model without changing generation config", () => {
+  it("sets resolved model without changing generation config", () => {
     const agent = new MiniAgent(createLLM([]), {
       providers: [
         {
@@ -267,9 +300,9 @@ describe("MiniAgent", () => {
       paths: { sessiondir: testDir },
     });
 
-    agent.setModel({ id: "p/b" });
+    agent.setResolvedModel({ id: "p/b" });
 
-    expect(agent.getCurrentModel().id).toBe("p/b");
+    expect(agent.getCurrentResolvedModel().id).toBe("p/b");
     expect(agent.getGenerationConfig()).toEqual({
       temperature: 0.3,
       thinking: ThinkingLevel.High,
@@ -285,7 +318,308 @@ describe("MiniAgent", () => {
       temperature: 0.2,
       thinking: ThinkingLevel.Max,
     });
-    expect(agent.getCurrentModel().id).toBe("test-main/custom-model");
+    expect(agent.getCurrentResolvedModel().id).toBe("test-main/custom-model");
+  });
+
+  it("keeps legacy model APIs compatible with ModelConfig callers", () => {
+    const firstModel: ModelConfig = {
+      provider: "test",
+      model: "test-model",
+      apiKey: "test-key",
+      baseUrl: "http://localhost",
+    };
+    const secondModel: ModelConfig = {
+      provider: "test",
+      model: "other-model",
+      apiKey: "other-key",
+      baseUrl: "http://other",
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 123,
+      thinking: false,
+    };
+    const notified: AgentConfig[] = [];
+    const agent = new MiniAgent(createLLM([]), {
+      model: firstModel,
+      models: new Map([["test", { models: [firstModel, secondModel] }]]),
+      plugins: new Map(),
+      paths: { sessiondir: testDir },
+    });
+
+    agent.register({
+      setConfig: async (config: AgentConfig): Promise<void> => {
+        notified.push(config);
+      },
+    });
+    agent.setModel(secondModel);
+
+    expect(agent.getCurrentModel()).toEqual(secondModel);
+    expect(agent.getModelList()).toEqual([firstModel, secondModel]);
+    expect(agent.getCurrentResolvedModel()).toMatchObject({
+      id: "test/other-model",
+      provider: "test",
+      engine: "test",
+      model: "other-model",
+    });
+    expect(notified[notified.length - 1]?.model).toEqual(secondModel);
+  });
+
+  it("honors legacy generation fields from ModelConfig", async () => {
+    const seenConfigs: ModelConfig[] = [];
+    const agent = new MiniAgent(
+      createLLM([
+        wrapResponse({
+          id: "assist-1",
+          type: MessageType.Assist,
+          content: "done",
+        }),
+      ], (_messages, config) => {
+        if (config) {
+          seenConfigs.push(config);
+        }
+      }),
+      {
+        model: {
+          provider: "legacy",
+          model: "legacy-model",
+          apiKey: "legacy-key",
+          baseUrl: "http://legacy",
+          temperature: 0.2,
+          topP: 0.8,
+          maxOutputTokens: 456,
+          thinking: false,
+        },
+        models: new Map(),
+        plugins: new Map(),
+        paths: { sessiondir: testDir },
+      },
+    );
+
+    expect(agent.getGenerationConfig()).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 456,
+      thinking: ThinkingLevel.None,
+    });
+
+    await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect(seenConfigs[0]).toEqual({
+      provider: "legacy",
+      model: "legacy-model",
+      apiKey: "legacy-key",
+      baseUrl: "http://legacy",
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 456,
+      thinking: false,
+    });
+  });
+
+  it("does not add default generation fields to legacy stream configs", async () => {
+    const seenConfigs: ModelConfig[] = [];
+    const agent = new MiniAgent(
+      createLLM([
+        wrapResponse({
+          id: "assist-1",
+          type: MessageType.Assist,
+          content: "done",
+        }),
+      ], (_messages, config) => {
+        if (config) {
+          seenConfigs.push(config);
+        }
+      }),
+      createConfig(testDir),
+    );
+
+    expect(agent.getGenerationConfig()).toEqual({
+      temperature: 0.7,
+      thinking: ThinkingLevel.Medium,
+    });
+
+    await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect(seenConfigs[0]).toEqual({
+      provider: "test",
+      model: "test-model",
+      apiKey: "test-key",
+      baseUrl: "http://localhost",
+    });
+  });
+
+  it("runs legacy LLMEngineManager registrations through the legacy path", async () => {
+    const manager = new LLMEngineManager();
+    manager.register("legacy", LegacyEngine);
+    const agent = new MiniAgent(manager, {
+      model: {
+        provider: "legacy",
+        model: "legacy-model",
+        apiKey: "legacy-key",
+      },
+      models: new Map(),
+      plugins: new Map(),
+      paths: { sessiondir: testDir },
+    });
+
+    const messages = await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect(messages.map((message) => message.id)).toEqual(["user-1", "assist-legacy"]);
+    expect(LegacyEngine.seenConfigs).toEqual([
+      {
+        provider: "legacy",
+        model: "legacy-model",
+        apiKey: "legacy-key",
+      },
+    ]);
+    expect(LegacyEngine.seenRequests[0]?.map((message) => message.id)).toEqual(["user-1"]);
+  });
+
+  it("rejects duplicate provider names clearly", () => {
+    expect(() =>
+      new MiniAgent(createLLM([]), {
+        providers: [
+          {
+            name: "dup",
+            engine: "test",
+            apiKey: "one",
+            models: {
+              add: [{ model: "a", thinkingLevels: [ThinkingLevel.None] }],
+            },
+          },
+          {
+            name: "dup",
+            engine: "test",
+            apiKey: "two",
+            models: {
+              add: [{ model: "b", thinkingLevels: [ThinkingLevel.None] }],
+            },
+          },
+        ],
+        defaultModel: { id: "dup/a" },
+        models: new Map(),
+        plugins: new Map(),
+        paths: { sessiondir: testDir },
+      }),
+    ).toThrow('Duplicate provider name: "dup"');
+  });
+
+  it("notifies config updates for resolved model and generation changes", () => {
+    const notified: AgentConfig[] = [];
+    const agent = new MiniAgent(createLLM([]), {
+      providers: [
+        {
+          name: "p",
+          engine: "test",
+          apiKey: "k",
+          models: {
+            add: [
+              { model: "a", thinkingLevels: [ThinkingLevel.None] },
+              { model: "b", thinkingLevels: [ThinkingLevel.None] },
+            ],
+          },
+        },
+      ],
+      defaultModel: { id: "p/a" },
+      models: new Map(),
+      plugins: new Map(),
+      paths: { sessiondir: testDir },
+    });
+
+    agent.register({
+      setConfig: async (config: AgentConfig): Promise<void> => {
+        notified.push(config);
+      },
+    });
+
+    agent.setResolvedModel({ id: "p/b" });
+    agent.setGenerationConfig({ temperature: 0.1, thinking: ThinkingLevel.High });
+
+    expect(notified.at(-2)?.model).toMatchObject({
+      provider: "test",
+      model: "b",
+      apiKey: "k",
+    });
+    expect(notified.at(-1)?.generation).toEqual({
+      temperature: 0.1,
+      thinking: ThinkingLevel.High,
+    });
+  });
+
+  it("passes cloned request objects to model-aware LLMs", async () => {
+    const seenRequests: LLMGenerateRequest[] = [];
+    const agent = new MiniAgent(
+      createModelAwareLLM(
+        [
+          wrapResponse({
+            id: "assist-1",
+            type: MessageType.Assist,
+            content: "done",
+          }),
+        ],
+        {
+          "test-engine": [
+            {
+              model: "catalog-model",
+              thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+            },
+          ],
+        },
+        (request) => {
+          seenRequests.push(request);
+          request.provider.name = "mutated-provider";
+          request.model.id = "mutated/model";
+          request.model.thinkingLevels.push(ThinkingLevel.Max);
+          request.generation.temperature = 1.5;
+          request.generation.thinking = ThinkingLevel.Max;
+        },
+      ),
+      {
+        providers: [
+          {
+            name: "test-main",
+            engine: "test-engine",
+            apiKey: "test-key",
+          },
+        ],
+        defaultModel: { id: "test-main/catalog-model" },
+        generation: { temperature: 0.4, thinking: ThinkingLevel.Medium },
+        models: new Map(),
+        plugins: new Map(),
+        paths: { sessiondir: testDir },
+      },
+    );
+
+    await agent.run({
+      id: "user-1",
+      type: MessageType.User,
+      content: "hello",
+    });
+
+    expect(seenRequests).toHaveLength(1);
+    expect(agent.getCurrentResolvedModel()).toEqual({
+      id: "test-main/catalog-model",
+      provider: "test-main",
+      engine: "test-engine",
+      model: "catalog-model",
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    });
+    expect(agent.getGenerationConfig()).toEqual({
+      temperature: 0.4,
+      thinking: ThinkingLevel.Medium,
+    });
   });
 
   it("runs through request-object streamInvoke when the LLM is model-aware", async () => {
