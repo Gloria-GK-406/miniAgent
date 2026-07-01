@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { Tool } from "../tool/types.js";
+import type { Message } from "./types.js";
 
 export type JsonValue =
     | string
@@ -112,6 +114,22 @@ export function normalizeGenerationConfig(
 ): GenerationConfig {
     return GenerationConfigSchema.parse(input ?? {});
 }
+
+export const LLMGenerateRequestSchema = z.object({
+    messages: z.array(z.custom<Message>()),
+    tools: z.array(z.custom<Tool>()),
+    provider: ModelProviderConfigSchema,
+    model: ResolvedModelSchema,
+    generation: GenerationConfigSchema,
+});
+
+export type LLMGenerateRequest = {
+    messages: Message[];
+    tools: Tool[];
+    provider: ModelProviderConfig;
+    model: ResolvedModel;
+    generation: GenerationConfig;
+};
 
 export const ModelGroupSchema = z.object({
     models: z.array(ModelConfigSchema).min(1),

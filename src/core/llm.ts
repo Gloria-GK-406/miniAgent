@@ -8,18 +8,31 @@ import type {
   LLMStreamHandle,
 } from "./types.js";
 import type {
+  LLMGenerateRequest,
   ModelConfig,
+  ModelPreset,
 } from "./config.js";
 import { LRUCache } from "lru-cache";
 
 export interface LLMEngine {
-  streamGenerate(
-    messages: Message[],
-    tools: Tool[],
-  ): LLMStreamHandle<LLMResponse>;
+  readonly name?: string;
+  getModels?(): ModelPreset[];
+  streamGenerate:
+    | ((request: LLMGenerateRequest) => LLMStreamHandle<LLMResponse>)
+    | ((messages: Message[], tools: Tool[]) => LLMStreamHandle<LLMResponse>);
 }
 
-export type LLMEngineCtor = new (config: ModelConfig) => LLMEngine;
+export interface RegisteredLLMEngine {
+  readonly name: string;
+  getModels(): ModelPreset[];
+  streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
+}
+
+export type LegacyLLMEngine = {
+  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
+};
+
+export type LLMEngineCtor = new (config: ModelConfig) => LegacyLLMEngine;
 
 class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
   private listeners = new Set<(chunk: LLMStreamChunk) => void>();
@@ -101,34 +114,72 @@ export function createLLMStreamHandle<T>(): LLMStreamController<T> {
 }
 
 export class LLMEngineManager implements LLMRequest {
-  private ctors = new Map<string, LLMEngineCtor>();
-  private cache = new LRUCache<ModelConfig, LLMEngine>({ max: 20 });
+  private engines = new Map<string, RegisteredLLMEngine>();
+  private legacyCtors = new Map<string, LLMEngineCtor>();
+  private legacyCache = new LRUCache<ModelConfig, LegacyLLMEngine>({ max: 20 });
 
-  register(provider: string, ctor: LLMEngineCtor): void {
-    this.ctors.set(provider, ctor);
+  register(engine: RegisteredLLMEngine): void;
+  register(provider: string, ctor: LLMEngineCtor): void;
+  register(providerOrEngine: string | RegisteredLLMEngine, ctor?: LLMEngineCtor): void {
+    if (typeof providerOrEngine === "string") {
+      if (!ctor) {
+        throw new Error(`No LLM engine constructor provided for provider: ${providerOrEngine}`);
+      }
+      this.legacyCtors.set(providerOrEngine, ctor);
+      return;
+    }
+    this.engines.set(providerOrEngine.name, providerOrEngine);
   }
 
-  get(config: ModelConfig): LLMEngine {
-    const cached = this.cache.get(config);
+  get(config: ModelConfig): LegacyLLMEngine {
+    const cached = this.legacyCache.get(config);
     if (cached) {
       return cached;
     }
-    const Ctor = this.ctors.get(config.provider);
+    const Ctor = this.legacyCtors.get(config.provider);
     if (!Ctor) {
       throw new Error(`No LLM engine registered for provider: ${config.provider}`);
     }
     const engine = new Ctor(config);
-    this.cache.set(config, engine);
+    this.legacyCache.set(config, engine);
     return engine;
   }
 
+  getEngineModels(engineName: string): ModelPreset[] {
+    const engine = this.engines.get(engineName);
+    if (!engine) {
+      return [];
+    }
+    return engine.getModels().map((model) => ({
+      ...model,
+      thinkingLevels: [...model.thinkingLevels],
+    }));
+  }
+
+  streamInvoke(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
   streamInvoke(
     messages: Message[],
     config: ModelConfig,
     tools: Tool[],
+  ): LLMStreamHandle<LLMResponse>;
+  streamInvoke(
+    requestOrMessages: LLMGenerateRequest | Message[],
+    config?: ModelConfig,
+    tools?: Tool[],
   ): LLMStreamHandle<LLMResponse> {
-    const engine = this.get(config);
-    return engine.streamGenerate(messages, tools);
+    if (Array.isArray(requestOrMessages)) {
+      if (!config || !tools) {
+        throw new Error("Legacy streamInvoke requires config and tools");
+      }
+      const engine = this.get(config);
+      return engine.streamGenerate(requestOrMessages, tools);
+    }
+
+    const engine = this.engines.get(requestOrMessages.model.engine);
+    if (!engine) {
+      throw new Error(`No LLM engine registered for engine: ${requestOrMessages.model.engine}`);
+    }
+    return engine.streamGenerate(requestOrMessages);
   }
 }
 
