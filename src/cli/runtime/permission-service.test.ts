@@ -117,6 +117,27 @@ describe("PermissionService", () => {
     });
   });
 
+  it("keeps explicit config denies ahead of remembered session allows", () => {
+    const service = createSessionPermissionService(
+      createPermissionService({ "*": "ask", shell: "ask" }),
+    );
+    const request = { toolName: "shell", args: { command: "npm test" } };
+
+    service.rememberSessionDecision(request, "allow");
+    service.updateConfig({
+      "*": "ask",
+      shell: {
+        "*": "ask",
+        "npm *": "deny",
+      },
+    });
+
+    expect(service.resolve(request, true)).toEqual({
+      decision: "deny",
+      reason: "shell pattern npm *",
+    });
+  });
+
   it("matches session decisions with stable argument key order", () => {
     const service = createSessionPermissionService(
       createPermissionService({ "*": "ask" }),

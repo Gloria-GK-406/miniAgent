@@ -122,6 +122,10 @@ export function createSessionPermissionService(base: PermissionService): Session
 
   return {
     resolve: (request, autoApprove): CLIPermissionResult => {
+      const configResult = base.resolve(request, false);
+      if (configResult.decision === "deny") {
+        return configResult;
+      }
       const decision = sessionDecisions.get(sessionDecisionKey(request));
       if (decision !== undefined) {
         return {
@@ -129,7 +133,10 @@ export function createSessionPermissionService(base: PermissionService): Session
           reason: `session rule ${request.toolName}`,
         };
       }
-      return base.resolve(request, autoApprove);
+      if (autoApprove && configResult.decision === "ask") {
+        return { decision: "allow", reason: "auto approve" };
+      }
+      return configResult;
     },
     updateConfig: (config) => {
       base.updateConfig(config);
