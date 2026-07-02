@@ -312,6 +312,19 @@ describe("CLI entry args", () => {
       outputPath: "exports/session.json",
       output: "json",
     });
+    expect(parseCLIEntryArgs([
+      "--export-session",
+      "--format",
+      "json",
+      "--output",
+      "exports/session.json",
+      "s1",
+    ])).toEqual({
+      type: "export-session",
+      sessionId: "s1",
+      format: "json",
+      outputPath: "exports/session.json",
+    });
   });
 
   it("imports a session without opening the TUI", () => {

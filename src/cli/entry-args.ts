@@ -526,6 +526,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       gitDiffPath = arg;
       continue;
     }
+    if (exportSessionMode && sessionId === undefined) {
+      sessionId = arg;
+      continue;
+    }
     promptParts.push(...args.slice(index));
     break;
   }
