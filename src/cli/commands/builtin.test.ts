@@ -574,6 +574,17 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.createSession = vi.fn(async () => undefined);
     commandCtx.runtime.switchSession = vi.fn(async () => undefined);
     commandCtx.runtime.renameSession = vi.fn(async () => undefined);
+    commandCtx.updateState({
+      sessions: [
+        {
+          id: "s2",
+          name: "work",
+          createdAt: "2026-07-02T00:00:00.000Z",
+          updatedAt: "2026-07-02T00:00:00.000Z",
+          messageCount: 0,
+        },
+      ],
+    });
 
     await registry.execute(commandCtx, "/new feature work");
     await registry.execute(commandCtx, "/sessions switch s2");
@@ -582,6 +593,77 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.createSession).toHaveBeenCalledWith("feature work");
     expect(commandCtx.runtime.switchSession).toHaveBeenCalledWith("s2");
     expect(commandCtx.runtime.renameSession).toHaveBeenCalledWith("s2", "renamed session");
+  });
+
+  it("resolves session management selectors by id prefix or exact name", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.switchSession = vi.fn(async () => undefined);
+    commandCtx.runtime.forkSession = vi.fn(async () => undefined);
+    commandCtx.runtime.renameSession = vi.fn(async () => undefined);
+    commandCtx.runtime.deleteSession = vi.fn(async () => undefined);
+    commandCtx.updateState({
+      sessions: [
+        {
+          id: "alpha-session-id",
+          name: "default",
+          createdAt: "2026-07-02T00:00:00.000Z",
+          updatedAt: "2026-07-02T00:00:00.000Z",
+          messageCount: 1,
+        },
+        {
+          id: "beta-session-id",
+          name: "feature",
+          createdAt: "2026-07-02T00:00:01.000Z",
+          updatedAt: "2026-07-02T00:00:01.000Z",
+          messageCount: 2,
+        },
+      ],
+    });
+
+    await registry.execute(commandCtx, "/sessions switch alpha");
+    await registry.execute(commandCtx, "/sessions fork beta forked work");
+    await registry.execute(commandCtx, "/sessions rename feature renamed work");
+    await registry.execute(commandCtx, "/sessions delete default");
+
+    expect(commandCtx.runtime.switchSession).toHaveBeenCalledWith("alpha-session-id");
+    expect(commandCtx.runtime.forkSession).toHaveBeenCalledWith("beta-session-id", "forked work");
+    expect(commandCtx.runtime.renameSession).toHaveBeenCalledWith("beta-session-id", "renamed work");
+    expect(commandCtx.runtime.deleteSession).toHaveBeenCalledWith("alpha-session-id");
+  });
+
+  it("shows an error panel for ambiguous session selectors", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.switchSession = vi.fn(async () => undefined);
+    commandCtx.updateState({
+      sessions: [
+        {
+          id: "same-prefix-one",
+          name: "one",
+          createdAt: "2026-07-02T00:00:00.000Z",
+          updatedAt: "2026-07-02T00:00:00.000Z",
+          messageCount: 1,
+        },
+        {
+          id: "same-prefix-two",
+          name: "two",
+          createdAt: "2026-07-02T00:00:01.000Z",
+          updatedAt: "2026-07-02T00:00:01.000Z",
+          messageCount: 2,
+        },
+      ],
+    });
+
+    await registry.execute(commandCtx, "/sessions switch same");
+
+    expect(commandCtx.runtime.switchSession).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Session selector is ambiguous: same",
+    });
   });
 
   it("dispatches export and import commands to runtime methods", async () => {

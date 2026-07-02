@@ -512,7 +512,8 @@ tools, guarded `git_commit`, and a permission-gated `diagnostics` tool; `/diff`,
 `/diagnostics`, `/activity`, and `/editor` provide local developer workflow
 panels. Project custom commands can be added as `.cliagent/commands/*.md`;
 exports, imports, undo, and redo are project-local under `.cliagent/`. Session
-exports include model, agent mode, and token usage metadata.
+exports include model, agent mode, and token usage metadata. Session selectors
+accept a full id, a unique id prefix, or an exact session name.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

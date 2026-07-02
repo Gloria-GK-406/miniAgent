@@ -5,6 +5,7 @@ import {
   App,
   EXIT_CONFIRM_TEXT,
   STATIC_PANEL_CLOSE_TEXT,
+  getSessionSelectorSuggestions,
   getMessageWindow,
   nextAgentMode,
   padMessageWindow,
@@ -128,6 +129,30 @@ describe("App", () => {
   it("toggles between build and plan modes", () => {
     expect(nextAgentMode("build")).toBe("plan");
     expect(nextAgentMode("plan")).toBe("build");
+  });
+
+  it("builds session selector suggestions from ids and names", () => {
+    expect(getSessionSelectorSuggestions([
+      {
+        id: "alpha-session-id",
+        name: "default",
+        createdAt: "2026-07-02T00:00:00.000Z",
+        updatedAt: "2026-07-02T00:00:00.000Z",
+        messageCount: 1,
+      },
+      {
+        id: "beta-session-id",
+        name: "feature",
+        createdAt: "2026-07-02T00:00:01.000Z",
+        updatedAt: "2026-07-02T00:00:01.000Z",
+        messageCount: 2,
+      },
+    ])).toEqual([
+      "alpha-session-id",
+      "default",
+      "beta-session-id",
+      "feature",
+    ]);
   });
 
   it("routes message scrolling to paging keys so arrows remain available for input", () => {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
+import type { SessionMeta } from "../../core/session.js";
 import type { Message } from "../../core/types.js";
 import { useRuntime } from "../hooks/useRuntime.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
@@ -60,6 +61,10 @@ export function resolveCtrlCAction(isRunning: boolean, exitArmed: boolean): Ctrl
     return "stop";
   }
   return exitArmed ? "exit" : "arm-exit";
+}
+
+export function getSessionSelectorSuggestions(sessions: SessionMeta[]): string[] {
+  return sessions.flatMap((session) => [session.id, session.name]);
 }
 
 export type MessageScrollAction = "none" | "page-up" | "page-down" | "home" | "end";
@@ -764,7 +769,7 @@ export function App({ runtime }: AppProps) {
     commandSuggestions: state.commandSuggestions,
     modelPaths: state.modelPaths,
     referencePaths: state.referencePaths,
-    sessionSuggestions: state.sessions.map((session) => session.id),
+    sessionSuggestions: getSessionSelectorSuggestions(state.sessions),
   });
   const { stdout } = useStdout();
   const [scrollFromBottom, setScrollFromBottom] = useState(0);

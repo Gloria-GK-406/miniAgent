@@ -183,7 +183,7 @@ Windows 默认使用 PowerShell；配置可以切换到 Git Bash、WSL、cmd 或
 
 会话保存在项目本地的 `.cliagent/sessions` 下。`/new` 创建并切换到新会话；
 `/sessions` 打开会话面板，子命令可以创建、切换、fork、重命名或删除会话。最后一个
-会话会受到保护，不能删除。
+会话会受到保护，不能删除。会话选择器支持完整 id、唯一 id 前缀或精确会话名称。
 
 项目自定义命令放在 `.cliagent/commands/*.md`。文件名就是 slash command 名称。
 可选 YAML frontmatter 支持 `description`、`agent` 和 `model`；Markdown 正文会通过

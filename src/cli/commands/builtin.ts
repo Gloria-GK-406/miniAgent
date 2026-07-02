@@ -32,6 +32,37 @@ function filterSessions(sessions: SessionMeta[], query: string): SessionMeta[] {
     session.id.toLowerCase().includes(normalized));
 }
 
+function resolveSessionSelector(sessions: SessionMeta[], selector: string): string {
+  const trimmed = selector.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Session selector cannot be empty");
+  }
+
+  const exactId = sessions.find((session) => session.id === trimmed);
+  if (exactId !== undefined) {
+    return exactId.id;
+  }
+
+  const idMatches = sessions.filter((session) => session.id.startsWith(trimmed));
+  if (idMatches.length === 1) {
+    return idMatches[0]!.id;
+  }
+  if (idMatches.length > 1) {
+    throw new Error(`Session selector is ambiguous: ${trimmed}`);
+  }
+
+  const normalized = trimmed.toLowerCase();
+  const nameMatches = sessions.filter((session) => session.name.toLowerCase() === normalized);
+  if (nameMatches.length === 1) {
+    return nameMatches[0]!.id;
+  }
+  if (nameMatches.length > 1) {
+    throw new Error(`Session selector is ambiguous: ${trimmed}`);
+  }
+
+  throw new Error(`Session not found: ${trimmed}`);
+}
+
 function messageContentText(content: MessageContent): string {
   if (typeof content === "string") return content;
   if (content.type === "text") return content.text;
@@ -587,29 +618,35 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
             break;
           }
           case "switch": {
-            const id = parts[1];
-            if (id === undefined) throw new Error("Usage: /sessions switch <id>");
-            await ctx.runtime.switchSession(id);
+            const selector = parts[1];
+            if (selector === undefined) throw new Error("Usage: /sessions switch <selector>");
+            await ctx.runtime.switchSession(resolveSessionSelector(ctx.getState().sessions, selector));
             break;
           }
           case "fork": {
-            const id = parts[1];
-            if (id === undefined) throw new Error("Usage: /sessions fork <id> [name]");
-            const name = args.trim().slice(`${action} ${id}`.length).trim();
-            await ctx.runtime.forkSession(id, name.length === 0 ? undefined : name);
+            const selector = parts[1];
+            if (selector === undefined) throw new Error("Usage: /sessions fork <selector> [name]");
+            const name = args.trim().slice(`${action} ${selector}`.length).trim();
+            await ctx.runtime.forkSession(
+              resolveSessionSelector(ctx.getState().sessions, selector),
+              name.length === 0 ? undefined : name,
+            );
             break;
           }
           case "rename": {
-            const id = parts[1];
-            if (id === undefined) throw new Error("Usage: /sessions rename <id> <name>");
-            const name = args.trim().slice(`${action} ${id}`.length).trim();
-            await ctx.runtime.renameSession(id, name);
+            const selector = parts[1];
+            if (selector === undefined) throw new Error("Usage: /sessions rename <selector> <name>");
+            const name = args.trim().slice(`${action} ${selector}`.length).trim();
+            await ctx.runtime.renameSession(
+              resolveSessionSelector(ctx.getState().sessions, selector),
+              name,
+            );
             break;
           }
           case "delete": {
-            const id = parts[1];
-            if (id === undefined) throw new Error("Usage: /sessions delete <id>");
-            await ctx.runtime.deleteSession(id);
+            const selector = parts[1];
+            if (selector === undefined) throw new Error("Usage: /sessions delete <selector>");
+            await ctx.runtime.deleteSession(resolveSessionSelector(ctx.getState().sessions, selector));
             break;
           }
           default:

@@ -255,7 +255,8 @@ calls.
 Sessions are project-local under `.cliagent/sessions`. `/new` creates and
 switches to a session. `/sessions` opens the session panel, and subcommands can
 create, switch, fork, rename, or delete sessions. The last remaining session is
-protected from deletion.
+protected from deletion. Session selectors accept a full id, a unique id prefix,
+or an exact session name.
 
 Project custom commands live in `.cliagent/commands/*.md`. Each file name
 becomes the slash command name. Optional YAML frontmatter supports

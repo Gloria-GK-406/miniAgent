@@ -457,7 +457,8 @@ CLI 使用产品级权限策略：读/搜索工具默认允许，写入、编辑
 CLI shell service 执行。Agent 还会获得 git 只读工具、受保护的 `git_commit`
 和经权限控制的 `diagnostics` 工具。项目自定义命令可以放在
 `.cliagent/commands/*.md`；导出、导入、撤销和重做都使用项目本地的
-`.cliagent/` 数据。会话导出会包含模型、Agent 模式和 token 用量等元数据。
+`.cliagent/` 数据。会话导出会包含模型、Agent 模式和 token 用量等元数据。会话选择器
+支持完整 id、唯一 id 前缀或精确会话名称。
 
 → [完整 CLI 文档](./document/cli/repl_CN.md)
 
