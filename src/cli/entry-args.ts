@@ -79,6 +79,7 @@ export type CLIEntryAction =
   | { type: "show-config"; cwd?: string; output?: CLIEntryOutput }
   | { type: "init"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
   | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
+  | { type: "list-commands"; cwd?: string; output?: CLIEntryOutput }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -95,6 +96,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let diagnosticsMode = false;
   let listSessionsMode = false;
   let listModelsMode = false;
+  let listCommandsMode = false;
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
@@ -151,6 +153,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-models") {
       listModelsMode = true;
+      continue;
+    }
+    if (arg === "--list-commands") {
+      listCommandsMode = true;
       continue;
     }
     if (arg === "--export-session") {
@@ -347,6 +353,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || initMode
       || listSessionsMode
       || listModelsMode
+      || listCommandsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -364,6 +371,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || diagnosticsMode
       || listSessionsMode
       || listModelsMode
+      || listCommandsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -383,6 +391,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || configPathsMode
       || listSessionsMode
       || listModelsMode
+      || listCommandsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -403,6 +412,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || showConfigMode
       || listSessionsMode
       || listModelsMode
+      || listCommandsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -412,13 +422,13 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   ) {
     return { type: "error", message: "Cannot combine --init with another headless mode" };
   }
-  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode)) {
+  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
   }
-  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
+  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --rename-session with another headless mode" };
   }
-  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
+  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
     return { type: "error", message: "Cannot combine --fork-session with another headless mode" };
   }
   if (listSessionsMode && printMode) {
@@ -433,8 +443,11 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return { type: "error", message: "Cannot combine --import-session with another headless mode" };
   }
-  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-models with another headless mode" };
+  }
+  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    return { type: "error", message: "Cannot combine --list-commands with another headless mode" };
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
@@ -572,6 +585,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (listCommandsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --list-commands" };
+    }
+    return {
+      type: "list-commands",
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (doctorMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --doctor" };
@@ -608,7 +631,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --list-models, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -643,6 +666,7 @@ export function formatCLIHelp(): string {
     "  --new-session   Create and start in a named session",
     "  --list-sessions List sessions headlessly",
     "  --list-models   List configured models headlessly",
+    "  --list-commands List slash commands headlessly",
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",

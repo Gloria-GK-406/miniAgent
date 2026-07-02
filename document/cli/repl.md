@@ -78,6 +78,7 @@ also accept `--json`.
 | `--config-paths` | Yes | Print the resolved project and global config file paths without creating files |
 | `--show-config` | Yes | Print the merged effective CLI config without creating missing config files |
 | `--list-models` | Yes | List configured model selectors and mark the default model |
+| `--list-commands` | Yes | List built-in and project custom slash commands |
 | `--list-sessions` | Yes | List project sessions and mark the active session |
 | `--export-session [id] --format json|markdown --output <path>` | Yes | Export a session transcript |
 | `--import-session <path> [--name <name>]` | Yes | Import a JSON session export as a new session |
@@ -95,6 +96,7 @@ Examples:
 ```bash
 miniagent --init
 miniagent --list-models --json
+miniagent --list-commands --json
 miniagent --print --prompt-file task.md --json
 miniagent --diagnostics
 miniagent --export-session --format markdown --output exports/session.md

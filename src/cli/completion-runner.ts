@@ -14,6 +14,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--session", short: "-s", description: "Resume a session by id" },
   { long: "--new-session", description: "Create and start in a named session" },
   { long: "--list-sessions", description: "List sessions headlessly" },
+  { long: "--list-commands", description: "List slash commands headlessly" },
   { long: "--export-session", description: "Export a session headlessly" },
   { long: "--import-session", description: "Import a session export headlessly" },
   { long: "--delete-session", description: "Delete a session headlessly" },

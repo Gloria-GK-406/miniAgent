@@ -425,6 +425,7 @@ and shell integration:
 | `--config-paths [--json]` | Print project/global config paths |
 | `--show-config [--json]` | Print merged runtime config |
 | `--list-models [--json]` | List configured model selectors |
+| `--list-commands [--json]` | List built-in and project custom slash commands |
 | `--list-sessions [--json]` | List project sessions |
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |
 | `--doctor [--json]` | Run setup checks |

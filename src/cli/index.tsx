@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render } from "ink";
 import { formatCompletionScript } from "./completion-runner.js";
+import { runCommandList } from "./command-list-runner.js";
 import { runConfigPaths } from "./config-paths-runner.js";
 import { App } from "./components/App.js";
 import { runHeadlessDiagnostics } from "./diagnostics-runner.js";
@@ -103,6 +104,16 @@ async function main(): Promise<void> {
   }
   if (action.type === "list-models") {
     process.exitCode = await runModelList({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "list-commands") {
+    process.exitCode = await runCommandList({
       baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.output !== undefined && { output: action.output }),
     }, {
