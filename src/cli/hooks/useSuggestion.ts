@@ -3,22 +3,28 @@ import { useCallback, useState } from "react";
 const COMMANDS = [
   "/agent",
   "/auto",
+  "/compact",
   "/context",
   "/details",
   "/exit",
+  "/export",
   "/help",
   "/history",
+  "/import",
   "/model",
   "/models",
+  "/new",
   "/quit",
+  "/redo",
   "/session",
   "/sessions",
   "/thinking",
   "/tools",
+  "/undo",
 ];
 
 const AGENT_SUBS = ["build", "plan"];
-const COMMANDS_WITH_ARGS = new Set(["/agent", "/model"]);
+const COMMANDS_WITH_ARGS = new Set(["/agent", "/export", "/import", "/model", "/new", "/sessions"]);
 
 export function matchSuggestions(
   input: string,

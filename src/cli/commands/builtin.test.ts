@@ -56,6 +56,7 @@ describe("registerBuiltinCommands", () => {
 
     expect(registry.list().map((command) => command.name)).toEqual(expect.arrayContaining([
       "help",
+      "compact",
       "context",
       "history",
       "tools",
@@ -129,12 +130,15 @@ describe("registerBuiltinCommands", () => {
     const commandCtx = ctx();
     commandCtx.runtime.undo = vi.fn(async () => undefined);
     commandCtx.runtime.redo = vi.fn(async () => undefined);
+    commandCtx.runtime.compactContext = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
+    await registry.execute(commandCtx, "/compact");
 
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
     expect(commandCtx.runtime.redo).toHaveBeenCalled();
+    expect(commandCtx.runtime.compactContext).toHaveBeenCalled();
   });
 
   it("opens sessions panel with session metadata", async () => {

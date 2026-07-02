@@ -66,10 +66,16 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/thinking` | 切换推理内容显示 |
 | `/models` | 打开模型选择器 |
 | `/model <id\|provider/id>` | 按解析后的模型 ID 切换活动模型 |
+| `/new [name]` | 创建并切换到新会话 |
 | `/tools` | 列出已注册的工具 |
 | `/history` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
-| `/sessions` | 显示当前会话信息 |
+| `/compact` | 运行上下文压缩 |
+| `/sessions [new\|switch\|fork\|rename\|delete]` | 显示或管理会话 |
+| `/export [json\|markdown] [path]` | 导出当前会话 |
+| `/import <path> [name]` | 导入 JSON 会话导出 |
+| `/undo` | 撤销最后一个用户 turn 并恢复文件快照 |
+| `/redo` | 在可行时重新应用上一次撤销的 turn |
 | `/help` | 显示帮助 |
 | `/quit` | 退出 |
 
@@ -103,6 +109,25 @@ CLI 使用产品级权限策略。读/搜索工具默认允许，写入、编辑
 
 以 `!` 开头的消息会通过 CLI shell service 在本地执行，并把输出记录到对话中。
 Windows 默认使用 PowerShell；配置可以切换到 Git Bash、WSL、cmd 或显式可执行文件。
+
+## 会话与自定义命令
+
+会话保存在项目本地的 `.cliagent/sessions` 下。`/new` 创建并切换到新会话；
+`/sessions` 打开会话面板，子命令可以创建、切换、fork、重命名或删除会话。最后一个
+会话会受到保护，不能删除。
+
+项目自定义命令放在 `.cliagent/commands/*.md`。文件名就是 slash command 名称。
+可选 YAML frontmatter 支持 `description`、`agent` 和 `model`；Markdown 正文会通过
+正常 runtime 路径提交，其中 `{{args}}` 或 `$ARGUMENTS` 会替换成用户参数。
+
+## 导出、导入、撤销
+
+`/export markdown` 写出可读 transcript，`/export json` 写出经过 schema 校验的会话导出。
+`/import` 会从 JSON 导出创建新会话并切换过去。
+
+会修改工作区的工具会记录每个 turn 的文件快照。`/undo` 删除最后一个用户 turn，并在
+当前文件内容仍匹配记录的修改后内容时恢复文件。`/redo` 会在没有冲突时重新应用被撤销的
+消息和文件状态。
 
 ## 上下文压缩
 

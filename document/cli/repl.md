@@ -58,10 +58,16 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 | `/thinking` | Toggle reasoning visibility |
 | `/models` | Open the model selector |
 | `/model <id|provider/id>` | Switch active model by resolved id |
+| `/new [name]` | Create and switch to a new session |
 | `/tools` | List registered tools |
 | `/history` | View conversation history |
 | `/context` | Preview context sent to LLM |
-| `/sessions` | Show current session information |
+| `/compact` | Run context compression |
+| `/sessions [new|switch|fork|rename|delete]` | Show or manage sessions |
+| `/export [json|markdown] [path]` | Export the current session |
+| `/import <path> [name]` | Import a JSON session export |
+| `/undo` | Undo the last user turn and restore file snapshots |
+| `/redo` | Reapply the last undone turn when possible |
 | `/help` | Show help |
 | `/quit` | Exit |
 
@@ -96,6 +102,29 @@ it never overrides a deny rule.
 Messages beginning with `!` run through the CLI shell service and are recorded
 as shell output in the conversation. On Windows the default shell is PowerShell;
 the config can switch to Git Bash, WSL, cmd, or an explicit executable.
+
+## Sessions And Commands
+
+Sessions are project-local under `.cliagent/sessions`. `/new` creates and
+switches to a session. `/sessions` opens the session panel, and subcommands can
+create, switch, fork, rename, or delete sessions. The last remaining session is
+protected from deletion.
+
+Project custom commands live in `.cliagent/commands/*.md`. Each file name
+becomes the slash command name. Optional YAML frontmatter supports
+`description`, `agent`, and `model`; the Markdown body is submitted through the
+normal runtime path with `{{args}}` or `$ARGUMENTS` replaced by user arguments.
+
+## Export, Import, Undo
+
+`/export markdown` writes a readable transcript, while `/export json` writes a
+schema-validated session export. `/import` creates a new session from a JSON
+export and switches to it.
+
+Mutating workspace tools record per-turn file snapshots. `/undo` removes the
+last user turn and restores files when their current content still matches the
+recorded post-turn content. `/redo` reapplies the undone messages and file
+state when no conflict is detected.
 
 ## Context Compression
 

@@ -420,16 +420,24 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 | `/thinking` | Toggle reasoning visibility |
 | `/models` | Open the model selector |
 | `/model <id\|provider/id>` | Switch active model by resolved id |
+| `/new [name]` | Create and switch to a new session |
 | `/tools` | List registered tools |
 | `/history` | View conversation history |
 | `/context` | Preview context sent to LLM |
-| `/sessions` | Show current session information |
+| `/compact` | Run context compression |
+| `/sessions [new\|switch\|fork\|rename\|delete]` | Show or manage sessions |
+| `/export [json\|markdown] [path]` | Export the current session |
+| `/import <path> [name]` | Import a JSON session export |
+| `/undo` | Undo the last user turn and restore file snapshots |
+| `/redo` | Reapply the last undone turn when possible |
 | `/help` | Show help |
 | `/quit` | Exit |
 
 The CLI uses product-level permissions: read/search tools are allowed by default,
 mutating tools and shell commands ask by default, and explicit deny rules always
 win. Messages beginning with `!` run through the configured CLI shell service.
+Project custom commands can be added as `.cliagent/commands/*.md`; exports,
+imports, undo, and redo are project-local under `.cliagent/`.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

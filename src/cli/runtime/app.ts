@@ -297,6 +297,16 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       await replaceAgentForActiveSession();
       emit({ type: "notice", level: "info", message: `Redid turn ${entry.turnId}` });
     },
+    compactContext: async () => {
+      const messages = await built.agent.getMessages();
+      built.compressor.updateMessages(messages);
+      await built.compressor.maybeCompress();
+      emit({
+        type: "notice",
+        level: "info",
+        message: `Compressed ${built.compressor.getCompressedCount()} messages`,
+      });
+    },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);

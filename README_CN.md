@@ -414,16 +414,23 @@ npm run chat
 | `/thinking` | 切换推理内容显示 |
 | `/models` | 打开模型选择器 |
 | `/model <id\|provider/id>` | 按解析后的模型 ID 切换活动模型 |
+| `/new [name]` | 创建并切换到新会话 |
 | `/tools` | 列出已注册的工具 |
 | `/history` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
-| `/sessions` | 显示当前会话信息 |
+| `/compact` | 运行上下文压缩 |
+| `/sessions [new\|switch\|fork\|rename\|delete]` | 显示或管理会话 |
+| `/export [json\|markdown] [path]` | 导出当前会话 |
+| `/import <path> [name]` | 导入 JSON 会话导出 |
+| `/undo` | 撤销最后一个用户 turn 并恢复文件快照 |
+| `/redo` | 在可行时重新应用上一次撤销的 turn |
 | `/help` | 显示帮助 |
 | `/quit` | 退出 |
 
 CLI 使用产品级权限策略：读/搜索工具默认允许，写入、编辑和 Shell
 命令默认询问，显式拒绝规则始终生效。以 `!` 开头的消息会通过配置的 CLI
-shell service 执行。
+shell service 执行。项目自定义命令可以放在 `.cliagent/commands/*.md`；
+导出、导入、撤销和重做都使用项目本地的 `.cliagent/` 数据。
 
 → [完整 CLI 文档](./document/cli/repl_CN.md)
 

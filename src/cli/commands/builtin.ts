@@ -184,6 +184,16 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "compact",
+    description: "Run context compression",
+    usage: "/compact",
+    execute: async (ctx) => {
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.compactContext();
+      });
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",

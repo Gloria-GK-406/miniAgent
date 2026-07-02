@@ -75,6 +75,7 @@ export interface CLIAppRuntime {
   importSession(inputPath: string, name?: string): Promise<void>;
   undo(): Promise<void>;
   redo(): Promise<void>;
+  compactContext(): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

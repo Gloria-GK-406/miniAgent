@@ -71,7 +71,16 @@ describe("matchSuggestions", () => {
 
   it("matches /co to context", () => {
     const result = matchSuggestions("/co");
-    expect(result).toEqual(["/context"]);
+    expect(result).toEqual(["/compact", "/context"]);
+  });
+
+  it("matches Phase 2 commands", () => {
+    expect(matchSuggestions("/n")).toEqual(["/new"]);
+    expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
+    expect(matchSuggestions("/i")).toEqual(["/import"]);
+    expect(matchSuggestions("/u")).toEqual(["/undo"]);
+    expect(matchSuggestions("/r")).toEqual(["/redo"]);
+    expect(matchSuggestions("/comp")).toEqual(["/compact"]);
   });
 });
 

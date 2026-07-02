@@ -55,6 +55,7 @@ describe("useRuntime", () => {
       importSession: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),
+      compactContext: vi.fn(),
       destroy: vi.fn(),
     };
 
