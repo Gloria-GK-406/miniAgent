@@ -192,6 +192,39 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("persists shell shortcut output in the active session", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-persist-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "allow",
+        shell: "allow",
+      },
+      shell: {
+        windows: "powershell",
+        executable: process.execPath,
+        args: ["-e"],
+        timeoutMs: 120000,
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("!console.log('shell-ok')");
+    const stateMessage = runtime.getState().messages.at(-1);
+    if (stateMessage === undefined) {
+      throw new Error("Expected shell shortcut to append a visible message");
+    }
+
+    expect(stateMessage).toMatchObject({
+      type: MessageType.User,
+      content: "Shell output:\nshell-ok\n",
+    });
+
+    const sessionService = await createCLISessionService(baseDir);
+    await expect(sessionService.readMessages(runtime.getState().sessionId))
+      .resolves.toEqual([stateMessage]);
+    await runtime.destroy();
+  });
+
   it("opens an agents panel with configured subagents", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-agents-"));
     await writeConfig(baseDir, {

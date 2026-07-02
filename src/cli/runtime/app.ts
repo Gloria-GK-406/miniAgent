@@ -338,7 +338,11 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
             type: MessageType.User,
             content: `Shell output:\n${result.content}`,
           };
-          updateState({ messages: [...state.messages, message] });
+          await sessionService.appendMessages(state.sessionId, [message]);
+          updateState({
+            messages: [...state.messages, message],
+            sessions: sessionService.listSessions(),
+          });
         }
       } catch (error: unknown) {
         updateState({ panel: { type: "error", message: errorMessage(error) } });
