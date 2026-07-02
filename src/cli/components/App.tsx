@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette.js";
 import { InputBox } from "./InputBox.js";
 import { ModelSelectView } from "./ModelSelectView.js";
 import { PanelView } from "./PanelView.js";
+import { DiffView } from "./DiffView.js";
 
 export interface AppProps {
   runtime: CLIAppRuntime;
@@ -236,6 +237,16 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "error") {
     return <ErrorPanel panel={state.panel} />;
+  }
+
+  if (state.panel.type === "git" || state.panel.type === "diff") {
+    return (
+      <DiffView
+        title={state.panel.title}
+        content={state.panel.content}
+        onClose={() => closePanel(runtime)}
+      />
+    );
   }
 
   return (

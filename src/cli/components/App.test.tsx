@@ -208,4 +208,42 @@ describe("App", () => {
     expect(output).toContain("* work");
     expect(output).toContain("default");
   });
+
+  it("renders git panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "git",
+          title: "Git Status",
+          content: " M src/cli/components/App.tsx",
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Git Status");
+    expect(output).toContain("M src/cli/components/App.tsx");
+  });
+
+  it("renders diff panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "diff",
+          title: "Working Tree Diff",
+          content: [
+            "diff --git a/src/a.ts b/src/a.ts",
+            "@@ -1 +1 @@",
+            "-old",
+            "+new",
+          ].join("\n"),
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Working Tree Diff");
+    expect(output).toContain("-old");
+    expect(output).toContain("+new");
+  });
 });
