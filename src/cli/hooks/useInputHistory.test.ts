@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   appendInputHistory,
   useInputHistory,
@@ -20,6 +20,27 @@ describe("appendInputHistory", () => {
 });
 
 describe("useInputHistory", () => {
+  it("starts from persisted initial entries", () => {
+    const { result } = renderHook(() => useInputHistory({
+      initialEntries: ["persisted"],
+    }));
+
+    act(() => {
+      expect(result.current.previous("draft")).toBe("persisted");
+    });
+  });
+
+  it("notifies when an input is remembered", () => {
+    const onRemember = vi.fn();
+    const { result } = renderHook(() => useInputHistory({ onRemember }));
+
+    act(() => {
+      result.current.remember("  remembered  ");
+    });
+
+    expect(onRemember).toHaveBeenCalledWith("remembered");
+  });
+
   it("navigates previous and next while preserving the current draft", () => {
     const { result } = renderHook(() => useInputHistory());
 

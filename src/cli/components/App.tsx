@@ -408,6 +408,10 @@ export function App({ runtime }: AppProps) {
     return applySelected(text);
   }, [applySelected]);
 
+  const handleHistoryEntry = useCallback((text: string) => {
+    void runtime.rememberInputHistory(text);
+  }, [runtime]);
+
   const handleApprovalDecision = useCallback((decision: boolean) => {
     const approvalId = state.approval?.id;
     if (approvalId === undefined) {
@@ -568,6 +572,8 @@ export function App({ runtime }: AppProps) {
           disabled={state.isRunning}
           focused={true}
           hasSuggestions={hasSuggestions}
+          initialHistory={state.inputHistory}
+          onHistoryEntry={handleHistoryEntry}
           onSuggestionNext={selectNext}
           onSuggestionPrev={selectPrev}
           onSuggestionComplete={handleSuggestionComplete}

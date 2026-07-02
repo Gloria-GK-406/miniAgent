@@ -10,6 +10,8 @@ interface InputBoxProps {
   focused?: boolean;
   placeholder?: string;
   hasSuggestions?: boolean;
+  initialHistory?: string[];
+  onHistoryEntry?: (input: string) => void;
   onSuggestionNext?: () => void;
   onSuggestionPrev?: () => void;
   onSuggestionComplete?: (currentValue: string) => string | null;
@@ -23,13 +25,18 @@ export function InputBox({
   focused = true,
   placeholder,
   hasSuggestions = false,
+  initialHistory,
+  onHistoryEntry,
   onSuggestionNext,
   onSuggestionPrev,
   onSuggestionComplete,
 }: InputBoxProps) {
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
-  const inputHistory = useInputHistory();
+  const inputHistory = useInputHistory({
+    ...(initialHistory !== undefined && { initialEntries: initialHistory }),
+    ...(onHistoryEntry !== undefined && { onRemember: onHistoryEntry }),
+  });
 
   const updateValue = (nextValue: string, nextCursor: number, resetHistory = true) => {
     setValue(nextValue);

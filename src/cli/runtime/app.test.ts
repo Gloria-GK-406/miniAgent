@@ -72,6 +72,25 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("loads and persists prompt input history", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-input-history-"));
+    await writeConfig(baseDir);
+    await writeFile(join(baseDir, ".cliagent", "input-history.json"), JSON.stringify({
+      version: 1,
+      entries: ["persisted"],
+    }), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+    expect(runtime.getState().inputHistory).toEqual(["persisted"]);
+
+    await runtime.rememberInputHistory("  next  ");
+
+    expect(runtime.getState().inputHistory).toEqual(["persisted", "next"]);
+    await expect(readFile(join(baseDir, ".cliagent", "input-history.json"), "utf-8"))
+      .resolves.toContain('"next"');
+    await runtime.destroy();
+  });
+
   it("edits permission policy from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-permissions-"));
     await writeConfig(baseDir);

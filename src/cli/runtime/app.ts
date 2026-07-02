@@ -15,6 +15,7 @@ import { loadCustomCommands } from "./custom-command-service.js";
 import { createExportService } from "./export-service.js";
 import { createGitService } from "./git-service.js";
 import { createInputRouter } from "./input-router.js";
+import { createInputHistoryService } from "./input-history-service.js";
 import { createPermissionService } from "./permission-service.js";
 import { createPermissionConfigService } from "./permission-config-service.js";
 import { createProjectInstructionsService } from "./project-instructions-service.js";
@@ -51,6 +52,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const systemPromptConfigService = createSystemPromptConfigService(baseDir);
   const subagentService = createSubagentService(baseDir, () => config);
   const editorService = createEditorService({ config: config.editor });
+  const inputHistoryService = createInputHistoryService(baseDir);
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
   const approvalResolvers = new Map<string, (decision: boolean) => void>();
@@ -106,6 +108,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     modelName: formatCurrentModel(built.agent),
     modelPaths: getResolvedModelPaths(built.agent),
     referencePaths: await referenceService.listReferenceCandidates(),
+    inputHistory: await inputHistoryService.list(),
     sessionId: session.id,
     sessionName: session.name,
     sessions: sessionService.listSessions(),
@@ -334,6 +337,9 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     selectModel: async (path) => {
       selectResolvedModelForCLI(built.agent, path);
       updateState({ modelName: formatCurrentModel(built.agent) });
+    },
+    rememberInputHistory: async (input) => {
+      updateState({ inputHistory: await inputHistoryService.append(input) });
     },
     createSession: async (name) => {
       await sessionService.createSession(name);

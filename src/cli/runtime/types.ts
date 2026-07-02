@@ -53,6 +53,7 @@ export interface CLIState {
   modelName: string;
   modelPaths: string[];
   referencePaths: string[];
+  inputHistory: string[];
   sessionId: string;
   sessionName: string;
   sessions: SessionMeta[];
@@ -88,6 +89,7 @@ export interface CLIAppRuntime {
   submitInput(input: string): Promise<void>;
   runCommand(name: string, args: string): Promise<void>;
   selectModel(path: string): Promise<void>;
+  rememberInputHistory(input: string): Promise<void>;
   createSession(name?: string): Promise<void>;
   switchSession(id: string): Promise<void>;
   renameSession(id: string, name: string): Promise<void>;

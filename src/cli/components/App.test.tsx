@@ -23,6 +23,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     modelName: "test/model",
     modelPaths: ["test/model"],
     referencePaths: [],
+    inputHistory: [],
     sessionId: "s1",
     sessionName: "default",
     sessions: [],
@@ -71,6 +72,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
       current = { ...current, modelName: path };
       emit({ type: "state", state: current });
     }),
+    rememberInputHistory: vi.fn(async () => undefined),
     answerApproval: vi.fn(),
     stop: vi.fn(),
     rebuildAgent: vi.fn(async () => undefined),

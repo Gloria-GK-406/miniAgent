@@ -23,16 +23,30 @@ export interface InputHistoryController {
   resetNavigation(currentValue: string): void;
 }
 
-export function useInputHistory(limit = DEFAULT_INPUT_HISTORY_LIMIT): InputHistoryController {
-  const [entries, setEntries] = useState<string[]>([]);
+export interface UseInputHistoryOptions {
+  initialEntries?: string[];
+  limit?: number;
+  onRemember?: (input: string) => void;
+}
+
+export function useInputHistory(options: UseInputHistoryOptions = {}): InputHistoryController {
+  const limit = options.limit ?? DEFAULT_INPUT_HISTORY_LIMIT;
+  const onRemember = options.onRemember;
+  const [entries, setEntries] = useState<string[]>(() => (
+    options.initialEntries ?? []
+  ).slice(-limit));
   const [cursor, setCursor] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
 
   const remember = useCallback((input: string): void => {
+    const trimmed = input.trim();
     setEntries((current) => appendInputHistory(current, input, limit));
+    if (trimmed.length > 0) {
+      onRemember?.(trimmed);
+    }
     setCursor(null);
     setDraft("");
-  }, [limit]);
+  }, [limit, onRemember]);
 
   const previous = useCallback((currentValue: string): string | null => {
     if (entries.length === 0) {

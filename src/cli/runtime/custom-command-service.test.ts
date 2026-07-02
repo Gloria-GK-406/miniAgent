@@ -13,6 +13,7 @@ function state(): CLIState {
     modelName: "openai/fast",
     modelPaths: ["openai/fast"],
     referencePaths: [],
+    inputHistory: [],
     sessionId: "s1",
     sessionName: "default",
     sessions: [],
