@@ -522,6 +522,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg.startsWith("-")) {
       return parseError(`Unknown argument: ${arg}`);
     }
+    if (gitAction === "diff" && gitDiffPath === undefined) {
+      gitDiffPath = arg;
+      continue;
+    }
     promptParts.push(...args.slice(index));
     break;
   }

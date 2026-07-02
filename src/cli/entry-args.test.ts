@@ -288,6 +288,12 @@ describe("CLI entry args", () => {
       path: "src/cli",
       staged: true,
     });
+    expect(parseCLIEntryArgs(["--git-diff", "--staged", "src/cli"])).toEqual({
+      type: "git-headless",
+      action: "diff",
+      path: "src/cli",
+      staged: true,
+    });
   });
 
   it("exports a session without opening the TUI", () => {
