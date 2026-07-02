@@ -63,6 +63,7 @@ describe("useRuntime", () => {
       openEditor: vi.fn(),
       runDiagnostics: vi.fn(),
       showActivity: vi.fn(),
+      initializeProjectInstructions: vi.fn(),
       destroy: vi.fn(),
     };
 

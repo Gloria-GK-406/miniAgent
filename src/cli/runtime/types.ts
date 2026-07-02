@@ -9,6 +9,7 @@ import type {
 import type { Tool } from "../../tool/types.js";
 import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
 import type { DiagnosticResult } from "./diagnostics-service.js";
+import type { ProjectInstructionsResult } from "./project-instructions-service.js";
 
 export type CLIViewPanel =
   | { type: "none" }
@@ -100,6 +101,7 @@ export interface CLIAppRuntime {
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
   showActivity(): Promise<void>;
+  initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

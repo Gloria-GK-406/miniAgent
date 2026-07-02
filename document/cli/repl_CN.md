@@ -9,6 +9,7 @@
 - `/activity`：查看最近工具调用和子 Agent 形态工具调用的活动时间线。
 - `/permissions`：查看当前 allow/ask/deny 权限策略。
 - `/system`：查看基础系统提示词和实际生效的系统提示词。
+- `/init [--force]`：根据项目脚本和目录生成 `AGENTS.md` 初稿；默认不覆盖已有文件。
 
 CLI Agent 还会注入 `git_status`、`git_diff`、`git_log` 和受权限保护的
 `git_commit` 工具。`editor` 配置可指定 `executable`、`args` 和 `wait`；

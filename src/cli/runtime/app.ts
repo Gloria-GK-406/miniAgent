@@ -16,6 +16,7 @@ import { createExportService } from "./export-service.js";
 import { createGitService } from "./git-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createPermissionService } from "./permission-service.js";
+import { createProjectInstructionsService } from "./project-instructions-service.js";
 import { createReferenceService } from "./reference-service.js";
 import { createShellService } from "./shell-service.js";
 import { createCLISessionService } from "./session-service.js";
@@ -38,6 +39,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const sessionService = await createCLISessionService(baseDir);
   const session = await sessionService.ensureActiveSession();
   const exportService = createExportService({ baseDir, sessionService });
+  const projectInstructionsService = createProjectInstructionsService(baseDir);
   const editorService = createEditorService({ config: config.editor });
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
@@ -372,6 +374,9 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     showActivity: async () => {
       updateState({ panel: { type: "activity", entries: state.activity } });
     },
+    initializeProjectInstructions: async (overwrite) => (
+      projectInstructionsService.initialize({ overwrite })
+    ),
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);

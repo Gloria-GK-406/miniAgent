@@ -77,7 +77,7 @@ describe("matchSuggestions", () => {
   it("matches Phase 2 commands", () => {
     expect(matchSuggestions("/n")).toEqual(["/new"]);
     expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
-    expect(matchSuggestions("/i")).toEqual(["/import"]);
+    expect(matchSuggestions("/i")).toEqual(["/import", "/init"]);
     expect(matchSuggestions("/u")).toEqual(["/undo"]);
     expect(matchSuggestions("/r")).toEqual(["/redo"]);
     expect(matchSuggestions("/comp")).toEqual(["/compact"]);
@@ -90,6 +90,7 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/ac")).toEqual(["/activity"]);
     expect(matchSuggestions("/pe")).toEqual(["/permissions"]);
     expect(matchSuggestions("/sy")).toEqual(["/system"]);
+    expect(matchSuggestions("/in")).toEqual(["/init"]);
   });
 });
 

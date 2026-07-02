@@ -138,7 +138,13 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.showDiff = vi.fn(async () => undefined);
     commandCtx.runtime.runDiagnostics = vi.fn(async () => undefined);
     commandCtx.runtime.showActivity = vi.fn(async () => undefined);
+    commandCtx.runtime.initializeProjectInstructions = vi.fn(async () => ({
+      written: true,
+      path: "AGENTS.md",
+    }));
 
+    await registry.execute(commandCtx, "/init");
+    await registry.execute(commandCtx, "/init --force");
     await registry.execute(commandCtx, "/permissions");
     expect(commandCtx.getState().panel).toEqual({
       type: "permissions",
@@ -164,6 +170,8 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();
+    expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(1, false);
+    expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(2, true);
     expect(commandCtx.getState().panel).toEqual({
       type: "system",
       basePrompt: "You are a helpful assistant.",

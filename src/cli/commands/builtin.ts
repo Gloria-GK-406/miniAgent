@@ -35,6 +35,28 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "init",
+    description: "Create project AGENTS.md guidance",
+    usage: "/init [--force]",
+    execute: async (ctx, args) => {
+      await runSessionMutation(ctx, async () => {
+        const parts = splitArgs(args);
+        const overwrite = parts.includes("--force");
+        const unknown = parts.find((part) => part !== "--force");
+        if (unknown !== undefined) {
+          throw new Error("Usage: /init [--force]");
+        }
+        const result = await ctx.runtime.initializeProjectInstructions(overwrite);
+        ctx.notice(
+          "info",
+          result.written
+            ? `Wrote project instructions to ${result.path}`
+            : `Project instructions already exist at ${result.path}`,
+        );
+      });
+    },
+  });
+  registry.register({
     name: "history",
     description: "Show message history",
     usage: "/history",

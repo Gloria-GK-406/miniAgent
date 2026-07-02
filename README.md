@@ -441,6 +441,7 @@ are shallow-merged.
 | `/sessions [new\|switch\|fork\|rename\|delete]` | Show or manage sessions |
 | `/export [json\|markdown] [path]` | Export the current session |
 | `/import <path> [name]` | Import a JSON session export |
+| `/init [--force]` | Create project `AGENTS.md` guidance |
 | `/undo` | Undo the last user turn and restore file snapshots |
 | `/redo` | Reapply the last undone turn when possible |
 | `/help` | Show help |
