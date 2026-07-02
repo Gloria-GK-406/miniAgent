@@ -140,7 +140,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       <Text bold color="cyan">Help</Text>
       <Text>/help /history /context /tools /models /sessions /activity</Text>
       <Text>/permissions /system /agent build|plan /auto /details</Text>
-      <Text>/thinking /git /diff /editor /diagnostics /quit</Text>
+      <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
       <Text dimColor>{runtime.getState().mode} mode</Text>
     </StaticPanelFrame>
   );
@@ -283,6 +283,33 @@ function DiagnosticsPanel({
           );
         })
       )}
+    </StaticPanelFrame>
+  );
+}
+
+function doctorStatusColor(status: "pass" | "warn" | "fail"): string {
+  if (status === "pass") return "green";
+  if (status === "fail") return "red";
+  return "yellow";
+}
+
+function DoctorPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "doctor" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">Doctor</Text>
+      {panel.checks.map((item) => (
+        <Text key={item.id}>
+          <Text color={doctorStatusColor(item.status)}>{item.status.toUpperCase()}</Text>
+          <Text> {item.label}</Text>
+          <Text dimColor> {item.detail}</Text>
+        </Text>
+      ))}
     </StaticPanelFrame>
   );
 }
@@ -482,6 +509,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "diagnostics") {
     return <DiagnosticsPanel panel={state.panel} runtime={runtime} />;
+  }
+
+  if (state.panel.type === "doctor") {
+    return <DoctorPanel panel={state.panel} runtime={runtime} />;
   }
 
   if (state.panel.type === "activity") {

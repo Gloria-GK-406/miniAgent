@@ -91,6 +91,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showDiff: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => ""),
     runDiagnostics: vi.fn(async () => undefined),
+    runDoctor: vi.fn(async () => undefined),
     showActivity: vi.fn(async () => undefined),
     showAgents: vi.fn(async () => undefined),
     initializeProjectInstructions: vi.fn(async () => ({ written: true, path: "AGENTS.md" })),
@@ -368,6 +369,42 @@ describe("App", () => {
     expect(output).toContain("FAIL npm test");
     expect(output).toContain("lint ok");
     expect(output).toContain("failed test");
+  });
+
+  it("renders doctor panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "doctor",
+          checks: [
+            {
+              id: "configuration",
+              label: "Configuration",
+              status: "pass",
+              detail: "1 provider, 1 model",
+            },
+            {
+              id: "git",
+              label: "Git",
+              status: "warn",
+              detail: "Workspace is not a Git repository",
+            },
+            {
+              id: "model",
+              label: "Default model",
+              status: "fail",
+              detail: "No model is selected",
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Doctor");
+    expect(output).toContain("PASS Configuration");
+    expect(output).toContain("WARN Git");
+    expect(output).toContain("FAIL Default model");
   });
 
   it("renders activity panel from runtime state", () => {

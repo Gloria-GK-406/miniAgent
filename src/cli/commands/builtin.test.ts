@@ -71,6 +71,7 @@ describe("registerBuiltinCommands", () => {
       "auto",
       "details",
       "thinking",
+      "doctor",
       "panel-close",
       "quit",
     ]));
@@ -150,6 +151,7 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
     commandCtx.runtime.showDiff = vi.fn(async () => undefined);
     commandCtx.runtime.runDiagnostics = vi.fn(async () => undefined);
+    commandCtx.runtime.runDoctor = vi.fn(async () => undefined);
     commandCtx.runtime.showActivity = vi.fn(async () => undefined);
     commandCtx.runtime.initializeProjectInstructions = vi.fn(async () => ({
       written: true,
@@ -181,6 +183,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/git log 3");
     await registry.execute(commandCtx, "/diff src/cli");
     await registry.execute(commandCtx, "/diagnostics");
+    await registry.execute(commandCtx, "/doctor");
     await registry.execute(commandCtx, "/activity");
 
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
@@ -190,6 +193,7 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
+    expect(commandCtx.runtime.runDoctor).toHaveBeenCalled();
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();
     expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(1, false);
     expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(2, true);

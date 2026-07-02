@@ -68,6 +68,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showDiff: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => ""),
     runDiagnostics: vi.fn(async () => undefined),
+    runDoctor: vi.fn(async () => undefined),
     showActivity: vi.fn(async () => undefined),
     showAgents: vi.fn(async () => undefined),
     initializeProjectInstructions: vi.fn(async () => ({ written: true, path: "AGENTS.md" })),

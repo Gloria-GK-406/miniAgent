@@ -10,6 +10,7 @@ import {
 } from "./agent-factory.js";
 import { createCommandRegistry } from "./command-registry.js";
 import { createDiagnosticsService } from "./diagnostics-service.js";
+import { createDoctorService } from "./doctor-service.js";
 import { createEditorService } from "./editor-service.js";
 import { loadCustomCommands } from "./custom-command-service.js";
 import { createExportService } from "./export-service.js";
@@ -65,6 +66,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     shellService,
   });
   const gitService = createGitService(baseDir);
+  const doctorService = createDoctorService({ gitService, diagnosticsService });
   let activeTurnId: string | null = null;
   let activeMode = config.defaultAgent;
   const referenceService = createReferenceService(baseDir);
@@ -446,6 +448,14 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         panel: {
           type: "diagnostics",
           results: await diagnosticsService.runDiagnostics(),
+        },
+      });
+    },
+    runDoctor: async () => {
+      updateState({
+        panel: {
+          type: "doctor",
+          checks: await doctorService.run(state),
         },
       });
     },

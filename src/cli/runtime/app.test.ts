@@ -132,6 +132,23 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("opens a doctor panel from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-doctor-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/doctor");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "doctor",
+      checks: expect.arrayContaining([
+        expect.objectContaining({ id: "configuration", status: "pass" }),
+        expect.objectContaining({ id: "model", status: "pass" }),
+      ]),
+    });
+    await runtime.destroy();
+  });
+
   it("shows an error panel when a shell shortcut is denied", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-deny-"));
     await writeConfig(baseDir, {

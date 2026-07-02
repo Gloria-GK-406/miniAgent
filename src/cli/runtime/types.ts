@@ -9,6 +9,7 @@ import type {
 import type { Tool } from "../../tool/types.js";
 import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
 import type { DiagnosticResult } from "./diagnostics-service.js";
+import type { CLIDoctorCheck } from "./doctor-service.js";
 import type { ProjectInstructionsResult } from "./project-instructions-service.js";
 import type { CLISubagentSummary } from "./subagent-service.js";
 
@@ -26,6 +27,7 @@ export type CLIViewPanel =
   | { type: "git"; title: string; content: string }
   | { type: "diff"; title: string; content: string }
   | { type: "diagnostics"; results: DiagnosticResult[] }
+  | { type: "doctor"; checks: CLIDoctorCheck[] }
   | { type: "activity"; entries: CLIActivityEntry[] }
   | { type: "error"; message: string };
 
@@ -105,6 +107,7 @@ export interface CLIAppRuntime {
   showDiff(path?: string): Promise<void>;
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
+  runDoctor(): Promise<void>;
   showActivity(): Promise<void>;
   showAgents(): Promise<void>;
   initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;
