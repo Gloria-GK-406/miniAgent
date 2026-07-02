@@ -103,7 +103,7 @@ export function ModelSelectView({
         </Text>
         <Text> ({modelPaths.length})</Text>
       </Box>
-      <Text dimColor>────────────────────────────────────────</Text>
+      <Text dimColor>----------------------------------------</Text>
       <Box flexDirection="column" height={contentHeight}>
         {visibleModels.map((path, index) => {
           const absoluteIndex = clampedOffset + index;
@@ -118,21 +118,21 @@ export function ModelSelectView({
               dimColor={!isSelected && !isActive}
               {...(isActive && { color: "green" })}
             >
-              {isSelected ? "› " : "  "}
+              {isSelected ? "> " : "  "}
               {path}
               {isActive ? "  (active)" : ""}
             </Text>
           );
         })}
       </Box>
-      <Text dimColor>────────────────────────────────────────</Text>
+      <Text dimColor>----------------------------------------</Text>
       <Box justifyContent="space-between">
         <Text dimColor>
-          {clampedOffset > 0 ? "↑ more above" : ""}
-          {clampedOffset > 0 && clampedOffset < maxOffset ? " · " : ""}
-          {clampedOffset < maxOffset ? "↓ more below" : ""}
+          {clampedOffset > 0 ? "up more above" : ""}
+          {clampedOffset > 0 && clampedOffset < maxOffset ? " | " : ""}
+          {clampedOffset < maxOffset ? "down more below" : ""}
         </Text>
-        <Text dimColor>{isSubmitting ? "Switching..." : "Enter switch · ESC close"}</Text>
+        <Text dimColor>{isSubmitting ? "Switching..." : "Enter switch | ESC close"}</Text>
       </Box>
       {error && <Text color="red">{error}</Text>}
     </Box>

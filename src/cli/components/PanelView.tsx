@@ -79,7 +79,7 @@ export function PanelView({ data, onClose }: PanelViewProps) {
         </Text>
         <Text> ({data.messages.length} messages)</Text>
       </Box>
-      <Text dimColor>────────────────────────────────────────</Text>
+      <Text dimColor>----------------------------------------</Text>
       <Box flexDirection="column" height={contentHeight}>
         {visibleMessages.map((msg, i) => {
           const color = TYPE_COLORS[msg.type] ?? "white";
@@ -93,15 +93,15 @@ export function PanelView({ data, onClose }: PanelViewProps) {
           );
         })}
       </Box>
-      <Text dimColor>────────────────────────────────────────</Text>
+      <Text dimColor>----------------------------------------</Text>
       <Box justifyContent="space-between">
         <Text dimColor>
-          {clampedOffset > 0 ? "↑ more above" : ""}
-          {clampedOffset > 0 && clampedOffset < maxOffset ? " · " : ""}
-          {clampedOffset < maxOffset ? "↓ more below" : ""}
+          {clampedOffset > 0 ? "up more above" : ""}
+          {clampedOffset > 0 && clampedOffset < maxOffset ? " | " : ""}
+          {clampedOffset < maxOffset ? "down more below" : ""}
         </Text>
         <Text dimColor>
-          ESC close · ↑↓ scroll · PgUp/PgDn page
+          ESC close | Up/Down scroll | PgUp/PgDn page
         </Text>
       </Box>
     </Box>
