@@ -139,4 +139,22 @@ describe("PermissionConfigService", () => {
       },
     });
   });
+
+  it("updates project permission config files with a UTF-8 BOM", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-permission-bom-"));
+    await mkdir(join(baseDir, ".cliagent"), { recursive: true });
+    await writeFile(
+      join(baseDir, ".cliagent", "config.json"),
+      `\uFEFF${JSON.stringify({ permission: { write: "ask" } })}`,
+      "utf-8",
+    );
+    const service = createPermissionConfigService(baseDir);
+
+    const next = await service.setRule("write", "deny", { "*": "ask" });
+
+    expect(next.permission.write).toBe("deny");
+    await expect(readProjectConfig(baseDir)).resolves.toMatchObject({
+      permission: { write: "deny" },
+    });
+  });
 });

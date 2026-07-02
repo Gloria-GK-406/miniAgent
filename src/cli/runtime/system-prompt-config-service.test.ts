@@ -49,4 +49,22 @@ describe("SystemPromptConfigService", () => {
       "System prompt cannot be empty",
     );
   });
+
+  it("updates project system prompt config files with a UTF-8 BOM", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-system-prompt-bom-"));
+    await mkdir(join(baseDir, ".cliagent"), { recursive: true });
+    await writeFile(
+      join(baseDir, ".cliagent", "config.json"),
+      `\uFEFF${JSON.stringify({ systemPrompt: "Old prompt." })}`,
+      "utf-8",
+    );
+    const service = createSystemPromptConfigService(baseDir);
+
+    const next = await service.setSystemPrompt("New prompt.");
+
+    expect(next.systemPrompt).toBe("New prompt.");
+    await expect(readProjectConfig(baseDir)).resolves.toMatchObject({
+      systemPrompt: "New prompt.",
+    });
+  });
 });

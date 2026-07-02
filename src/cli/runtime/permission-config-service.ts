@@ -37,7 +37,8 @@ function projectConfigPath(baseDir: string): string {
 
 async function readProjectConfig(baseDir: string): Promise<Record<string, unknown>> {
   try {
-    const raw = JSON.parse(await readFile(projectConfigPath(baseDir), "utf-8")) as unknown;
+    const content = await readFile(projectConfigPath(baseDir), "utf-8");
+    const raw = JSON.parse(content.replace(/^\uFEFF/, "")) as unknown;
     if (!isRecord(raw)) {
       throw new Error("Project config must be a JSON object");
     }
