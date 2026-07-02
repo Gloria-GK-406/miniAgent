@@ -188,6 +188,18 @@ describe("App", () => {
     expect(output).toContain("/help for commands");
   });
 
+  it("renders registered command names in the help panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        commandSuggestions: ["/help", "/shortcut"],
+        panel: { type: "help" },
+      })}
+      />,
+    );
+
+    expect(output).toContain("/shortcut");
+  });
+
   it("exports Ctrl+C confirmation text for the idle exit prompt", () => {
     expect(EXIT_CONFIRM_TEXT).toBe("Press Ctrl+C again to exit");
   });

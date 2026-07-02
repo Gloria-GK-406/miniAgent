@@ -135,13 +135,15 @@ function panelTitle(panel: Extract<CLIViewPanel, { type: "history" | "context" }
 }
 
 function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
+  const state = runtime.getState();
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Help</Text>
       <Text>/help /history /context /tools /models /sessions /activity</Text>
       <Text>/permissions /system /agent build|plan /auto /details</Text>
       <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
-      <Text dimColor>{runtime.getState().mode} mode</Text>
+      <Text dimColor>{state.commandSuggestions.join(" ")}</Text>
+      <Text dimColor>{state.mode} mode</Text>
     </StaticPanelFrame>
   );
 }
