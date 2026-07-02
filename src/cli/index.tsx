@@ -13,6 +13,7 @@ import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { writeCLIEntryError } from "./entry-fatal.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
+import { runRuntimeBackedCLIEntry } from "./entry-runtime-runner.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runContextPreview } from "./context-preview-runner.js";
 import { runGitHeadless } from "./git-headless-runner.js";
@@ -42,6 +43,10 @@ function readPackageVersion(): string {
 
 async function main(): Promise<void> {
   const action = parseCLIEntryArgs(process.argv.slice(2));
+  const streams = {
+    stdout: (text: string) => process.stdout.write(text),
+    stderr: (text: string) => process.stderr.write(text),
+  };
   if (action.type === "help") {
     process.stdout.write(`${formatCLIHelp()}\n`);
     return;
@@ -192,111 +197,63 @@ async function main(): Promise<void> {
     return;
   }
   if (action.type === "list-tools") {
-    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
-    try {
-      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
-      await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runToolList(
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runToolList(
         runtime,
-        {
-          stdout: (text) => process.stdout.write(text),
-          stderr: (text) => process.stderr.write(text),
-        },
+        streams,
         {
           ...(action.output !== undefined && { output: action.output }),
         },
-      );
-      runtime = undefined;
-    } catch (e: unknown) {
-      if (runtime !== undefined) {
-        await runtime.destroy();
-      }
-      process.exitCode = writeCLIEntryError({
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      }, e, action.output ?? "text");
-    }
+      ),
+    });
     return;
   }
   if (action.type === "list-agents") {
-    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
-    try {
-      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
-      await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runAgentList(
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runAgentList(
         runtime,
-        {
-          stdout: (text) => process.stdout.write(text),
-          stderr: (text) => process.stderr.write(text),
-        },
+        streams,
         {
           ...(action.output !== undefined && { output: action.output }),
         },
-      );
-      runtime = undefined;
-    } catch (e: unknown) {
-      if (runtime !== undefined) {
-        await runtime.destroy();
-      }
-      process.exitCode = writeCLIEntryError({
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      }, e, action.output ?? "text");
-    }
+      ),
+    });
     return;
   }
   if (action.type === "preview-context") {
-    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
-    try {
-      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
-      await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runContextPreview(
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runContextPreview(
         runtime,
-        {
-          stdout: (text) => process.stdout.write(text),
-          stderr: (text) => process.stderr.write(text),
-        },
+        streams,
         {
           ...(action.output !== undefined && { output: action.output }),
         },
-      );
-      runtime = undefined;
-    } catch (e: unknown) {
-      if (runtime !== undefined) {
-        await runtime.destroy();
-      }
-      process.exitCode = writeCLIEntryError({
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      }, e, action.output ?? "text");
-    }
+      ),
+    });
     return;
   }
   if (action.type === "show-history") {
-    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
-    try {
-      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
-      await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runHistory(
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runHistory(
         runtime,
-        {
-          stdout: (text) => process.stdout.write(text),
-          stderr: (text) => process.stderr.write(text),
-        },
+        streams,
         {
           ...(action.output !== undefined && { output: action.output }),
         },
-      );
-      runtime = undefined;
-    } catch (e: unknown) {
-      if (runtime !== undefined) {
-        await runtime.destroy();
-      }
-      process.exitCode = writeCLIEntryError({
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      }, e, action.output ?? "text");
-    }
+      ),
+    });
     return;
   }
   if (action.type === "export-session") {
@@ -370,53 +327,41 @@ async function main(): Promise<void> {
     return;
   }
   if (action.type === "doctor") {
-    try {
-      const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
-      await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runDoctorChecks(
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runDoctorChecks(
         runtime,
-        {
-          stdout: (text) => process.stdout.write(text),
-          stderr: (text) => process.stderr.write(text),
-        },
+        streams,
         {
           ...(action.output !== undefined && { output: action.output }),
         },
-      );
-    } catch (e: unknown) {
-      process.exitCode = writeCLIEntryError({
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      }, e, action.output ?? "text");
-    }
+      ),
+    });
     return;
   }
   if (action.type === "print") {
-    try {
-      const cwd = resolve(action.cwd ?? process.cwd());
-      const runtime = await createCLIRuntime(cwd);
-      await applyCLIEntryRuntimeOptions(runtime, action);
-      const prompt = await loadEntryPrompt(action, cwd);
-      if (prompt === undefined) {
-        throw new Error("Missing prompt for --print");
-      }
-      process.exitCode = await runPrintPrompt(
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      prepare: async (_runtime, cwd) => {
+        const prompt = await loadEntryPrompt(action, cwd);
+        if (prompt === undefined) {
+          throw new Error("Missing prompt for --print");
+        }
+        return prompt;
+      },
+      run: async (runtime, prompt) => await runPrintPrompt(
         runtime,
         prompt,
-        {
-          stdout: (text) => process.stdout.write(text),
-          stderr: (text) => process.stderr.write(text),
-        },
+        streams,
         {
           ...(action.output !== undefined && { output: action.output }),
         },
-      );
-    } catch (e: unknown) {
-      process.exitCode = writeCLIEntryError({
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      }, e, action.output ?? "text");
-    }
+      ),
+    });
     return;
   }
 
