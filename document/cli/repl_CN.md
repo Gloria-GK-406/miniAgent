@@ -80,6 +80,8 @@ CLI Agent 通过语义蓝图组装。默认蓝图始终包含：
 - **read** — 读取文件和目录
 - **write** — 写入文件
 - **edit** — 精确字符串替换编辑文件
+- **multi_edit** — 对单个文件原子执行多个精确字符串替换
+- **patch** — 应用保守的单文件 unified patch
 - **glob** — 按模式查找文件
 - **grep** — 搜索文件内容
 - **shell** — 通过 CLI shell service 执行 Shell 命令

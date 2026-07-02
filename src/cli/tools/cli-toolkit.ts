@@ -26,6 +26,17 @@ const EditParamsSchema = PathParamsSchema.extend({
   replaceAll: z.boolean().optional(),
 });
 
+const MultiEditParamsSchema = PathParamsSchema.extend({
+  edits: z.array(z.object({
+    oldString: z.string().min(1),
+    newString: z.string(),
+  })).min(1),
+});
+
+const PatchParamsSchema = z.object({
+  patch: z.string().min(1),
+});
+
 const ShellParamsSchema = z.object({
   command: z.string().min(1),
   timeoutMs: z.number().int().positive().optional(),
@@ -68,6 +79,78 @@ async function mutateWithSnapshot(
     return;
   }
   await options.snapshotService.recordBeforeMutation(path, mutate);
+}
+
+function countOccurrences(content: string, needle: string): number {
+  return content.split(needle).length - 1;
+}
+
+function stripPatchPath(path: string): string {
+  const trimmed = path.trim();
+  if (trimmed.startsWith("a/") || trimmed.startsWith("b/")) {
+    return trimmed.slice(2);
+  }
+  return trimmed;
+}
+
+interface ParsedPatch {
+  path: string;
+  hunks: Array<{
+    oldText: string;
+    newText: string;
+  }>;
+}
+
+function parseUnifiedPatch(patch: string): ParsedPatch {
+  const lines = patch.split(/\r?\n/);
+  const oldPathLine = lines.find((line) => line.startsWith("--- "));
+  const newPathLine = lines.find((line) => line.startsWith("+++ "));
+  if (oldPathLine === undefined || newPathLine === undefined) {
+    throw new Error("Patch must include --- and +++ file headers");
+  }
+  const oldPath = stripPatchPath(oldPathLine.slice(4));
+  const newPath = stripPatchPath(newPathLine.slice(4));
+  if (oldPath === "/dev/null" || newPath === "/dev/null") {
+    throw new Error("Patch tool does not support file create/delete yet");
+  }
+  if (oldPath !== newPath) {
+    throw new Error("Patch tool only supports single-file patches");
+  }
+
+  const hunks: ParsedPatch["hunks"] = [];
+  let index = lines.findIndex((line) => line.startsWith("@@ "));
+  while (index !== -1) {
+    index++;
+    const oldLines: string[] = [];
+    const newLines: string[] = [];
+    while (index < lines.length && !lines[index]!.startsWith("@@ ")) {
+      const line = lines[index]!;
+      if (line.startsWith(" ")) {
+        oldLines.push(line.slice(1));
+        newLines.push(line.slice(1));
+      } else if (line.startsWith("-")) {
+        oldLines.push(line.slice(1));
+      } else if (line.startsWith("+")) {
+        newLines.push(line.slice(1));
+      } else if (line === "\\ No newline at end of file" || line === "") {
+        // Ignore metadata and trailing split lines.
+      } else {
+        throw new Error(`Unsupported patch line: ${line}`);
+      }
+      index++;
+    }
+    hunks.push({
+      oldText: oldLines.join("\n"),
+      newText: newLines.join("\n"),
+    });
+    const next = lines.findIndex((line, lineIndex) => lineIndex >= index && line.startsWith("@@ "));
+    index = next;
+  }
+
+  if (hunks.length === 0) {
+    throw new Error("Patch must include at least one hunk");
+  }
+  return { path: newPath, hunks };
 }
 
 function createReadTool(options: CLIToolkitOptions): Tool {
@@ -141,6 +224,66 @@ function createEditTool(options: CLIToolkitOptions): Tool {
   };
 }
 
+function createMultiEditTool(options: CLIToolkitOptions): Tool {
+  return {
+    name: "multi_edit",
+    description: "Apply multiple exact replacements to one workspace file atomically.",
+    parameters: MultiEditParamsSchema,
+    execute: async (args): Promise<string> => {
+      await assertPermission(options, "multi_edit", args);
+      const parsed = MultiEditParamsSchema.parse(args);
+      const target = resolveWorkspacePath(options.baseDir, parsed.path);
+      const content = await readFile(target.absolutePath, "utf-8");
+      for (const edit of parsed.edits) {
+        const count = countOccurrences(content, edit.oldString);
+        if (count === 0) {
+          throw new Error(`oldString not found in ${target.displayPath}`);
+        }
+        if (count > 1) {
+          throw new Error(`oldString found ${count} times in ${target.displayPath}`);
+        }
+      }
+      const next = parsed.edits.reduce(
+        (current, edit) => current.replace(edit.oldString, edit.newString),
+        content,
+      );
+      await mutateWithSnapshot(options, parsed.path, async () => {
+        await writeFile(target.absolutePath, next, "utf-8");
+      });
+      return `Edited ${target.displayPath}`;
+    },
+  };
+}
+
+function createPatchTool(options: CLIToolkitOptions): Tool {
+  return {
+    name: "patch",
+    description: "Apply a conservative single-file unified patch.",
+    parameters: PatchParamsSchema,
+    execute: async (args): Promise<string> => {
+      await assertPermission(options, "patch", args);
+      const parsed = PatchParamsSchema.parse(args);
+      const patch = parseUnifiedPatch(parsed.patch);
+      const target = resolveWorkspacePath(options.baseDir, patch.path);
+      let content = await readFile(target.absolutePath, "utf-8");
+      for (const hunk of patch.hunks) {
+        const count = countOccurrences(content, hunk.oldText);
+        if (count === 0) {
+          throw new Error(`Patch hunk not found in ${target.displayPath}`);
+        }
+        if (count > 1) {
+          throw new Error(`Patch hunk is ambiguous in ${target.displayPath}`);
+        }
+        content = content.replace(hunk.oldText, hunk.newText);
+      }
+      await mutateWithSnapshot(options, patch.path, async () => {
+        await writeFile(target.absolutePath, content, "utf-8");
+      });
+      return `Patched ${target.displayPath}`;
+    },
+  };
+}
+
 function createShellTool(options: CLIToolkitOptions): Tool {
   return {
     name: "shell",
@@ -176,6 +319,8 @@ export function createCLIToolkit(options: CLIToolkitOptions): CLIToolkit {
       createReadTool(options),
       createWriteTool(options),
       createEditTool(options),
+      createMultiEditTool(options),
+      createPatchTool(options),
       createShellTool(options),
     ],
   };

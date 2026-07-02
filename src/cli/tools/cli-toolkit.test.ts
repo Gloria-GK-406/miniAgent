@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -70,5 +70,64 @@ describe("createCLIToolkit", () => {
         }),
       ]),
     );
+  });
+
+  it("applies multi_edit atomically", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-multiedit-"));
+    await writeFile(join(baseDir, "a.txt"), "one two three", "utf-8");
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+    });
+    const multiEdit = toolkit.tools.find((tool) => tool.name === "multi_edit")!;
+
+    await multiEdit.execute({
+      path: "a.txt",
+      edits: [
+        { oldString: "one", newString: "ONE" },
+        { oldString: "three", newString: "THREE" },
+      ],
+    });
+
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("ONE two THREE");
+
+    await expect(multiEdit.execute({
+      path: "a.txt",
+      edits: [
+        { oldString: "ONE", newString: "one" },
+        { oldString: "missing", newString: "value" },
+      ],
+    })).rejects.toThrow("oldString not found");
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("ONE two THREE");
+  });
+
+  it("applies a simple single-file unified patch", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-patch-"));
+    await writeFile(join(baseDir, "a.txt"), "alpha\nbeta\ngamma\n", "utf-8");
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+    });
+    const patch = toolkit.tools.find((tool) => tool.name === "patch")!;
+
+    await patch.execute({
+      patch: [
+        "--- a/a.txt",
+        "+++ b/a.txt",
+        "@@ -1,3 +1,3 @@",
+        " alpha",
+        "-beta",
+        "+BETA",
+        " gamma",
+      ].join("\n"),
+    });
+
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("alpha\nBETA\ngamma\n");
   });
 });

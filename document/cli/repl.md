@@ -73,6 +73,8 @@ needed:
 - **read** - Read files and directories inside the workspace.
 - **write** - Write workspace files after permission checks.
 - **edit** - Edit workspace files with exact string replacement.
+- **multi_edit** - Apply multiple exact replacements to one file atomically.
+- **patch** - Apply conservative single-file unified patches.
 - **glob** - Find files by pattern.
 - **grep** - Search file contents.
 - **shell** - Execute shell commands through the CLI shell service.
