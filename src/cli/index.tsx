@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { render } from "ink";
 import { runAgentList } from "./agent-list-runner.js";
 import { formatCompletionScript } from "./completion-runner.js";
@@ -22,6 +20,7 @@ import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
 import { runPermissionShow } from "./permission-show-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
+import { readPackageVersion } from "./package-info.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { runProjectInstructionsInit } from "./project-instructions-runner.js";
 import { runReferenceList } from "./reference-list-runner.js";
@@ -40,12 +39,6 @@ import { runRuntimeStatus } from "./status-runner.js";
 import { runSystemPromptShow } from "./system-prompt-show-runner.js";
 import { runSystemPromptUpdate } from "./system-prompt-runner.js";
 import { runToolList } from "./tool-list-runner.js";
-
-function readPackageVersion(): string {
-  const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
-  const raw = JSON.parse(readFileSync(packagePath, "utf-8")) as { version?: unknown };
-  return typeof raw.version === "string" ? raw.version : "unknown";
-}
 
 async function main(): Promise<void> {
   const action = parseCLIEntryArgs(process.argv.slice(2));

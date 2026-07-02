@@ -213,9 +213,9 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/help /commands /keybindings /status /config /history /context /references</Text>
-          <Text>/tools /models /sessions /activity /snapshots /permissions /system /agent build|plan</Text>
-          <Text>/auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/about /help /commands /keybindings /status /config /history /context</Text>
+          <Text>/references /tools /models /sessions /activity /snapshots /permissions /system</Text>
+          <Text>/agent build|plan /auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -233,6 +233,31 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       <Text dimColor>Tab build/plan | Ctrl+C stop/exit | PgUp/PgDn scroll</Text>
       {state.commandHelp.length === 0 && <Text dimColor>{state.commandSuggestions.join(" ")}</Text>}
       <Text dimColor>{state.mode} mode</Text>
+    </StaticPanelFrame>
+  );
+}
+
+function AboutPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "about" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">MiniAgent</Text>
+      <Text>Version: {panel.info.packageVersion}</Text>
+      <Text>Node: {panel.info.nodeVersion}</Text>
+      <Text>Platform: {panel.info.platform} {panel.info.arch}</Text>
+      <Text>Workspace: {panel.info.baseDir}</Text>
+      <Text>Project config: {panel.info.projectConfigPath}</Text>
+      <Text>Global config: {panel.info.globalConfigPath}</Text>
+      <Text>Models: {panel.info.modelCount}</Text>
+      <Text>Sessions: {panel.info.sessionCount}</Text>
+      <Text>
+        Commands: {panel.info.builtinCommandCount} builtin / {panel.info.customCommandCount} custom
+      </Text>
     </StaticPanelFrame>
   );
 }
@@ -707,6 +732,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "help") {
     return <HelpPanel runtime={runtime} />;
+  }
+
+  if (state.panel.type === "about") {
+    return <AboutPanel panel={state.panel} runtime={runtime} />;
   }
 
   if (state.panel.type === "keybindings") {

@@ -144,6 +144,7 @@ miniagent --completion powershell
 
 | Command | Description |
 |---------|-------------|
+| `/about` | Show CLI version and runtime info |
 | `/activity` | Show recent tool and subagent activity |
 | `/agent [build|plan]` | Show or switch the primary agent mode |
 | `/auto` | Toggle auto approval for requests that are not denied |

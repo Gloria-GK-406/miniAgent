@@ -36,6 +36,11 @@ describe("matchSuggestions", () => {
     expect(result).toEqual(["/help", "/history"]);
   });
 
+  it("matches about and version commands", () => {
+    expect(matchSuggestions("/ab")).toEqual(["/about"]);
+    expect(matchSuggestions("/ver")).toEqual(["/version"]);
+  });
+
   it("matches /agent to build and plan", () => {
     const result = matchSuggestions("/agent");
     expect(result).toEqual(["list", "build", "plan"]);

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 const COMMANDS = [
+  "/about",
   "/activity",
   "/agent",
   "/auto",
@@ -34,6 +35,7 @@ const COMMANDS = [
   "/thinking",
   "/tools",
   "/undo",
+  "/version",
 ];
 
 const AGENT_SUBS = ["list", "build", "plan"];

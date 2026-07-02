@@ -4,6 +4,7 @@ import type { CLIPermissionDecision } from "../config.js";
 import type { SessionMeta } from "../../core/session.js";
 import { formatConfigForDisplay } from "../config-display.js";
 import { formatConfigPaths, resolveConfigPaths } from "../config-paths-runner.js";
+import { readPackageVersion } from "../package-info.js";
 import {
   buildEffectiveSystemPrompt,
   getBaseSystemPrompt,
@@ -54,6 +55,29 @@ function showHelpPanel(ctx: CLICommandContext, args: string): void {
   });
 }
 
+function showAboutPanel(ctx: CLICommandContext): void {
+  const state = ctx.getState();
+  const paths = resolveConfigPaths(state.baseDir);
+  ctx.updateState({
+    panel: {
+      type: "about",
+      info: {
+        packageVersion: readPackageVersion(),
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        baseDir: state.baseDir,
+        projectConfigPath: paths.projectConfigPath,
+        globalConfigPath: paths.globalConfigPath,
+        modelCount: state.modelPaths.length,
+        sessionCount: state.sessions.length,
+        builtinCommandCount: state.commandHelp.filter((command) => command.source === "builtin").length,
+        customCommandCount: state.commandHelp.filter((command) => command.source === "custom").length,
+      },
+    },
+  });
+}
+
 function showPermissionsPanel(ctx: CLICommandContext): void {
   const state = ctx.getState();
   ctx.updateState({
@@ -93,6 +117,15 @@ async function runSessionMutation(
 }
 
 export function registerBuiltinCommands(registry: CommandRegistry): void {
+  registry.register({
+    name: "about",
+    aliases: ["version", "info"],
+    description: "Show CLI version and runtime info",
+    usage: "/about",
+    execute: async (ctx) => {
+      showAboutPanel(ctx);
+    },
+  });
   registry.register({
     name: "help",
     aliases: ["h"],

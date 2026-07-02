@@ -16,6 +16,7 @@ import type { CLISubagentSummary } from "./subagent-service.js";
 
 export type CLIViewPanel =
   | { type: "none" }
+  | { type: "about"; info: CLIAboutInfo }
   | { type: "status" }
   | { type: "help"; query?: string }
   | { type: "keybindings" }
@@ -36,6 +37,20 @@ export type CLIViewPanel =
   | { type: "doctor"; checks: CLIDoctorCheck[] }
   | { type: "activity"; entries: CLIActivityEntry[] }
   | { type: "error"; message: string };
+
+export interface CLIAboutInfo {
+  packageVersion: string;
+  nodeVersion: string;
+  platform: NodeJS.Platform;
+  arch: string;
+  baseDir: string;
+  projectConfigPath: string;
+  globalConfigPath: string;
+  modelCount: number;
+  sessionCount: number;
+  builtinCommandCount: number;
+  customCommandCount: number;
+}
 
 export interface CLIApprovalRequest {
   id: string;

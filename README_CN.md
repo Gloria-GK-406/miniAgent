@@ -418,6 +418,7 @@ npm run chat
 
 | 命令 | 说明 |
 |------|------|
+| `/about` | 显示 CLI 版本和运行环境信息 |
 | `/agent [build\|plan]` | 查看或切换主 Agent 模式 |
 | `/auto` | 切换自动批准未被拒绝的请求 |
 | `/details` | 切换工具详情显示 |

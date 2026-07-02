@@ -66,6 +66,7 @@ describe("registerBuiltinCommands", () => {
     registerBuiltinCommands(registry);
 
     expect(registry.list().map((command) => command.name)).toEqual(expect.arrayContaining([
+      "about",
       "help",
       "keybindings",
       "status",
@@ -129,6 +130,60 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/status");
 
     expect(commandCtx.getState().panel).toEqual({ type: "status" });
+  });
+
+  it("opens about panel from version alias", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.updateState({
+      baseDir: "C:/repo/project",
+      modelPaths: ["openai/fast", "anthropic/sonnet"],
+      commandHelp: [
+        {
+          name: "help",
+          aliases: ["h"],
+          description: "Show help",
+          usage: "/help [query]",
+          source: "builtin",
+        },
+        {
+          name: "review",
+          aliases: [],
+          description: "Review changes",
+          usage: "/review [args]",
+          source: "custom",
+        },
+      ],
+      sessions: [
+        {
+          id: "s1",
+          name: "default",
+          createdAt: "2026-07-02T00:00:00.000Z",
+          updatedAt: "2026-07-02T00:00:00.000Z",
+          messageCount: 0,
+        },
+      ],
+    });
+
+    await registry.execute(commandCtx, "/version");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "about",
+      info: expect.objectContaining({
+        packageVersion: expect.any(String),
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        baseDir: "C:/repo/project",
+        modelCount: 2,
+        sessionCount: 1,
+        builtinCommandCount: 1,
+        customCommandCount: 1,
+        projectConfigPath: expect.stringContaining(".cliagent"),
+        globalConfigPath: expect.any(String),
+      }),
+    });
   });
 
   it("opens keybindings panel from alias", async () => {

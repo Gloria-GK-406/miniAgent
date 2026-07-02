@@ -385,6 +385,41 @@ describe("App", () => {
     expect(output).toContain("a / d");
   });
 
+  it("renders about panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "about",
+          info: {
+            packageVersion: "0.6.0",
+            nodeVersion: "v25.0.0",
+            platform: "win32",
+            arch: "x64",
+            baseDir: "C:/repo/project",
+            projectConfigPath: "C:/repo/project/.cliagent/config.json",
+            globalConfigPath: "C:/Users/test/AppData/Roaming/miniagent/config.json",
+            modelCount: 2,
+            sessionCount: 3,
+            builtinCommandCount: 30,
+            customCommandCount: 4,
+          },
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("MiniAgent");
+    expect(output).toContain("Version: 0.6.0");
+    expect(output).toContain("Node: v25.0.0");
+    expect(output).toContain("Platform: win32 x64");
+    expect(output).toContain("Workspace: C:/repo/project");
+    expect(output).toContain("Project config: C:/repo/project/.cliagent/config.json");
+    expect(output).toContain("Global config: C:/Users/test/AppData/Roaming/miniagent/config.json");
+    expect(output).toContain("Models: 2");
+    expect(output).toContain("Sessions: 3");
+    expect(output).toContain("Commands: 30 builtin / 4 custom");
+  });
+
   it("renders focused approval prompt instead of normal input when approval is pending", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({
