@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { join, posix, win32 } from "node:path";
 import { z } from "zod";
 import {
   GenerationConfigSchema,
@@ -17,6 +17,12 @@ import { SkillPluginConfigSchema } from "../tool/skill/types.js";
 import { SubagentPluginConfigSchema } from "../tool/subagent.js";
 
 export const CLIAGENT_DIR = ".cliagent";
+
+export interface LoadConfigOptions {
+  env?: Record<string, string | undefined>;
+  platform?: NodeJS.Platform;
+  homeDir?: string;
+}
 
 export const CLIProviderSchema = z
   .object({
@@ -151,11 +157,82 @@ export function toAgentGenerationConfig(config: CLIConfig): GenerationConfig | u
   return normalizeGenerationConfig(config.generation);
 }
 
-export async function loadConfig(baseDir: string): Promise<CLIConfig> {
+export function getGlobalConfigPath(options: LoadConfigOptions = {}): string {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const home = options.homeDir ?? homedir();
+  const pathJoin = platform === "win32" ? win32.join : posix.join;
+
+  if (platform === "win32") {
+    const appData = env.APPDATA?.trim();
+    return pathJoin(
+      appData !== undefined && appData.length > 0 ? appData : pathJoin(home, "AppData", "Roaming"),
+      "miniagent",
+      "config.json",
+    );
+  }
+
+  const xdgConfigHome = env.XDG_CONFIG_HOME?.trim();
+  return pathJoin(
+    xdgConfigHome !== undefined && xdgConfigHome.length > 0 ? xdgConfigHome : pathJoin(home, ".config"),
+    "miniagent",
+    "config.json",
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function mergeConfigObjects(base: unknown, override: unknown): unknown {
+  if (!isRecord(base)) return override;
+  if (!isRecord(override)) return override;
+
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    const previous = merged[key];
+    if (isRecord(previous) && isRecord(value)) {
+      merged[key] = { ...previous, ...value };
+      continue;
+    }
+    merged[key] = value;
+  }
+  return merged;
+}
+
+async function readJsonIfExists(path: string): Promise<unknown | null> {
+  try {
+    return JSON.parse(await readFile(path, "utf-8")) as unknown;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function parseConfig(raw: unknown): CLIConfig {
+  const result = CLIConfigSchema.safeParse(raw);
+  if (!result.success) {
+    console.error("Invalid config file:");
+    for (const issue of result.error.issues) {
+      console.error(`  ${issue.path.join(".")}: ${issue.message}`);
+    }
+    process.exit(1);
+  }
+
+  return result.data;
+}
+
+export async function loadConfig(baseDir: string, options: LoadConfigOptions = {}): Promise<CLIConfig> {
   const dir = join(baseDir, CLIAGENT_DIR);
   const configPath = join(dir, "config.json");
+  const globalConfigPath = getGlobalConfigPath(options);
 
-  if (!existsSync(configPath)) {
+  const globalConfig = await readJsonIfExists(globalConfigPath);
+  const projectConfig = await readJsonIfExists(configPath);
+
+  if (projectConfig === null && globalConfig === null) {
     await mkdir(dir, { recursive: true });
     const template: CLIConfig = {
       providers: [],
@@ -201,15 +278,5 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
     process.exit(0);
   }
 
-  const content = await readFile(configPath, "utf-8");
-  const result = CLIConfigSchema.safeParse(JSON.parse(content));
-  if (!result.success) {
-    console.error("Invalid config file:");
-    for (const issue of result.error.issues) {
-      console.error(`  ${issue.path.join(".")}: ${issue.message}`);
-    }
-    process.exit(1);
-  }
-
-  return result.data;
+  return parseConfig(mergeConfigObjects(globalConfig ?? {}, projectConfig ?? {}));
 }

@@ -48,6 +48,23 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 }
 ```
 
+## Config Files
+
+The CLI reads project config from `.cliagent/config.json`. It also supports a
+global config for shared defaults:
+
+- Windows: `%APPDATA%/miniagent/config.json`
+- macOS/Linux with XDG: `$XDG_CONFIG_HOME/miniagent/config.json`
+- macOS/Linux fallback: `~/.config/miniagent/config.json`
+
+If both files exist, global config is loaded first and project config wins.
+Arrays such as `providers` are replaced by the project value. Object fields such
+as `permission`, `shell`, `editor`, and `diagnostics` are shallow-merged, so a
+project file can override one setting without restating every global default.
+
+If neither file exists, the CLI keeps the first-run behavior and creates a
+project-local `.cliagent/config.json` template.
+
 ## Commands
 
 | Command | Description |

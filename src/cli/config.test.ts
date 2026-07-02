@@ -1,11 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { ThinkingLevel } from "../core/config.js";
 import {
   CLIConfigSchema,
+  getGlobalConfigPath,
+  loadConfig,
   parseDefaultModel,
   toAgentGenerationConfig,
   toAgentProviders,
 } from "./config.js";
+
+async function writeJson(path: string, value: unknown): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(value, null, 2), "utf-8");
+}
+
+function provider(id: string) {
+  return {
+    engine: "openai",
+    key: `sk-${id}`,
+    models: [{ id, name: `model-${id}` }],
+  };
+}
 
 describe("CLI config provider mode", () => {
   it("rejects top-level legacy models", () => {
@@ -297,5 +315,97 @@ describe("CLI config provider mode", () => {
     });
 
     expect(toAgentGenerationConfig(config)).toBeUndefined();
+  });
+
+  it("resolves global config paths per platform", () => {
+    expect(getGlobalConfigPath({
+      platform: "win32",
+      env: { APPDATA: "C:/Users/Test/AppData/Roaming" },
+      homeDir: "C:/Users/Test",
+    }).replaceAll("\\", "/")).toBe("C:/Users/Test/AppData/Roaming/miniagent/config.json");
+
+    expect(getGlobalConfigPath({
+      platform: "linux",
+      env: { XDG_CONFIG_HOME: "/home/test/.config-root" },
+      homeDir: "/home/test",
+    })).toBe("/home/test/.config-root/miniagent/config.json");
+
+    expect(getGlobalConfigPath({
+      platform: "linux",
+      env: {},
+      homeDir: "/home/test",
+    })).toBe("/home/test/.config/miniagent/config.json");
+  });
+
+  it("loads global config when project config is absent", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-config-project-"));
+    const globalRoot = await mkdtemp(join(tmpdir(), "miniagent-config-global-"));
+    await writeJson(join(globalRoot, "miniagent", "config.json"), {
+      providers: [provider("global")],
+      defaultModel: "global",
+    });
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: string | number | null) => {
+      throw new Error(`exit ${String(code)}`);
+    }) as never);
+
+    try {
+      await expect(loadConfig(baseDir, {
+        platform: "linux",
+        env: { XDG_CONFIG_HOME: globalRoot },
+        homeDir: globalRoot,
+      })).resolves.toMatchObject({
+        providers: [provider("global")],
+        defaultModel: "global",
+      });
+      expect(exit).not.toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+    }
+  });
+
+  it("merges global config with project config and lets project values win", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-config-merge-"));
+    const globalRoot = await mkdtemp(join(tmpdir(), "miniagent-config-global-"));
+    await writeJson(join(globalRoot, "miniagent", "config.json"), {
+      providers: [provider("global")],
+      defaultModel: "global",
+      permission: {
+        "*": "ask",
+        read: "allow",
+        write: "ask",
+      },
+      shell: {
+        windows: "powershell",
+        timeoutMs: 60000,
+      },
+    });
+    await writeJson(join(baseDir, ".cliagent", "config.json"), {
+      providers: [provider("project")],
+      defaultModel: "project",
+      permission: {
+        write: "deny",
+      },
+      shell: {
+        timeoutMs: 30000,
+      },
+    });
+
+    await expect(loadConfig(baseDir, {
+      platform: "linux",
+      env: { XDG_CONFIG_HOME: globalRoot },
+      homeDir: globalRoot,
+    })).resolves.toMatchObject({
+      providers: [provider("project")],
+      defaultModel: "project",
+      permission: {
+        "*": "ask",
+        read: "allow",
+        write: "deny",
+      },
+      shell: {
+        windows: "powershell",
+        timeoutMs: 30000,
+      },
+    });
   });
 });

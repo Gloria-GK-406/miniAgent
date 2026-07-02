@@ -1,5 +1,20 @@
 # CLI
 
+## 全局配置
+
+CLI 会读取项目本地的 `.cliagent/config.json`，也支持全局默认配置：
+
+- Windows：`%APPDATA%/miniagent/config.json`
+- macOS/Linux 且设置 XDG：`$XDG_CONFIG_HOME/miniagent/config.json`
+- macOS/Linux 默认：`~/.config/miniagent/config.json`
+
+当项目配置和全局配置同时存在时，先加载全局配置，再由项目配置覆盖。`providers`
+这类数组字段会整体替换；`permission`、`shell`、`editor`、`diagnostics`
+这类对象字段会做浅合并，方便项目只覆盖少量设置。
+
+如果两个位置都没有配置文件，CLI 仍会保持首次运行行为，在项目下生成
+`.cliagent/config.json` 模板。
+
 内置 CLI 提供功能丰富的交互式 REPL。
 
 ## 快速开始
