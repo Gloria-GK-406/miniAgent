@@ -8,6 +8,7 @@ import {
   getMessageWindow,
   padMessageWindow,
   resolveCtrlCAction,
+  resolveMessageScrollAction,
 } from "./App.js";
 import { buildRenderableLines } from "./MessageList.js";
 import { MessageType } from "../../core/types.js";
@@ -104,6 +105,17 @@ describe("App", () => {
     expect(resolveCtrlCAction(true, false)).toBe("stop");
     expect(resolveCtrlCAction(false, false)).toBe("arm-exit");
     expect(resolveCtrlCAction(false, true)).toBe("exit");
+  });
+
+  it("routes message scrolling to paging keys so arrows remain available for input", () => {
+    expect(resolveMessageScrollAction("", { upArrow: true })).toBe("none");
+    expect(resolveMessageScrollAction("", { downArrow: true })).toBe("none");
+    expect(resolveMessageScrollAction("", { pageUp: true })).toBe("page-up");
+    expect(resolveMessageScrollAction("", { pageDown: true })).toBe("page-down");
+    expect(resolveMessageScrollAction("u", { ctrl: true })).toBe("page-up");
+    expect(resolveMessageScrollAction("d", { ctrl: true })).toBe("page-down");
+    expect(resolveMessageScrollAction("", { home: true })).toBe("home");
+    expect(resolveMessageScrollAction("", { end: true })).toBe("end");
   });
 
   it("anchors the message window to the bottom by default", () => {

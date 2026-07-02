@@ -37,6 +37,34 @@ export function resolveCtrlCAction(isRunning: boolean, exitArmed: boolean): Ctrl
   return exitArmed ? "exit" : "arm-exit";
 }
 
+export type MessageScrollAction = "none" | "page-up" | "page-down" | "home" | "end";
+
+export interface MessageScrollKey {
+  upArrow?: boolean;
+  downArrow?: boolean;
+  pageUp?: boolean;
+  pageDown?: boolean;
+  ctrl?: boolean;
+  home?: boolean;
+  end?: boolean;
+}
+
+export function resolveMessageScrollAction(input: string, key: MessageScrollKey): MessageScrollAction {
+  if (key.pageUp || (key.ctrl === true && input === "u")) {
+    return "page-up";
+  }
+  if (key.pageDown || (key.ctrl === true && input === "d")) {
+    return "page-down";
+  }
+  if (key.home) {
+    return "home";
+  }
+  if (key.end) {
+    return "end";
+  }
+  return "none";
+}
+
 export interface MessageWindow {
   visibleLines: RenderLine[];
   maxScrollFromBottom: number;
@@ -299,28 +327,21 @@ export function App({ runtime }: AppProps) {
   useInput((_input, key) => {
     if (state.panel.type !== "none") return;
     const pageSize = Math.max(1, Math.floor(messageAreaHeight / 2));
+    const action = resolveMessageScrollAction(_input, key);
 
-    if (key.upArrow) {
-      setScrollFromBottom((prev) => Math.min(maxScrollFromBottom, prev + 1));
-      return;
-    }
-    if (key.downArrow) {
-      setScrollFromBottom((prev) => Math.max(0, prev - 1));
-      return;
-    }
-    if (key.pageUp || (key.ctrl && _input === "u")) {
+    if (action === "page-up") {
       setScrollFromBottom((prev) => Math.min(maxScrollFromBottom, prev + pageSize));
       return;
     }
-    if (key.pageDown || (key.ctrl && _input === "d")) {
+    if (action === "page-down") {
       setScrollFromBottom((prev) => Math.max(0, prev - pageSize));
       return;
     }
-    if (key.home) {
+    if (action === "home") {
       setScrollFromBottom(maxScrollFromBottom);
       return;
     }
-    if (key.end) {
+    if (action === "end") {
       setScrollFromBottom(0);
     }
   });
