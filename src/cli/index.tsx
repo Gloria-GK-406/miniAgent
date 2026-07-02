@@ -15,6 +15,7 @@ import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runContextPreview } from "./context-preview-runner.js";
 import { runGitHeadless } from "./git-headless-runner.js";
+import { runHistory } from "./history-runner.js";
 import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
@@ -236,6 +237,31 @@ async function main(): Promise<void> {
       runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
       await applyCLIEntryRuntimeOptions(runtime, action);
       process.exitCode = await runContextPreview(
+        runtime,
+        {
+          stdout: (text) => process.stdout.write(text),
+          stderr: (text) => process.stderr.write(text),
+        },
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      );
+      runtime = undefined;
+    } catch (e: unknown) {
+      if (runtime !== undefined) {
+        await runtime.destroy();
+      }
+      process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+  if (action.type === "show-history") {
+    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
+    try {
+      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+      await applyCLIEntryRuntimeOptions(runtime, action);
+      process.exitCode = await runHistory(
         runtime,
         {
           stdout: (text) => process.stdout.write(text),
