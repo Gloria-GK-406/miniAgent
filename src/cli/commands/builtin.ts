@@ -321,6 +321,16 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "clear",
+    description: "Clear current session messages",
+    usage: "/clear",
+    execute: async (ctx) => {
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.clearSession();
+      });
+    },
+  });
+  registry.register({
     name: "export",
     description: "Export current session",
     usage: "/export [json|markdown] [path]",

@@ -73,6 +73,7 @@ describe("registerBuiltinCommands", () => {
       "tools",
       "models",
       "new",
+      "clear",
       "sessions",
       "agent",
       "auto",
@@ -191,6 +192,7 @@ describe("registerBuiltinCommands", () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);
     const commandCtx = ctx();
+    commandCtx.runtime.clearSession = vi.fn(async () => undefined);
     commandCtx.runtime.undo = vi.fn(async () => undefined);
     commandCtx.runtime.redo = vi.fn(async () => undefined);
     commandCtx.runtime.compactContext = vi.fn(async () => undefined);
@@ -223,6 +225,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/system");
     await registry.execute(commandCtx, "/system set Custom coding prompt");
     await registry.execute(commandCtx, "/system unset");
+    await registry.execute(commandCtx, "/clear");
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
     await registry.execute(commandCtx, "/compact");
@@ -234,6 +237,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/doctor");
     await registry.execute(commandCtx, "/activity");
 
+    expect(commandCtx.runtime.clearSession).toHaveBeenCalled();
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
     expect(commandCtx.runtime.redo).toHaveBeenCalled();
     expect(commandCtx.runtime.compactContext).toHaveBeenCalled();

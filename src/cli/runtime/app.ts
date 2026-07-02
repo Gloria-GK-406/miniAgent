@@ -107,6 +107,8 @@ interface ApprovalResolver {
   resolve: (approved: boolean) => void;
 }
 
+const EMPTY_TOKEN_USAGE = { input: 0, output: 0, total: 0 } as const;
+
 function normalizeApprovalAnswer(answer: CLIApprovalAnswer): CLIApprovalDecision {
   if (answer === true) return "allow";
   if (answer === false) return "deny";
@@ -591,6 +593,18 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     switchSession: async (id) => {
       await sessionService.switchSession(id);
       await replaceAgentForActiveSession();
+    },
+    clearSession: async () => {
+      const sessionId = state.sessionId;
+      await sessionService.writeMessages(sessionId, []);
+      await sessionService.updateSessionTokenUsage(sessionId, EMPTY_TOKEN_USAGE);
+      for (let index = redoStack.length - 1; index >= 0; index--) {
+        if (redoStack[index]!.sessionId === sessionId) {
+          redoStack.splice(index, 1);
+        }
+      }
+      await replaceAgentForActiveSession();
+      emit({ type: "notice", level: "info", message: "Cleared current session" });
     },
     renameSession: async (id, name) => {
       await sessionService.renameSession(id, name);

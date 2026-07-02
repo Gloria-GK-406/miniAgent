@@ -771,6 +771,39 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("clears the active session transcript from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-clear-"));
+    await writeConfig(baseDir);
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    const messages: Message[] = [
+      { id: "u1", type: MessageType.User, content: "old context" },
+      { id: "a1", type: MessageType.Assist, content: "old answer" },
+    ];
+    await sessionService.writeMessages(session.id, messages);
+    await sessionService.updateSessionTokenUsage(session.id, { input: 10, output: 20, total: 30 });
+
+    const runtime = await createCLIRuntime(baseDir);
+    const notices: string[] = [];
+    runtime.subscribe((event) => {
+      if (event.type === "notice") {
+        notices.push(event.message);
+      }
+    });
+
+    expect(runtime.getState().messages).toEqual(messages);
+    expect(runtime.getState().tokenUsage).toEqual({ input: 10, output: 20, total: 30 });
+
+    await runtime.submitInput("/clear");
+
+    expect(runtime.getState().messages).toEqual([]);
+    expect(runtime.getState().tokenUsage).toEqual({ input: 0, output: 0, total: 0 });
+    expect(runtime.getState().sessions.find((item) => item.id === session.id)?.messageCount).toBe(0);
+    await expect(sessionService.readMessages(session.id)).resolves.toEqual([]);
+    expect(notices).toContain("Cleared current session");
+    await runtime.destroy();
+  });
+
   it("opens git and diff panels", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-git-"));
     await writeConfig(baseDir);

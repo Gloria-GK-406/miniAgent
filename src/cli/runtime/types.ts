@@ -126,6 +126,7 @@ export interface CLIAppRuntime {
   rememberInputHistory(input: string): Promise<void>;
   createSession(name?: string): Promise<void>;
   switchSession(id: string): Promise<void>;
+  clearSession(): Promise<void>;
   renameSession(id: string, name: string): Promise<void>;
   deleteSession(id: string): Promise<void>;
   forkSession(id: string, name?: string): Promise<void>;
