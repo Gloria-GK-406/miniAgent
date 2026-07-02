@@ -8,6 +8,7 @@ import {
   selectResolvedModelForCLI,
 } from "./agent-factory.js";
 import { createCommandRegistry } from "./command-registry.js";
+import { loadCustomCommands } from "./custom-command-service.js";
 import { createExportService } from "./export-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createPermissionService } from "./permission-service.js";
@@ -73,6 +74,21 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   const registry = createCommandRegistry();
   registerBuiltinCommands(registry);
+  const registeredCommandNames = new Set(registry.list().flatMap((command) => [
+    command.name,
+    ...(command.aliases ?? []),
+  ]));
+  for (const command of await loadCustomCommands(baseDir)) {
+    if (registeredCommandNames.has(command.name)) {
+      emit({ type: "notice", level: "warn", message: `Custom command /${command.name} conflicts with a built-in command` });
+      continue;
+    }
+    registry.register(command);
+    registeredCommandNames.add(command.name);
+    for (const alias of command.aliases ?? []) {
+      registeredCommandNames.add(alias);
+    }
+  }
   const router = createInputRouter({
     commandRegistry: registry,
     shellService,

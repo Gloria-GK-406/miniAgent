@@ -88,4 +88,23 @@ describe("createCLIRuntime", () => {
     expect(runtime.getState().sessionName).toBe("imported");
     await runtime.destroy();
   });
+
+  it("registers project custom commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-custom-command-"));
+    await writeConfig(baseDir);
+    await mkdir(join(baseDir, ".cliagent", "commands"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "commands", "shortcut.md"), [
+      "---",
+      "description: Open help",
+      "---",
+      "",
+      "/help",
+    ].join("\n"), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/shortcut");
+
+    expect(runtime.getState().panel).toEqual({ type: "help" });
+    await runtime.destroy();
+  });
 });
