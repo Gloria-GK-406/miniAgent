@@ -91,6 +91,20 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/system un")).toEqual(["unset"]);
   });
 
+  it("matches help query command names", () => {
+    expect(matchSuggestions("/help d", undefined, undefined, [
+      "/diff",
+      "/diagnostics",
+      "/doctor",
+      "/git",
+    ])).toEqual(["diff", "diagnostics", "doctor"]);
+    expect(matchSuggestions("/commands di", undefined, undefined, [
+      "/diff",
+      "/diagnostics",
+      "/doctor",
+    ])).toEqual(["diff", "diagnostics"]);
+  });
+
   it("hides exact /auto because it has no subcommands", () => {
     const result = matchSuggestions("/auto");
     expect(result).toEqual([]);
@@ -305,7 +319,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/he");
     });
-    expect(result.current.applySelected("/he")).toBe("/help");
+    expect(result.current.applySelected("/he")).toBe("/help ");
   });
 
   it("applies selected file reference completion", () => {
@@ -319,6 +333,11 @@ describe("useSuggestion", () => {
 
   it("adds a trailing space for system command completion", () => {
     expect(applySuggestion("/sy", "/system")).toBe("/system ");
+  });
+
+  it("adds a trailing space for commands query completion", () => {
+    expect(applySuggestion("/comm", "/commands")).toBe("/commands ");
+    expect(applySuggestion("/commands di", "diff")).toBe("/commands diff ");
   });
 
   it("applies selected diff flag completion", () => {

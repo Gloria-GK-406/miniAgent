@@ -43,12 +43,15 @@ const PERMISSION_SUBS = ["set", "unset"];
 const SESSION_SUBS = ["search", "new", "switch", "fork", "rename", "delete"];
 const SESSION_ID_SUBS = new Set(["switch", "fork", "rename", "delete"]);
 const SYSTEM_SUBS = ["set", "unset"];
+const HELP_QUERY_COMMANDS = new Set(["/commands", "/help"]);
 const COMMANDS_WITH_ARGS = new Set([
   "/agent",
+  "/commands",
   "/diff",
   "/editor",
   "/export",
   "/git",
+  "/help",
   "/import",
   "/init",
   "/model",
@@ -99,6 +102,9 @@ export function matchSuggestions(
     if (cmd === "/git") {
       return GIT_SUBS.filter((s) => s.startsWith(partial));
     }
+    if (HELP_QUERY_COMMANDS.has(cmd)) {
+      return commandNameSuggestions(commandSuggestions, partial);
+    }
     if (cmd === "/permissions" || cmd === "/permission") {
       return PERMISSION_SUBS.filter((s) => s.startsWith(partial));
     }
@@ -128,6 +134,13 @@ export function matchSuggestions(
   }
 
   return matches;
+}
+
+function commandNameSuggestions(commandSuggestions: string[], partial: string): string[] {
+  const normalized = partial.startsWith("/") ? partial.slice(1) : partial;
+  return commandSuggestions
+    .map((command) => command.startsWith("/") ? command.slice(1) : command)
+    .filter((command) => command.startsWith(normalized));
 }
 
 function getReferenceQuery(input: string): string | null {
