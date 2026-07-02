@@ -92,12 +92,19 @@ function ToolsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "tools" }>
   );
 }
 
-function SessionsPanel({ runtime }: { runtime: CLIAppRuntime }) {
+function SessionsPanel({ runtime, panel }: { runtime: CLIAppRuntime; panel: Extract<CLIViewPanel, { type: "sessions" }> }) {
   const state = runtime.getState();
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">Sessions</Text>
-      <Text>{state.sessionName} ({state.sessionId.slice(0, 8)})</Text>
+      {panel.sessions.map((session) => {
+        const marker = session.id === state.sessionId ? "*" : " ";
+        return (
+          <Text key={session.id}>
+            {marker} {session.name} ({session.id.slice(0, 8)}) {session.messageCount} messages
+          </Text>
+        );
+      })}
     </Box>
   );
 }
@@ -224,7 +231,7 @@ export function App({ runtime }: AppProps) {
   }
 
   if (state.panel.type === "sessions") {
-    return <SessionsPanel runtime={runtime} />;
+    return <SessionsPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "error") {

@@ -1,8 +1,6 @@
-import { join } from "node:path";
-import { SessionManager } from "../../core/session.js";
 import { MessageType, type Message } from "../../core/types.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
-import { CLIAGENT_DIR, loadConfig } from "../config.js";
+import { loadConfig } from "../config.js";
 import {
   createCLIAgentFactory,
   formatResolvedModelPath,
@@ -14,6 +12,7 @@ import { createInputRouter } from "./input-router.js";
 import { createPermissionService } from "./permission-service.js";
 import { createReferenceService } from "./reference-service.js";
 import { createShellService } from "./shell-service.js";
+import { createCLISessionService } from "./session-service.js";
 import type { CLIAppRuntime, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
 
 function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
@@ -23,11 +22,8 @@ function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICo
 
 export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> {
   const config = await loadConfig(baseDir);
-  const sessionManager = new SessionManager(join(baseDir, CLIAGENT_DIR));
-  await sessionManager.load();
-  const existingSessions = sessionManager.list();
-  const session = existingSessions[0] ?? await sessionManager.create("default");
-  sessionManager.setActive(session.id);
+  const sessionService = await createCLISessionService(baseDir);
+  const session = await sessionService.ensureActiveSession();
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
   const approvalResolvers = new Map<string, (decision: boolean) => void>();
@@ -57,6 +53,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     modelPaths: getResolvedModelPaths(built.agent),
     sessionId: session.id,
     sessionName: session.name,
+    sessions: sessionService.listSessions(),
     autoApprove: false,
     showReasoning: config.tui.showReasoning,
     showToolDetails: config.tui.showToolDetails,
@@ -139,6 +136,32 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   bindAgentEvents();
 
+  async function replaceAgentForActiveSession(): Promise<void> {
+    const previous = built.agent;
+    const active = sessionService.getActiveSession();
+    built = await factory.build(active.id);
+    await previous.destroy();
+    bindAgentEvents();
+    updateState({
+      sessionId: active.id,
+      sessionName: active.name,
+      sessions: sessionService.listSessions(),
+      modelName: formatCurrentModel(built.agent),
+      modelPaths: getResolvedModelPaths(built.agent),
+      messages: await built.agent.getMessages(),
+      panel: { type: "none" },
+    });
+  }
+
+  function refreshSessionMetadata(): void {
+    const active = sessionService.getActiveSession();
+    updateState({
+      sessionId: active.id,
+      sessionName: active.name,
+      sessions: sessionService.listSessions(),
+    });
+  }
+
   const runtime: CLIAppRuntime = {
     getState: () => state,
     subscribe: (listener) => {
@@ -173,6 +196,31 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       selectResolvedModelForCLI(built.agent, path);
       updateState({ modelName: formatCurrentModel(built.agent) });
     },
+    createSession: async (name) => {
+      await sessionService.createSession(name);
+      await replaceAgentForActiveSession();
+    },
+    switchSession: async (id) => {
+      await sessionService.switchSession(id);
+      await replaceAgentForActiveSession();
+    },
+    renameSession: async (id, name) => {
+      await sessionService.renameSession(id, name);
+      refreshSessionMetadata();
+    },
+    deleteSession: async (id) => {
+      const previousActiveId = state.sessionId;
+      await sessionService.deleteSession(id);
+      if (previousActiveId === id) {
+        await replaceAgentForActiveSession();
+        return;
+      }
+      refreshSessionMetadata();
+    },
+    forkSession: async (id, name) => {
+      await sessionService.forkSession(id, name);
+      refreshSessionMetadata();
+    },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);
@@ -190,6 +238,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         modelName: formatCurrentModel(built.agent),
         modelPaths: getResolvedModelPaths(built.agent),
         messages: await built.agent.getMessages(),
+        sessions: sessionService.listSessions(),
       });
     },
     destroy: async () => {

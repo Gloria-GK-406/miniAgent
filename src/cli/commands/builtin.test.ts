@@ -12,6 +12,7 @@ function state(): CLIState {
     modelPaths: ["openai/fast"],
     sessionId: "s1",
     sessionName: "default",
+    sessions: [],
     autoApprove: false,
     showReasoning: false,
     showToolDetails: false,
@@ -59,6 +60,7 @@ describe("registerBuiltinCommands", () => {
       "history",
       "tools",
       "models",
+      "new",
       "sessions",
       "agent",
       "auto",
@@ -88,5 +90,40 @@ describe("registerBuiltinCommands", () => {
 
     expect(commandCtx.getState().mode).toBe("plan");
     expect(commandCtx.runtime.rebuildAgent).toHaveBeenCalledWith("switch agent plan");
+  });
+
+  it("dispatches session subcommands to runtime methods", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.createSession = vi.fn(async () => undefined);
+    commandCtx.runtime.switchSession = vi.fn(async () => undefined);
+    commandCtx.runtime.renameSession = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/new feature work");
+    await registry.execute(commandCtx, "/sessions switch s2");
+    await registry.execute(commandCtx, "/sessions rename s2 renamed session");
+
+    expect(commandCtx.runtime.createSession).toHaveBeenCalledWith("feature work");
+    expect(commandCtx.runtime.switchSession).toHaveBeenCalledWith("s2");
+    expect(commandCtx.runtime.renameSession).toHaveBeenCalledWith("s2", "renamed session");
+  });
+
+  it("opens sessions panel with session metadata", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    const sessions = [{
+      id: "s1",
+      name: "default",
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z",
+      messageCount: 0,
+    }];
+    commandCtx.updateState({ sessions });
+
+    await registry.execute(commandCtx, "/sessions");
+
+    expect(commandCtx.getState().panel).toEqual({ type: "sessions", sessions });
   });
 });

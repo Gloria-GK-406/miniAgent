@@ -20,6 +20,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     modelPaths: ["test/model"],
     sessionId: "s1",
     sessionName: "default",
+    sessions: [],
     autoApprove: false,
     showReasoning: false,
     showToolDetails: false,

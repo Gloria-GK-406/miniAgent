@@ -1,4 +1,5 @@
 import type { MiniAgent } from "../../core/agent.js";
+import type { SessionMeta } from "../../core/session.js";
 import type {
   Message,
   TokenCount,
@@ -14,7 +15,7 @@ export type CLIViewPanel =
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
   | { type: "models" }
-  | { type: "sessions" }
+  | { type: "sessions"; sessions: SessionMeta[] }
   | { type: "tools"; tools: Tool[] }
   | { type: "error"; message: string };
 
@@ -33,6 +34,7 @@ export interface CLIState {
   modelPaths: string[];
   sessionId: string;
   sessionName: string;
+  sessions: SessionMeta[];
   autoApprove: boolean;
   showReasoning: boolean;
   showToolDetails: boolean;
@@ -64,6 +66,11 @@ export interface CLIAppRuntime {
   submitInput(input: string): Promise<void>;
   runCommand(name: string, args: string): Promise<void>;
   selectModel(path: string): Promise<void>;
+  createSession(name?: string): Promise<void>;
+  switchSession(id: string): Promise<void>;
+  renameSession(id: string, name: string): Promise<void>;
+  deleteSession(id: string): Promise<void>;
+  forkSession(id: string, name?: string): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

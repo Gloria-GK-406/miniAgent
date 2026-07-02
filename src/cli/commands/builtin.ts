@@ -1,4 +1,24 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
+import type { CLICommandContext } from "../runtime/types.js";
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function splitArgs(args: string): string[] {
+  return args.trim().length === 0 ? [] : args.trim().split(/\s+/);
+}
+
+async function runSessionMutation(
+  ctx: CLICommandContext,
+  action: () => Promise<void>,
+): Promise<void> {
+  try {
+    await action();
+  } catch (error: unknown) {
+    ctx.updateState({ panel: { type: "error", message: errorMessage(error) } });
+  }
+}
 
 export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register({
@@ -46,10 +66,64 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register({
     name: "sessions",
     aliases: ["session"],
-    description: "Show sessions",
-    usage: "/sessions",
-    execute: async (ctx) => {
-      ctx.updateState({ panel: { type: "sessions" } });
+    description: "Show or manage sessions",
+    usage: "/sessions [new|switch|fork|rename|delete]",
+    execute: async (ctx, args) => {
+      const parts = splitArgs(args);
+      const action = parts[0];
+      if (action === undefined) {
+        ctx.updateState({ panel: { type: "sessions", sessions: ctx.getState().sessions } });
+        return;
+      }
+
+      await runSessionMutation(ctx, async () => {
+        switch (action) {
+          case "new": {
+            const name = args.trim().slice(action.length).trim();
+            await ctx.runtime.createSession(name.length === 0 ? undefined : name);
+            break;
+          }
+          case "switch": {
+            const id = parts[1];
+            if (id === undefined) throw new Error("Usage: /sessions switch <id>");
+            await ctx.runtime.switchSession(id);
+            break;
+          }
+          case "fork": {
+            const id = parts[1];
+            if (id === undefined) throw new Error("Usage: /sessions fork <id> [name]");
+            const name = args.trim().slice(`${action} ${id}`.length).trim();
+            await ctx.runtime.forkSession(id, name.length === 0 ? undefined : name);
+            break;
+          }
+          case "rename": {
+            const id = parts[1];
+            if (id === undefined) throw new Error("Usage: /sessions rename <id> <name>");
+            const name = args.trim().slice(`${action} ${id}`.length).trim();
+            await ctx.runtime.renameSession(id, name);
+            break;
+          }
+          case "delete": {
+            const id = parts[1];
+            if (id === undefined) throw new Error("Usage: /sessions delete <id>");
+            await ctx.runtime.deleteSession(id);
+            break;
+          }
+          default:
+            throw new Error(`Unknown sessions action: ${action}`);
+        }
+      });
+    },
+  });
+  registry.register({
+    name: "new",
+    description: "Create a new session",
+    usage: "/new [name]",
+    execute: async (ctx, args) => {
+      const name = args.trim();
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.createSession(name.length === 0 ? undefined : name);
+      });
     },
   });
   registry.register({

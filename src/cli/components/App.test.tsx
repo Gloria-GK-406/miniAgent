@@ -14,6 +14,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     modelPaths: ["test/model"],
     sessionId: "s1",
     sessionName: "default",
+    sessions: [],
     autoApprove: false,
     showReasoning: false,
     showToolDetails: false,
@@ -144,5 +145,54 @@ describe("App", () => {
     );
     expect(output).toContain("History");
     expect(output).toContain("hello");
+  });
+
+  it("renders sessions panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        sessionId: "s2",
+        sessionName: "work",
+        sessions: [
+          {
+            id: "s1",
+            name: "default",
+            createdAt: "2026-07-02T00:00:00.000Z",
+            updatedAt: "2026-07-02T00:00:00.000Z",
+            messageCount: 1,
+          },
+          {
+            id: "s2",
+            name: "work",
+            createdAt: "2026-07-02T00:00:01.000Z",
+            updatedAt: "2026-07-02T00:00:01.000Z",
+            messageCount: 2,
+          },
+        ],
+        panel: {
+          type: "sessions",
+          sessions: [
+            {
+              id: "s1",
+              name: "default",
+              createdAt: "2026-07-02T00:00:00.000Z",
+              updatedAt: "2026-07-02T00:00:00.000Z",
+              messageCount: 1,
+            },
+            {
+              id: "s2",
+              name: "work",
+              createdAt: "2026-07-02T00:00:01.000Z",
+              updatedAt: "2026-07-02T00:00:01.000Z",
+              messageCount: 2,
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Sessions");
+    expect(output).toContain("* work");
+    expect(output).toContain("default");
   });
 });

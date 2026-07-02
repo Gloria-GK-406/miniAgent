@@ -14,6 +14,7 @@ function state(): CLIState {
     modelPaths: ["openai/fast"],
     sessionId: "s1",
     sessionName: "default",
+    sessions: [],
     autoApprove: false,
     showReasoning: false,
     showToolDetails: false,
