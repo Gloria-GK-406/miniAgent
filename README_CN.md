@@ -441,6 +441,8 @@ npm run chat
 | `/import <path> [name]` | 导入 JSON 会话导出 |
 | `/undo` | 撤销最后一个用户 turn 并恢复文件快照 |
 | `/redo` | 在可行时重新应用上一次撤销的 turn |
+| `/restore <turnId>` | 从指定 turn 快照恢复工作区文件 |
+| `/reapply <turnId>` | 从指定 turn 快照重新应用工作区文件 |
 | `/help` | 显示帮助 |
 | `/commands [query]` | 显示可搜索的 slash command 帮助 |
 | `/keybindings` | 显示键盘快捷键 |
@@ -457,8 +459,9 @@ CLI 使用产品级权限策略：读/搜索工具默认允许，写入、编辑
 CLI shell service 执行。Agent 还会获得 git 只读工具、受保护的 `git_commit`
 和经权限控制的 `diagnostics` 工具。项目自定义命令可以放在
 `.cliagent/commands/*.md`；导出、导入、撤销和重做都使用项目本地的
-`.cliagent/` 数据。会话导出会包含模型、Agent 模式和 token 用量等元数据。会话选择器
-支持完整 id、唯一 id 前缀或精确会话名称。
+`.cliagent/` 数据。会话导出会包含模型、Agent 模式和 token 用量等元数据。`/restore`
+和 `/reapply` 只恢复或重放指定 turn 的文件状态，不修改 transcript。会话选择器支持
+完整 id、唯一 id 前缀或精确会话名称。
 
 → [完整 CLI 文档](./document/cli/repl_CN.md)
 

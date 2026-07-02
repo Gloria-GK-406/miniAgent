@@ -59,6 +59,8 @@ function runtime(current: CLIState): CLIAppRuntime {
     importSession: vi.fn(async () => undefined),
     undo: vi.fn(async () => undefined),
     redo: vi.fn(async () => undefined),
+    restoreSnapshot: vi.fn(async () => undefined),
+    reapplySnapshot: vi.fn(async () => undefined),
     compactContext: vi.fn(async () => undefined),
     showGitStatus: vi.fn(async () => undefined),
     showGitLog: vi.fn(async () => undefined),

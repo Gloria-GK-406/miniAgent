@@ -200,7 +200,7 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
     expect(matchSuggestions("/i")).toEqual(["/import", "/init", "/input-history", "/inputs"]);
     expect(matchSuggestions("/u")).toEqual(["/undo"]);
-    expect(matchSuggestions("/r")).toEqual(["/references", "/redo"]);
+    expect(matchSuggestions("/r")).toEqual(["/reapply", "/references", "/redo", "/restore"]);
     expect(matchSuggestions("/comp")).toEqual(["/compact"]);
   });
 
@@ -406,6 +406,11 @@ describe("useSuggestion", () => {
   it("adds a trailing space for input history completion", () => {
     expect(applySuggestion("/input-h", "/input-history")).toBe("/input-history ");
     expect(applySuggestion("/prom", "/prompts")).toBe("/prompts ");
+  });
+
+  it("adds a trailing space for snapshot restore completion", () => {
+    expect(applySuggestion("/rest", "/restore")).toBe("/restore ");
+    expect(applySuggestion("/rea", "/reapply")).toBe("/reapply ");
   });
 
   it("applies selected diff flag completion", () => {

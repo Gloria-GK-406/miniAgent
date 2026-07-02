@@ -734,6 +734,34 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "restore",
+    description: "Restore workspace files from a turn snapshot",
+    usage: "/restore <turnId>",
+    execute: async (ctx, args) => {
+      await runSessionMutation(ctx, async () => {
+        const turnId = args.trim();
+        if (turnId.length === 0) {
+          throw new Error("Usage: /restore <turnId>");
+        }
+        await ctx.runtime.restoreSnapshot(turnId);
+      });
+    },
+  });
+  registry.register({
+    name: "reapply",
+    description: "Reapply workspace files from a turn snapshot",
+    usage: "/reapply <turnId>",
+    execute: async (ctx, args) => {
+      await runSessionMutation(ctx, async () => {
+        const turnId = args.trim();
+        if (turnId.length === 0) {
+          throw new Error("Usage: /reapply <turnId>");
+        }
+        await ctx.runtime.reapplySnapshot(turnId);
+      });
+    },
+  });
+  registry.register({
     name: "compact",
     description: "Run context compression",
     usage: "/compact",

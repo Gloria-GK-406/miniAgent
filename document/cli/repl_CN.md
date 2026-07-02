@@ -127,6 +127,8 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/import <path> [name]` | 导入 JSON 会话导出 |
 | `/undo` | 撤销最后一个用户 turn 并恢复文件快照 |
 | `/redo` | 在可行时重新应用上一次撤销的 turn |
+| `/restore <turnId>` | 从指定 turn 快照恢复工作区文件 |
+| `/reapply <turnId>` | 从指定 turn 快照重新应用工作区文件 |
 | `/help` | 显示帮助 |
 | `/commands [query]` | 显示可搜索的 slash command 帮助 |
 | `/keybindings` | 显示键盘快捷键 |
@@ -197,7 +199,8 @@ Windows 默认使用 PowerShell；配置可以切换到 Git Bash、WSL、cmd 或
 
 会修改工作区的工具会记录每个 turn 的文件快照。`/undo` 删除最后一个用户 turn，并在
 当前文件内容仍匹配记录的修改后内容时恢复文件。`/redo` 会在没有冲突时重新应用被撤销的
-消息和文件状态。
+消息和文件状态。`/restore <turnId>` 和 `/reapply <turnId>` 只恢复或重放指定 turn 的
+文件状态，不修改 transcript。
 
 ## 上下文压缩
 

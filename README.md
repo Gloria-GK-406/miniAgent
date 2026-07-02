@@ -492,6 +492,8 @@ and shell integration:
 | `/init [--force]` | Create project `AGENTS.md` guidance |
 | `/undo` | Undo the last user turn and restore file snapshots |
 | `/redo` | Reapply the last undone turn when possible |
+| `/restore <turnId>` | Restore workspace files from a turn snapshot |
+| `/reapply <turnId>` | Reapply workspace files from a turn snapshot |
 | `/help` | Show help |
 | `/commands [query]` | Show searchable slash command help |
 | `/keybindings` | Show keyboard shortcuts |
@@ -511,9 +513,10 @@ through the configured CLI shell service. The agent also gets git-aware read
 tools, guarded `git_commit`, and a permission-gated `diagnostics` tool; `/diff`,
 `/diagnostics`, `/activity`, and `/editor` provide local developer workflow
 panels. Project custom commands can be added as `.cliagent/commands/*.md`;
-exports, imports, undo, and redo are project-local under `.cliagent/`. Session
-exports include model, agent mode, and token usage metadata. Session selectors
-accept a full id, a unique id prefix, or an exact session name.
+exports, imports, undo, redo, restore, and reapply are project-local under
+`.cliagent/`. Session exports include model, agent mode, and token usage
+metadata. Session selectors accept a full id, a unique id prefix, or an exact
+session name.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

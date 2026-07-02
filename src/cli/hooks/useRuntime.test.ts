@@ -65,6 +65,8 @@ describe("useRuntime", () => {
       importSession: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),
+      restoreSnapshot: vi.fn(),
+      reapplySnapshot: vi.fn(),
       compactContext: vi.fn(),
       showGitStatus: vi.fn(),
       showGitLog: vi.fn(),

@@ -75,6 +75,8 @@ describe("registerBuiltinCommands", () => {
       "config",
       "commands",
       "compact",
+      "restore",
+      "reapply",
       "context",
       "history",
       "input-history",
@@ -687,6 +689,8 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.clearSession = vi.fn(async () => undefined);
     commandCtx.runtime.undo = vi.fn(async () => undefined);
     commandCtx.runtime.redo = vi.fn(async () => undefined);
+    commandCtx.runtime.restoreSnapshot = vi.fn(async () => undefined);
+    commandCtx.runtime.reapplySnapshot = vi.fn(async () => undefined);
     commandCtx.runtime.compactContext = vi.fn(async () => undefined);
     commandCtx.runtime.showGitStatus = vi.fn(async () => undefined);
     commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
@@ -721,6 +725,8 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/clear");
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
+    await registry.execute(commandCtx, "/restore turn-1");
+    await registry.execute(commandCtx, "/reapply turn-1");
     await registry.execute(commandCtx, "/compact");
     await registry.execute(commandCtx, "/git status");
     await registry.execute(commandCtx, "/git log 3");
@@ -734,6 +740,8 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.clearSession).toHaveBeenCalled();
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
     expect(commandCtx.runtime.redo).toHaveBeenCalled();
+    expect(commandCtx.runtime.restoreSnapshot).toHaveBeenCalledWith("turn-1");
+    expect(commandCtx.runtime.reapplySnapshot).toHaveBeenCalledWith("turn-1");
     expect(commandCtx.runtime.compactContext).toHaveBeenCalled();
     expect(commandCtx.runtime.showGitStatus).toHaveBeenCalled();
     expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
@@ -753,6 +761,30 @@ describe("registerBuiltinCommands", () => {
       type: "system",
       basePrompt: "You are a helpful assistant.",
       effectivePrompt: expect.stringContaining("Agent mode: build"),
+    });
+  });
+
+  it("shows an error panel for malformed snapshot restore commands", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.restoreSnapshot = vi.fn(async () => undefined);
+    commandCtx.runtime.reapplySnapshot = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/restore");
+
+    expect(commandCtx.runtime.restoreSnapshot).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /restore <turnId>",
+    });
+
+    await registry.execute(commandCtx, "/reapply");
+
+    expect(commandCtx.runtime.reapplySnapshot).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /reapply <turnId>",
     });
   });
 

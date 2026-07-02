@@ -216,6 +216,8 @@ export interface CLIAppRuntime {
   importSession(inputPath: string, name?: string): Promise<void>;
   undo(): Promise<void>;
   redo(): Promise<void>;
+  restoreSnapshot(turnId: string): Promise<void>;
+  reapplySnapshot(turnId: string): Promise<void>;
   compactContext(): Promise<void>;
   showGitStatus(): Promise<void>;
   showGitLog(limit?: number): Promise<void>;

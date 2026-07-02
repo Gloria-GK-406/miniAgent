@@ -175,6 +175,8 @@ miniagent --completion powershell
 | `/init [--force]` | Create project `AGENTS.md` guidance |
 | `/undo` | Undo the last user turn and restore file snapshots |
 | `/redo` | Reapply the last undone turn when possible |
+| `/restore <turnId>` | Restore workspace files from a turn snapshot |
+| `/reapply <turnId>` | Reapply workspace files from a turn snapshot |
 | `/help` | Show help |
 | `/commands [query]` | Show searchable slash command help |
 | `/keybindings` | Show keyboard shortcuts |
@@ -273,7 +275,9 @@ from a JSON export and switches to it.
 Mutating workspace tools record per-turn file snapshots. `/undo` removes the
 last user turn and restores files when their current content still matches the
 recorded post-turn content. `/redo` reapplies the undone messages and file
-state when no conflict is detected.
+state when no conflict is detected. `/restore <turnId>` and `/reapply <turnId>`
+restore or replay only the recorded file state for a specific turn without
+editing the transcript.
 
 ## Context Compression
 

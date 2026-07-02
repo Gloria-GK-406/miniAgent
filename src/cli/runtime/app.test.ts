@@ -878,6 +878,54 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("restores and reapplies a named turn snapshot without changing transcript", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-snapshot-restore-"));
+    await writeConfig(baseDir);
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    const messages: Message[] = [
+      { id: "turn-1", type: MessageType.User, content: "change file" },
+      { id: "a1", type: MessageType.Assist, content: "changed" },
+    ];
+    await sessionService.writeMessages(session.id, messages);
+    await writeFile(join(baseDir, "a.txt"), "before", "utf-8");
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => session.id,
+      getActiveTurnId: () => "turn-1",
+    });
+    await snapshotService.recordBeforeMutation("a.txt", async () => {
+      await writeFile(join(baseDir, "a.txt"), "after", "utf-8");
+    });
+    const runtime = await createCLIRuntime(baseDir);
+
+    await runtime.submitInput("/restore turn-1");
+
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("before");
+    expect(runtime.getState().messages).toEqual(messages);
+
+    await runtime.submitInput("/reapply turn-1");
+
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("after");
+    expect(runtime.getState().messages).toEqual(messages);
+    await runtime.destroy();
+  });
+
+  it("shows an error panel when restoring an unknown snapshot turn", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-snapshot-missing-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/restore missing-turn");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "error",
+      message: "No snapshots found for turn missing-turn",
+    });
+    await runtime.destroy();
+  });
+
   it("opens a snapshots panel for the active session journal", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-snapshots-panel-"));
     await writeConfig(baseDir);

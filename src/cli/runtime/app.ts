@@ -826,6 +826,22 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       await replaceAgentForActiveSession();
       emit({ type: "notice", level: "info", message: `Redid turn ${entry.turnId}` });
     },
+    restoreSnapshot: async (turnId) => {
+      if ((await snapshotService.listTurnSnapshots(turnId)).length === 0) {
+        throw new Error(`No snapshots found for turn ${turnId}`);
+      }
+      await snapshotService.restoreTurn(turnId);
+      await refreshReferencePaths();
+      emit({ type: "notice", level: "info", message: `Restored snapshot ${turnId}` });
+    },
+    reapplySnapshot: async (turnId) => {
+      if ((await snapshotService.listTurnSnapshots(turnId)).length === 0) {
+        throw new Error(`No snapshots found for turn ${turnId}`);
+      }
+      await snapshotService.reapplyTurn(turnId);
+      await refreshReferencePaths();
+      emit({ type: "notice", level: "info", message: `Reapplied snapshot ${turnId}` });
+    },
     compactContext: async () => {
       const messages = await built.agent.getMessages();
       built.compressor.updateMessages(messages);

@@ -225,7 +225,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
           <Text>/about /overview /help /commands /keybindings /status /config /history</Text>
           <Text>/input-history /context /search /search-all /todos /references /tools</Text>
           <Text>/models /sessions /activity /snapshots /permissions /system /agent build|plan</Text>
-          <Text>/auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/restore /reapply /auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
