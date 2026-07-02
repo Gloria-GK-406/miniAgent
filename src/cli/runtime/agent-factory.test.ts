@@ -2,12 +2,36 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { ThinkingLevel } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type GenerationConfig,
+  type ModelProviderConfig,
+  type ResolvedModel,
+} from "../../core/config.js";
 import { MessageType } from "../../core/types.js";
 import { loadConfig, type CLIAgentMode, type CLIConfig } from "../config.js";
-import { createCLIAgentFactory, formatResolvedModelPath } from "./agent-factory.js";
+import {
+  buildSubagentAgentConfig,
+  createCLIAgentFactory,
+  formatResolvedModelPath,
+  getResolvedModelPaths,
+  selectResolvedModelForCLI,
+} from "./agent-factory.js";
 import { createPermissionService } from "./permission-service.js";
 import { createShellService } from "./shell-service.js";
+
+function resolvedModel(
+  id: string,
+  provider = "openai",
+  name = id,
+): ResolvedModel {
+  return {
+    id,
+    provider,
+    name,
+    thinkingLevels: [ThinkingLevel.None],
+  };
+}
 
 async function writeConfig(baseDir: string): Promise<void> {
   const configDir = join(baseDir, ".cliagent");
@@ -108,5 +132,103 @@ describe("createCLIAgentFactory", () => {
       .toContain("Initial prompt.");
     expect(updatedContext.find((message) => message.type === MessageType.System)?.content)
       .toContain("Updated prompt.");
+  });
+
+  it("formats and selects resolved model paths", () => {
+    const agent = {
+      getModels: vi.fn(() => [
+        resolvedModel("fast", "openai"),
+        resolvedModel("deep", "anthropic"),
+      ]),
+      setResolvedModel: vi.fn(),
+    };
+
+    expect(getResolvedModelPaths(agent)).toEqual(["openai/fast", "anthropic/deep"]);
+    expect(selectResolvedModelForCLI(agent, "anthropic/deep")).toMatchObject({
+      id: "deep",
+      provider: "anthropic",
+    });
+    expect(agent.setResolvedModel).toHaveBeenCalledWith({
+      id: "deep",
+      provider: "anthropic",
+    });
+  });
+
+  it("selects a unique model by id and rejects ambiguous bare ids", () => {
+    const uniqueAgent = {
+      getModels: vi.fn(() => [resolvedModel("fast", "openai")]),
+      setResolvedModel: vi.fn(),
+    };
+    selectResolvedModelForCLI(uniqueAgent, "fast");
+
+    expect(uniqueAgent.setResolvedModel).toHaveBeenCalledWith({
+      id: "fast",
+      provider: "openai",
+    });
+
+    const ambiguousAgent = {
+      getModels: vi.fn(() => [
+        resolvedModel("fast", "openai"),
+        resolvedModel("fast", "anthropic"),
+      ]),
+      setResolvedModel: vi.fn(),
+    };
+
+    expect(() => selectResolvedModelForCLI(ambiguousAgent, "fast")).toThrow(
+      /Model selector is ambiguous: fast.*openai\/fast.*anthropic\/fast/,
+    );
+    expect(ambiguousAgent.setResolvedModel).not.toHaveBeenCalled();
+  });
+
+  it("builds provider-only subagent config from the parent resolved model", () => {
+    const providers: ModelProviderConfig[] = [
+      {
+        provider: "openai",
+        key: "test-key",
+        models: [{ id: "fast", name: "gpt-4o-mini" }],
+      },
+    ];
+    const generation: GenerationConfig = {
+      temperature: 0.6,
+      thinking: ThinkingLevel.Medium,
+    };
+
+    expect(buildSubagentAgentConfig({
+      providers,
+      currentModel: resolvedModel("fast", "openai", "gpt-4o-mini"),
+      generation,
+      paths: { sessiondir: "/tmp/subagent-session" },
+    })).toEqual({
+      providers,
+      defaultModel: { id: "fast", provider: "openai" },
+      generation,
+      paths: { sessiondir: "/tmp/subagent-session" },
+    });
+  });
+
+  it("rejects unknown provider engines while building the runtime agent", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-agent-factory-unknown-"));
+    const configDir = join(baseDir, ".cliagent");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(join(configDir, "config.json"), JSON.stringify({
+      providers: [{
+        engine: "not-real",
+        key: "sk-test",
+        models: [{ id: "custom", name: "custom-model" }],
+      }],
+      defaultModel: "custom",
+    }), "utf-8");
+    const factory = await createCLIAgentFactory({
+      baseDir,
+      mode: "build",
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: createShellService({ windows: "powershell", timeoutMs: 120000 }),
+    });
+
+    await expect(factory.build("session-unknown")).rejects.toThrow(
+      "Unknown blueprint implementation: engine/not-real.",
+    );
   });
 });
