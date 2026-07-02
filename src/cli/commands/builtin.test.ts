@@ -142,6 +142,8 @@ describe("registerBuiltinCommands", () => {
       written: true,
       path: "AGENTS.md",
     }));
+    commandCtx.runtime.setPermissionRule = vi.fn(async () => undefined);
+    commandCtx.runtime.unsetPermissionRule = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/init");
     await registry.execute(commandCtx, "/init --force");
@@ -151,6 +153,8 @@ describe("registerBuiltinCommands", () => {
       permission: commandCtx.getState().config.permission,
       autoApprove: false,
     });
+    await registry.execute(commandCtx, "/permissions set shell:npm * allow");
+    await registry.execute(commandCtx, "/permissions unset write");
 
     await registry.execute(commandCtx, "/system");
     await registry.execute(commandCtx, "/undo");
@@ -172,10 +176,27 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();
     expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(1, false);
     expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(2, true);
+    expect(commandCtx.runtime.setPermissionRule).toHaveBeenCalledWith("shell:npm *", "allow");
+    expect(commandCtx.runtime.unsetPermissionRule).toHaveBeenCalledWith("write");
     expect(commandCtx.getState().panel).toEqual({
       type: "system",
       basePrompt: "You are a helpful assistant.",
       effectivePrompt: expect.stringContaining("Agent mode: build"),
+    });
+  });
+
+  it("shows an error panel for malformed permissions commands", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.setPermissionRule = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/permissions set write maybe");
+
+    expect(commandCtx.runtime.setPermissionRule).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /permissions set <target> <allow|ask|deny>",
     });
   });
 

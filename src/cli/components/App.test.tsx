@@ -80,6 +80,8 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     runDiagnostics: vi.fn(async () => undefined),
     showActivity: vi.fn(async () => undefined),
     initializeProjectInstructions: vi.fn(async () => ({ written: true, path: "AGENTS.md" })),
+    setPermissionRule: vi.fn(async () => undefined),
+    unsetPermissionRule: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   };
 }

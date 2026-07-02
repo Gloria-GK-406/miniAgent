@@ -207,6 +207,10 @@ describe("useSuggestion", () => {
     expect(result.current.applySelected("/he")).toBe("/help");
   });
 
+  it("adds a trailing space for permissions command completion", () => {
+    expect(applySuggestion("/pe", "/permissions")).toBe("/permissions ");
+  });
+
   it("applies selected agent mode completion", () => {
     const { result } = renderHook(() => useSuggestion());
     act(() => {

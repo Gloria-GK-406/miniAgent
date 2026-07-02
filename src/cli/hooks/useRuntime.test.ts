@@ -64,6 +64,8 @@ describe("useRuntime", () => {
       runDiagnostics: vi.fn(),
       showActivity: vi.fn(),
       initializeProjectInstructions: vi.fn(),
+      setPermissionRule: vi.fn(),
+      unsetPermissionRule: vi.fn(),
       destroy: vi.fn(),
     };
 

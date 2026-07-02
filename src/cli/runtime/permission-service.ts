@@ -3,6 +3,7 @@ import type { CLIPermissionRequest, CLIPermissionResult } from "./types.js";
 
 export interface PermissionService {
   resolve(request: CLIPermissionRequest, autoApprove: boolean): CLIPermissionResult;
+  updateConfig(config: CLIPermissionConfig): void;
 }
 
 function isDecision(value: unknown): value is CLIPermissionDecision {
@@ -43,9 +44,11 @@ function resolveNestedRule(
 }
 
 export function createPermissionService(config: CLIPermissionConfig): PermissionService {
+  let permissionConfig = config;
+
   return {
     resolve: (request, autoApprove): CLIPermissionResult => {
-      const toolRule = config[request.toolName];
+      const toolRule = permissionConfig[request.toolName];
       let result: CLIPermissionResult;
 
       if (isDecision(toolRule)) {
@@ -57,7 +60,7 @@ export function createPermissionService(config: CLIPermissionConfig): Permission
           toolRule as Record<string, CLIPermissionDecision>,
         );
       } else {
-        const fallback = config["*"];
+        const fallback = permissionConfig["*"];
         result = isDecision(fallback)
           ? { decision: fallback, reason: "global rule *" }
           : { decision: "ask", reason: "implicit ask" };
@@ -67,6 +70,9 @@ export function createPermissionService(config: CLIPermissionConfig): Permission
         return { decision: "allow", reason: "auto approve" };
       }
       return result;
+    },
+    updateConfig: (nextConfig) => {
+      permissionConfig = nextConfig;
     },
   };
 }

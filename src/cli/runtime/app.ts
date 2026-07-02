@@ -1,6 +1,6 @@
 import { MessageType, type Message } from "../../core/types.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
-import { loadConfig } from "../config.js";
+import { loadConfig, type CLIConfig, type CLIPermissionDecision } from "../config.js";
 import { completeActivityEntry, createActivityEntry } from "./activity.js";
 import {
   createCLIAgentFactory,
@@ -16,6 +16,7 @@ import { createExportService } from "./export-service.js";
 import { createGitService } from "./git-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createPermissionService } from "./permission-service.js";
+import { createPermissionConfigService } from "./permission-config-service.js";
 import { createProjectInstructionsService } from "./project-instructions-service.js";
 import { createReferenceService } from "./reference-service.js";
 import { createShellService } from "./shell-service.js";
@@ -35,11 +36,12 @@ interface RedoEntry {
 }
 
 export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> {
-  const config = await loadConfig(baseDir);
+  let config = await loadConfig(baseDir);
   const sessionService = await createCLISessionService(baseDir);
   const session = await sessionService.ensureActiveSession();
   const exportService = createExportService({ baseDir, sessionService });
   const projectInstructionsService = createProjectInstructionsService(baseDir);
+  const permissionConfigService = createPermissionConfigService(baseDir);
   const editorService = createEditorService({ config: config.editor });
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
@@ -135,6 +137,27 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   function updateState(patch: Partial<CLIState>): void {
     state = { ...state, ...patch };
     emit({ type: "state", state });
+  }
+
+  function applyConfig(nextConfig: CLIConfig): void {
+    config = nextConfig;
+    permissionService.updateConfig(nextConfig.permission);
+    updateState({ config: nextConfig });
+  }
+
+  async function updatePermissionRule(
+    update: () => Promise<CLIConfig>,
+  ): Promise<void> {
+    applyConfig(await update());
+    if (state.panel.type === "permissions") {
+      updateState({
+        panel: {
+          type: "permissions",
+          permission: state.config.permission,
+          autoApprove: state.autoApprove,
+        },
+      });
+    }
   }
 
   function createCommandContext(runtime: CLIAppRuntime): CLICommandContext {
@@ -377,6 +400,13 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     initializeProjectInstructions: async (overwrite) => (
       projectInstructionsService.initialize({ overwrite })
     ),
+    setPermissionRule: async (target: string, decision: CLIPermissionDecision) => {
+      await updatePermissionRule(() =>
+        permissionConfigService.setRule(target, decision, state.config.permission));
+    },
+    unsetPermissionRule: async (target: string) => {
+      await updatePermissionRule(() => permissionConfigService.unsetRule(target));
+    },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);

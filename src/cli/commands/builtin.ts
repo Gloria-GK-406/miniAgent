@@ -1,5 +1,6 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext } from "../runtime/types.js";
+import type { CLIPermissionDecision } from "../config.js";
 import {
   buildEffectiveSystemPrompt,
   getBaseSystemPrompt,
@@ -11,6 +12,24 @@ function errorMessage(error: unknown): string {
 
 function splitArgs(args: string): string[] {
   return args.trim().length === 0 ? [] : args.trim().split(/\s+/);
+}
+
+function parsePermissionDecision(value: string | undefined): CLIPermissionDecision | null {
+  if (value === "allow" || value === "ask" || value === "deny") {
+    return value;
+  }
+  return null;
+}
+
+function showPermissionsPanel(ctx: CLICommandContext): void {
+  const state = ctx.getState();
+  ctx.updateState({
+    panel: {
+      type: "permissions",
+      permission: state.config.permission,
+      autoApprove: state.autoApprove,
+    },
+  });
 }
 
 async function runSessionMutation(
@@ -83,16 +102,48 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register({
     name: "permissions",
     aliases: ["permission"],
-    description: "Show permission policy",
-    usage: "/permissions",
-    execute: async (ctx) => {
-      const state = ctx.getState();
-      ctx.updateState({
-        panel: {
-          type: "permissions",
-          permission: state.config.permission,
-          autoApprove: state.autoApprove,
-        },
+    description: "Show or edit permission policy",
+    usage: "/permissions [set <target> <allow|ask|deny>|unset <target>]",
+    execute: async (ctx, args) => {
+      const parts = splitArgs(args);
+      const action = parts[0];
+      if (action === undefined) {
+        showPermissionsPanel(ctx);
+        return;
+      }
+
+      await runSessionMutation(ctx, async () => {
+        switch (action) {
+          case "set": {
+            const raw = args.trim().slice(action.length).trim();
+            const rawParts = splitArgs(raw);
+            const decisionText = rawParts.at(-1);
+            const decision = parsePermissionDecision(decisionText);
+            if (decision === null || decisionText === undefined) {
+              throw new Error("Usage: /permissions set <target> <allow|ask|deny>");
+            }
+            const target = raw.slice(0, raw.length - decisionText.length).trim();
+            if (target.length === 0) {
+              throw new Error("Usage: /permissions set <target> <allow|ask|deny>");
+            }
+            await ctx.runtime.setPermissionRule(target, decision);
+            showPermissionsPanel(ctx);
+            ctx.notice("info", `Set permission ${target} to ${decision}`);
+            break;
+          }
+          case "unset": {
+            const target = args.trim().slice(action.length).trim();
+            if (target.length === 0) {
+              throw new Error("Usage: /permissions unset <target>");
+            }
+            await ctx.runtime.unsetPermissionRule(target);
+            showPermissionsPanel(ctx);
+            ctx.notice("info", `Unset permission ${target}`);
+            break;
+          }
+          default:
+            throw new Error(`Unknown permissions action: ${action}`);
+        }
       });
     },
   });

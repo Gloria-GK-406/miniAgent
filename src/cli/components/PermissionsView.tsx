@@ -73,7 +73,7 @@ export function PermissionsView({
       ))}
       {rows.length === 0 && <Text dimColor>No permission rules configured</Text>}
       <Text dimColor>{"-".repeat(72)}</Text>
-      <Text dimColor>ESC close | edit .cliagent/config.json to change policy</Text>
+      <Text dimColor>ESC close | /permissions set shell:npm * allow | /permissions unset write</Text>
     </Box>
   );
 }

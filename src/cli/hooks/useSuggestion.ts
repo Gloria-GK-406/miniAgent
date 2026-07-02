@@ -42,6 +42,7 @@ const COMMANDS_WITH_ARGS = new Set([
   "/init",
   "/model",
   "/new",
+  "/permissions",
   "/sessions",
 ]);
 

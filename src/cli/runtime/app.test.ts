@@ -51,6 +51,28 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("edits permission policy from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-permissions-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/permissions set shell:npm * allow");
+
+    expect(runtime.getState().config.permission.shell).toEqual({
+      "*": "ask",
+      "npm *": "allow",
+    });
+    expect(runtime.getState().panel).toEqual({
+      type: "permissions",
+      permission: runtime.getState().config.permission,
+      autoApprove: false,
+    });
+    await expect(readFile(join(baseDir, ".cliagent", "config.json"), "utf-8"))
+      .resolves.toContain('"npm *": "allow"');
+
+    await runtime.destroy();
+  });
+
   it("creates, switches, and renames sessions from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-sessions-"));
     await writeConfig(baseDir);

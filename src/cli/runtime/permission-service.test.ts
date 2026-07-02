@@ -59,4 +59,15 @@ describe("PermissionService", () => {
       reason: "tool rule write",
     });
   });
+
+  it("uses updated config for future permission decisions", () => {
+    const service = createPermissionService({ "*": "ask", write: "ask" });
+
+    service.updateConfig({ "*": "ask", write: "deny" });
+
+    expect(service.resolve({ toolName: "write", args: {} }, true)).toEqual({
+      decision: "deny",
+      reason: "tool rule write",
+    });
+  });
 });
