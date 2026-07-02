@@ -54,7 +54,14 @@ describe("CLI package entry", () => {
     const pkg = await readJson("package.json");
     const scripts = pkg["scripts"] as Record<string, unknown>;
 
-    expect(scripts["prepublishOnly"]).toBe("npm run lint && npm run build && npm test");
+    expect(scripts["prepublishOnly"]).toBe("npm run lint && npm run build && npm test && npm run package:smoke");
+  });
+
+  it("smoke tests the built CLI binary before publishing", async () => {
+    const pkg = await readJson("package.json");
+    const scripts = pkg["scripts"] as Record<string, unknown>;
+
+    expect(scripts["package:smoke"]).toBe("node dist/cli/index.js --version && node dist/cli/index.js --help");
   });
 
   it("keeps the compiled CLI directly executable by Node package managers", async () => {
