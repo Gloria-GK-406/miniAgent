@@ -5,6 +5,8 @@
 
     "module": "nodenext",
     "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
     "lib": ["esnext"],
     "types": ["node"],
 
@@ -29,5 +31,5 @@
     "skipLibCheck": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "src/cli", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }

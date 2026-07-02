@@ -116,7 +116,7 @@ export function ModelSelectView({
               bold={isSelected}
               inverse={isSelected}
               dimColor={!isSelected && !isActive}
-              color={isActive ? "green" : undefined}
+              {...(isActive && { color: "green" })}
             >
               {isSelected ? "› " : "  "}
               {path}

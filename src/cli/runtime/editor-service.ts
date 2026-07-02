@@ -65,7 +65,7 @@ export function resolveEditorInvocation({
     return { command: config.executable, args, filePath };
   }
 
-  const editor = env.EDITOR?.trim();
+  const editor = env["EDITOR"]?.trim();
   if (editor !== undefined && editor.length > 0) {
     const [command, ...args] = splitCommandLine(editor);
     if (command !== undefined) {

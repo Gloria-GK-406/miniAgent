@@ -164,7 +164,7 @@ export function getGlobalConfigPath(options: LoadConfigOptions = {}): string {
   const pathJoin = platform === "win32" ? win32.join : posix.join;
 
   if (platform === "win32") {
-    const appData = env.APPDATA?.trim();
+    const appData = env["APPDATA"]?.trim();
     return pathJoin(
       appData !== undefined && appData.length > 0 ? appData : pathJoin(home, "AppData", "Roaming"),
       "miniagent",
@@ -172,7 +172,7 @@ export function getGlobalConfigPath(options: LoadConfigOptions = {}): string {
     );
   }
 
-  const xdgConfigHome = env.XDG_CONFIG_HOME?.trim();
+  const xdgConfigHome = env["XDG_CONFIG_HOME"]?.trim();
   return pathJoin(
     xdgConfigHome !== undefined && xdgConfigHome.length > 0 ? xdgConfigHome : pathJoin(home, ".config"),
     "miniagent",

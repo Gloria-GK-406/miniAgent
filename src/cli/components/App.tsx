@@ -557,11 +557,6 @@ export function App({ runtime }: AppProps) {
           <Text dimColor>-</Text>
           <Text dimColor>/help for commands</Text>
         </Box>
-        {state.approval && (
-          <Text color="yellow">
-            Approval requested: {state.approval.toolName}
-          </Text>
-        )}
         {exitArmed && !state.isRunning && (
           <Text color="yellow">{EXIT_CONFIRM_TEXT}</Text>
         )}

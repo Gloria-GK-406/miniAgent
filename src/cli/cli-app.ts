@@ -355,7 +355,7 @@ function createBuiltinBlueprintManager(
         getAgentConfig: options.getAgentConfig,
         getHITL: options.getHitlEnabled,
         subagentFactory: options.subagentFactory,
-        onCompressor: options.onCompressor,
+        ...(options.onCompressor !== undefined && { onCompressor: options.onCompressor }),
     });
     return manager;
 }

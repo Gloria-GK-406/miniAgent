@@ -61,7 +61,10 @@ export function createGitToolkit(options: GitToolkitOptions): GitToolkit {
         parameters: GitDiffParamsSchema,
         execute: async (args): Promise<string> => {
           const parsed = GitDiffParamsSchema.parse(args);
-          return options.gitService.diff(parsed);
+          return options.gitService.diff({
+            ...(parsed.path !== undefined && { path: parsed.path }),
+            ...(parsed.staged !== undefined && { staged: parsed.staged }),
+          });
         },
       },
       {
@@ -70,7 +73,9 @@ export function createGitToolkit(options: GitToolkitOptions): GitToolkit {
         parameters: GitLogParamsSchema,
         execute: async (args): Promise<string> => {
           const parsed = GitLogParamsSchema.parse(args);
-          return options.gitService.log(parsed);
+          return options.gitService.log({
+            ...(parsed.limit !== undefined && { limit: parsed.limit }),
+          });
         },
       },
       {

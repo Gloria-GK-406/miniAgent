@@ -249,8 +249,8 @@ export function buildRenderableLines(
     const isLast = index === renderableMessages.length - 1;
     const isAssist = message.type === MessageType.Assist;
     return messageToLines(message, width, {
-      streamingText: isLast && isAssist ? streamingText : undefined,
-      reasoningText: isLast && isAssist ? reasoningText : undefined,
+      ...(isLast && isAssist && streamingText !== undefined && { streamingText }),
+      ...(isLast && isAssist && reasoningText !== undefined && { reasoningText }),
     });
   });
 }
