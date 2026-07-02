@@ -39,6 +39,19 @@ describe("applyCLIEntryRuntimeOptions", () => {
     expect(runtime.selectModel).toHaveBeenCalledWith("openai/fast");
   });
 
+  it("accepts snapshot listing actions with a startup session", async () => {
+    const runtime = {
+      switchSession: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "list-snapshots",
+      sessionId: "s2",
+    });
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("s2");
+  });
+
   it("selects the requested startup model when present", async () => {
     const runtime = {
       runCommand: vi.fn(async () => undefined),

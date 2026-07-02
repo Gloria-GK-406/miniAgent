@@ -299,6 +299,18 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("lists workspace snapshots without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--list-snapshots"])).toEqual({
+      type: "list-snapshots",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--session", "s2", "--list-snapshots", "--json"])).toEqual({
+      type: "list-snapshots",
+      cwd: "C:/repo",
+      sessionId: "s2",
+      output: "json",
+    });
+  });
+
   it("runs read-only git commands without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--git-status"])).toEqual({
       type: "git-headless",
@@ -678,6 +690,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects prompted snapshot listing mode", () => {
+    expect(parseCLIEntryArgs(["--list-snapshots", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --list-snapshots",
+    });
+    expect(parseCLIEntryArgs(["--status", "--list-snapshots"])).toEqual({
+      type: "error",
+      message: "Cannot combine --status with another headless mode",
+    });
+  });
+
   it("rejects prompted model listing mode", () => {
     expect(parseCLIEntryArgs(["--list-models", "prompt"])).toEqual({
       type: "error",
@@ -894,7 +917,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
       output: "json",
     });
   });
@@ -930,6 +953,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--list-agents");
     expect(help).toContain("--preview-context");
     expect(help).toContain("--show-history");
+    expect(help).toContain("--list-snapshots");
     expect(help).toContain("--git-status");
     expect(help).toContain("--git-log");
     expect(help).toContain("--git-diff");

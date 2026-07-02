@@ -33,6 +33,7 @@ import { runSessionImport } from "./session-import-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
 import { runSessionRename } from "./session-rename-runner.js";
 import { runShowConfig } from "./show-config-runner.js";
+import { runSnapshotList } from "./snapshot-list-runner.js";
 import { runRuntimeStatus } from "./status-runner.js";
 import { runSystemPromptUpdate } from "./system-prompt-runner.js";
 import { runToolList } from "./tool-list-runner.js";
@@ -264,6 +265,21 @@ async function main(): Promise<void> {
       createRuntime: createCLIRuntime,
       streams,
       run: async (runtime) => await runHistory(
+        runtime,
+        streams,
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      ),
+    });
+    return;
+  }
+  if (action.type === "list-snapshots") {
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runSnapshotList(
         runtime,
         streams,
         {

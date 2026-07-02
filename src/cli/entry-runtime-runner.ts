@@ -12,7 +12,8 @@ type RuntimeBackedCLIEntryActionType =
   | "list-tools"
   | "list-agents"
   | "preview-context"
-  | "show-history";
+  | "show-history"
+  | "list-snapshots";
 
 export type RuntimeBackedCLIEntryAction = Extract<CLIEntryAction, { type: RuntimeBackedCLIEntryActionType }>;
 

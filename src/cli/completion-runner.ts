@@ -21,6 +21,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--list-agents", description: "List primary and configured agents headlessly" },
   { long: "--preview-context", description: "Preview assembled runtime context headlessly" },
   { long: "--show-history", description: "Show session history headlessly" },
+  { long: "--list-snapshots", description: "Show workspace snapshots headlessly" },
   { long: "--git-status", description: "Print git status headlessly" },
   { long: "--git-log", description: "Print recent git commits headlessly" },
   { long: "--git-diff", description: "Print git diff headlessly" },

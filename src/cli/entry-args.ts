@@ -149,6 +149,12 @@ export type CLIEntryAction =
     output?: CLIEntryOutput;
   }
   | {
+    type: "list-snapshots";
+    cwd?: string;
+    sessionId?: string;
+    output?: CLIEntryOutput;
+  }
+  | {
     type: "permission-update";
     action: "set" | "unset";
     cwd?: string;
@@ -186,6 +192,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let listAgentsMode = false;
   let previewContextMode = false;
   let showHistoryMode = false;
+  let listSnapshotsMode = false;
   let gitAction: CLIEntryGitAction | undefined;
   let gitLogLimit: number | undefined;
   let gitDiffPath: string | undefined;
@@ -288,6 +295,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--show-history") {
       showHistoryMode = true;
+      continue;
+    }
+    if (arg === "--list-snapshots") {
+      listSnapshotsMode = true;
       continue;
     }
     if (arg === "--git-status") {
@@ -591,7 +602,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
-  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --status with another headless mode");
   }
   if (
@@ -612,6 +623,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listAgentsMode
       || previewContextMode
       || showHistoryMode
+      || listSnapshotsMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -785,6 +797,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (showHistoryMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --show-history with another headless mode");
+  }
+  if (listSnapshotsMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+    return parseError("Cannot combine --list-snapshots with another headless mode");
   }
   if (gitAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
@@ -1071,6 +1086,17 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (listSnapshotsMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --list-snapshots");
+    }
+    return {
+      type: "list-snapshots",
+      ...(cwd !== undefined && { cwd }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (gitAction !== undefined) {
     const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
     if (prompt.length > 0) {
@@ -1120,7 +1146,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1160,6 +1186,7 @@ export function formatCLIHelp(): string {
     "  --list-agents   List primary and configured agents headlessly",
     "  --preview-context Preview assembled runtime context headlessly",
     "  --show-history  Show session history headlessly",
+    "  --list-snapshots Show workspace snapshots headlessly",
     "  --git-status    Print git status headlessly",
     "  --git-log       Print recent git commits headlessly",
     "  --git-diff      Print git diff headlessly",
