@@ -40,7 +40,7 @@ export interface CLIApprovalRequest {
 
 export interface CLIActivityEntry {
   id: string;
-  kind: "tool" | "subagent";
+  kind: "tool" | "subagent" | "approval";
   name: string;
   status: "running" | "done" | "error";
   startedAt: string;

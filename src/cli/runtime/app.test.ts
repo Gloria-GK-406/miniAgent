@@ -240,6 +240,43 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("records rejected shell approvals in activity", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-approval-activity-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "ask",
+        shell: "ask",
+      },
+      shell: {
+        windows: "powershell",
+        executable: process.execPath,
+        args: ["-e"],
+        timeoutMs: 120000,
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    const pending = runtime.submitInput("!console.log('should-not-run')");
+    const approvalId = runtime.getState().approval?.id;
+    expect(approvalId).toEqual(expect.any(String));
+
+    runtime.answerApproval(approvalId!, false);
+    await pending;
+
+    expect(runtime.getState().panel).toEqual({
+      type: "error",
+      message: "Permission rejected for shell shortcut",
+    });
+    expect(runtime.getState().activity).toContainEqual(expect.objectContaining({
+      id: approvalId,
+      kind: "approval",
+      name: "shell",
+      status: "error",
+      summary: "rejected shell",
+    }));
+    await runtime.destroy();
+  });
+
   it("persists shell shortcut output as a tool-style transcript", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-persist-"));
     await writeConfig(baseDir, {

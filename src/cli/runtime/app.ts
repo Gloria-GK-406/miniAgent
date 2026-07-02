@@ -7,7 +7,12 @@ import {
 import { type SessionMeta } from "../../core/session.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
 import { loadConfig, type CLIConfig, type CLIPermissionDecision } from "../config.js";
-import { completeActivityEntry, createActivityEntry } from "./activity.js";
+import {
+  completeActivityEntry,
+  completeApprovalActivityEntry,
+  createActivityEntry,
+  createApprovalActivityEntry,
+} from "./activity.js";
 import {
   createCLIAgentFactory,
   formatResolvedModelPath,
@@ -102,7 +107,13 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     return new Promise((resolve) => {
       const id = crypto.randomUUID();
       approvalResolvers.set(id, resolve);
-      updateState({ approval: { id, toolName, args, decision: "pending" } });
+      updateState({
+        approval: { id, toolName, args, decision: "pending" },
+        activity: [
+          ...state.activity,
+          createApprovalActivityEntry(id, toolName, args, new Date().toISOString()),
+        ].slice(-100),
+      });
     });
   }
 
@@ -588,7 +599,15 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);
-      updateState({ approval: null });
+      updateState({
+        approval: null,
+        activity: completeApprovalActivityEntry(
+          state.activity,
+          id,
+          decision,
+          new Date().toISOString(),
+        ),
+      });
     },
     stop: () => {
       built.agent.stop();

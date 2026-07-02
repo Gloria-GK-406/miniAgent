@@ -35,7 +35,9 @@ function statusColor(status: CLIActivityEntry["status"]): string {
 }
 
 function kindLabel(kind: CLIActivityEntry["kind"]): string {
-  return kind === "subagent" ? "AGENT" : "TOOL";
+  if (kind === "subagent") return "AGENT";
+  if (kind === "approval") return "APPROVAL";
+  return "TOOL";
 }
 
 function statusLabel(status: CLIActivityEntry["status"]): string {

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { MessageType } from "../../core/types.js";
 import {
   classifyActivityKind,
+  completeApprovalActivityEntry,
   completeActivityEntry,
+  createApprovalActivityEntry,
   createActivityEntry,
 } from "./activity.js";
 import type { ToolCallMessage, ToolResultMessage } from "../../core/types.js";
@@ -43,6 +45,35 @@ describe("activity helpers", () => {
       startedAt: "2026-07-02T00:00:00.000Z",
       summary: '{"path":"src/index.ts"}',
     });
+  });
+
+  it("records approval decisions as activity entries", () => {
+    const pending = createApprovalActivityEntry(
+      "approval-1",
+      "shell",
+      { command: "npm test" },
+      "2026-07-02T00:00:00.000Z",
+    );
+
+    expect(pending).toEqual({
+      id: "approval-1",
+      kind: "approval",
+      name: "shell",
+      status: "running",
+      startedAt: "2026-07-02T00:00:00.000Z",
+      summary: '{"command":"npm test"}',
+    });
+    expect(completeApprovalActivityEntry(
+      [pending],
+      "approval-1",
+      false,
+      "2026-07-02T00:00:01.000Z",
+    )).toEqual([{
+      ...pending,
+      status: "error",
+      endedAt: "2026-07-02T00:00:01.000Z",
+      summary: "rejected shell",
+    }]);
   });
 
   it("completes activity entries with result summaries", () => {

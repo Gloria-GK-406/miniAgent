@@ -40,14 +40,24 @@ describe("ActivityView", () => {
             summary: "subtask complete",
             endedAt: "2026-07-02T00:00:03.000Z",
           }),
+          entry({
+            id: "c",
+            kind: "approval",
+            name: "shell",
+            status: "error",
+            summary: "rejected shell",
+            endedAt: "2026-07-02T00:00:04.000Z",
+          }),
         ]}
         onClose={vi.fn()}
       />,
     );
 
-    expect(output).toContain("Activity (2)");
+    expect(output).toContain("Activity (3)");
     expect(output).toContain("RUNNING TOOL read");
     expect(output).toContain("DONE AGENT run_subagent");
+    expect(output).toContain("ERROR APPROVAL shell");
+    expect(output).toContain("rejected shell");
     expect(output).toContain("subtask complete");
   });
 

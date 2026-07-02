@@ -54,6 +54,39 @@ export function createActivityEntry(
   };
 }
 
+export function createApprovalActivityEntry(
+  id: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  startedAt: string,
+): CLIActivityEntry {
+  return {
+    id,
+    kind: "approval",
+    name: toolName,
+    status: "running",
+    startedAt,
+    summary: summarizeArguments(args),
+  };
+}
+
+export function completeApprovalActivityEntry(
+  entries: CLIActivityEntry[],
+  id: string,
+  approved: boolean,
+  endedAt: string,
+): CLIActivityEntry[] {
+  return entries.map((entry) => {
+    if (entry.id !== id) return entry;
+    return {
+      ...entry,
+      status: approved ? "done" : "error",
+      endedAt,
+      summary: `${approved ? "approved" : "rejected"} ${entry.name}`,
+    };
+  });
+}
+
 export function completeActivityEntry(
   entries: CLIActivityEntry[],
   toolCall: ToolCallMessage,
