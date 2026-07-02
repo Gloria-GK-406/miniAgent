@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import type { Tool } from "../../tool/types.js";
@@ -199,6 +199,27 @@ function createWriteTool(options: CLIToolkitOptions): Tool {
   };
 }
 
+function createDeleteTool(options: CLIToolkitOptions): Tool {
+  return {
+    name: "delete",
+    description: "Delete a workspace file.",
+    parameters: PathParamsSchema,
+    execute: async (args): Promise<string> => {
+      await assertPermission(options, "delete", args);
+      const parsed = PathParamsSchema.parse(args);
+      const target = resolveWorkspacePath(options.baseDir, parsed.path);
+      const info = await stat(target.absolutePath);
+      if (info.isDirectory()) {
+        throw new Error(`Cannot delete directory ${target.displayPath}`);
+      }
+      await mutateWithSnapshot(options, parsed.path, async () => {
+        await unlink(target.absolutePath);
+      });
+      return `Deleted ${target.displayPath}`;
+    },
+  };
+}
+
 function createEditTool(options: CLIToolkitOptions): Tool {
   return {
     name: "edit",
@@ -321,6 +342,7 @@ export function createCLIToolkit(options: CLIToolkitOptions): CLIToolkit {
     tools: [
       createReadTool(options),
       createWriteTool(options),
+      createDeleteTool(options),
       createEditTool(options),
       createMultiEditTool(options),
       createPatchTool(options),

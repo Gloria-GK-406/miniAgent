@@ -147,6 +147,43 @@ describe("createCLIToolkit", () => {
     await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("ONE two THREE");
   });
 
+  it("deletes workspace files with snapshots and refresh notification", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-delete-"));
+    await writeFile(join(baseDir, "a.txt"), "remove me", "utf-8");
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => session.id,
+      getActiveTurnId: () => "turn-delete",
+    });
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      snapshotService,
+      onWorkspaceFilesChanged,
+    });
+    const deleteTool = toolkit.tools.find((tool) => tool.name === "delete")!;
+
+    await expect(deleteTool.execute({ path: "a.txt" })).resolves.toBe("Deleted a.txt");
+
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).rejects.toMatchObject({ code: "ENOENT" });
+    expect(onWorkspaceFilesChanged).toHaveBeenCalledTimes(1);
+    expect(await snapshotService.listTurnSnapshots("turn-delete")).toEqual([
+      expect.objectContaining({
+        displayPath: "a.txt",
+        beforeExists: true,
+        beforeContent: "remove me",
+        afterExists: false,
+      }),
+    ]);
+  });
+
   it("applies a simple single-file unified patch", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-patch-"));
     await writeFile(join(baseDir, "a.txt"), "alpha\nbeta\ngamma\n", "utf-8");
