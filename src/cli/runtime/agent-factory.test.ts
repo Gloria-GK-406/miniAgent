@@ -33,6 +33,24 @@ function resolvedModel(
   };
 }
 
+function toolCall(toolName: string, args: Record<string, unknown> = {}): {
+  id: string;
+  type: MessageType.ToolCall;
+  content: string;
+  toolCallId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+} {
+  return {
+    id: `${toolName}-message`,
+    type: MessageType.ToolCall,
+    content: "",
+    toolCallId: `${toolName}-call`,
+    toolName,
+    arguments: args,
+  };
+}
+
 async function writeConfig(baseDir: string): Promise<void> {
   const configDir = join(baseDir, ".cliagent");
   await mkdir(configDir, { recursive: true });
@@ -127,6 +145,33 @@ describe("createCLIAgentFactory", () => {
       });
       await expect(readFile(join(baseDir, "planned.txt"), "utf-8"))
         .rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await built.agent.destroy();
+    }
+  });
+
+  it("gates non-CLI blueprint tools with product permissions", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-agent-factory-approval-"));
+    await writeConfig(baseDir);
+    const requestApproval = vi.fn(async () => false);
+    const factory = await createCLIAgentFactory({
+      baseDir,
+      mode: "build",
+      permissionService: createPermissionService({ "*": "ask" }),
+      getAutoApprove: () => false,
+      requestApproval,
+      shellService: createShellService({ windows: "powershell", timeoutMs: 120000 }),
+    });
+    const built = await factory.build("session-blueprint-approval");
+    try {
+      await expect(built.agent.execute(toolCall("todo_create", {
+        title: "plan work",
+      }))).resolves.toEqual(expect.objectContaining({
+        content: "Tool execution denied by user.",
+      }));
+      expect(requestApproval).toHaveBeenCalledWith("todo_create", {
+        title: "plan work",
+      });
     } finally {
       await built.agent.destroy();
     }

@@ -6,6 +6,7 @@ import { createDefaultBlueprint, registerBuiltinBlueprintImpls } from "../../ass
 import type { AgentBlueprint, BlueprintUse } from "../../assembly/blueprint.js";
 import { BlueprintManager } from "../../assembly/manager.js";
 import type { MiniAgent } from "../../core/agent.js";
+import type { AgentUse } from "../../core/create-agent.js";
 import {
   AgentConfigSchema,
   JsonValueSchema,
@@ -40,6 +41,22 @@ import { buildEffectiveSystemPrompt, getBaseSystemPrompt } from "./system-prompt
 const DEFAULT_MESSAGE_FILE_NAME = "messages.jsonl";
 const TODO_TOOL_NAMES = ["todo_create", "todo_update", "todo_delete"];
 const PLUGIN_CAPABILITY_NAMESPACES = ["mcp", "skill", "subagent"] as const;
+const SELF_ENFORCING_PERMISSION_TOOL_NAMES = new Set([
+  "read",
+  "glob",
+  "grep",
+  "write",
+  "delete",
+  "move",
+  "edit",
+  "multi_edit",
+  "patch",
+  "shell",
+  "git_status",
+  "git_diff",
+  "git_log",
+  "git_commit",
+]);
 
 type PluginCapabilityNamespace = typeof PLUGIN_CAPABILITY_NAMESPACES[number];
 
@@ -324,7 +341,7 @@ async function buildAgentInner(
   };
 }
 
-function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typeof createCLIToolkit>["tools"] {
+function createRuntimeExtraUses(options: CLIAgentFactoryOptions): AgentUse[] {
   const permissionService = createModeAwarePermissionService({
     base: options.permissionService,
     getMode: () => resolveMode(options.mode),
@@ -346,7 +363,25 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typ
     getAutoApprove: options.getAutoApprove,
     requestApproval: options.requestApproval,
   }).tools;
-  return [...cliTools, ...gitTools];
+  return [
+    ...cliTools,
+    ...gitTools,
+    {
+      requestApproval: async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
+        if (SELF_ENFORCING_PERMISSION_TOOL_NAMES.has(toolName)) {
+          return true;
+        }
+        const result = permissionService.resolve({ toolName, args }, options.getAutoApprove());
+        if (result.decision === "deny") {
+          return false;
+        }
+        if (result.decision === "ask") {
+          return options.requestApproval(toolName, args);
+        }
+        return true;
+      },
+    },
+  ];
 }
 
 function createBuiltinBlueprintManager(
