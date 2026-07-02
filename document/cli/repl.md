@@ -202,6 +202,12 @@ default, mutating tools and shell commands ask by default, and explicit deny
 rules are always enforced. `/auto` allows requests that would otherwise ask, but
 it never overrides a deny rule.
 
+Approval prompts accept `y` or `Enter` to approve once, `n` or `Esc` to reject
+once, `a` to allow the same request for the current session, and `d` to reject
+the same request for the current session. Session decisions are exact-request
+overrides keyed by tool name and arguments; they are not persisted to
+`.cliagent/config.json`.
+
 ## Shell
 
 Messages beginning with `!` run through the CLI shell service and are recorded

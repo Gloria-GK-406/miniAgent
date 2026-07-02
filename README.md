@@ -487,16 +487,20 @@ and shell integration:
 
 Keybindings: `Tab` completes the active suggestion or switches build/plan when
 there is no suggestion, `Ctrl+C` stops a run or exits when idle, `PgUp`/`PgDn`
-scroll the transcript, and `Esc` closes panels or rejects approval.
+scroll the transcript, and `Esc` closes panels or rejects approval. Approval
+prompts also support `a`/`d` to allow or reject the same request for the current
+session without persisting a project permission rule.
 
 The CLI uses product-level permissions: read/search tools are allowed by default,
 mutating tools and shell commands ask by default, and explicit deny rules always
-win. Messages beginning with `!` run through the configured CLI shell service.
-The agent also gets git-aware read tools and guarded `git_commit`; `/diff`,
-`/diagnostics`, `/activity`, and `/editor` provide local developer workflow
-panels. Project custom commands can be added as `.cliagent/commands/*.md`;
-exports, imports, undo, and redo are project-local under `.cliagent/`. Session
-exports include model, agent mode, and token usage metadata.
+win. Session approval decisions match the exact tool arguments, so approving one
+shell command does not open the whole shell tool. Messages beginning with `!` run
+through the configured CLI shell service. The agent also gets git-aware read
+tools and guarded `git_commit`; `/diff`, `/diagnostics`, `/activity`, and
+`/editor` provide local developer workflow panels. Project custom commands can
+be added as `.cliagent/commands/*.md`; exports, imports, undo, and redo are
+project-local under `.cliagent/`. Session exports include model, agent mode, and
+token usage metadata.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 
