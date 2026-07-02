@@ -141,6 +141,7 @@ CLI Agent 通过语义蓝图组装。默认蓝图始终包含：
 - **grep** — 搜索文件内容
 - **shell** — 通过 CLI shell service 执行 Shell 命令
 - **todo** — 任务管理（todo_create、todo_update、todo_delete）
+- **diagnostics** — 经权限批准后运行配置或自动发现的项目诊断命令
 
 当 `.cliagent/config.json` 包含 `mcp`、`skill` 或 `subagent` 字段时，这些
 CLI 便捷字段会在组装时复制到蓝图组件配置中：

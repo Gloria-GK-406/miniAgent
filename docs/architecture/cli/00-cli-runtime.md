@@ -36,7 +36,7 @@ This unit splits the single-process CLI into seven top-level subparts with non-o
        v               v
 ┌────────────────────────────────────────────────────────────┐
 │ CLI-local tools + permission/safety layer                  │
-│ workspace IO, shell, git, snapshots, approval policy       │
+│ workspace IO, shell, git, diagnostics, snapshots, approval │
 └───────────────┬────────────────────────────────────────────┘
                 │ persists / loads
                 v
@@ -52,7 +52,7 @@ This unit splits the single-process CLI into seven top-level subparts with non-o
 | Runtime facade and state hub | `src/cli/runtime/app.ts` | Owns config, services, active session, active MiniAgent, state mutation, events, and approval resolution. | ⏳[INV-cli-runtime-tui-agnostic] Does not render Ink UI <br> ⏳[INV-cli-runtime-core-boundary] Does not modify MiniAgent core behavior |
 | Agent assembly bridge | `src/cli/runtime/agent-factory.ts` | Builds MiniAgent instances from CLI config, blueprint assembly, CLI-local tools, and subagent factories. | ⏳[INV-cli-factory-single-process] Does not introduce a separate server/runtime process <br> ⏳[INV-cli-factory-cli-tools-over-core-tools] Routes product tool behavior through CLI extra uses |
 | Commands and input routing | `src/cli/commands/builtin.ts`; `src/cli/runtime/input-router.ts` | Turns user input into slash-command execution, shell shortcuts, or prompt messages with references. | ⏳[INV-cli-command-runtime-api] Commands call runtime methods rather than touching services directly <br> ⏳[INV-cli-router-no-agent-run] Router classifies input but does not call `MiniAgent.run()` |
-| CLI-local tools and safety | `src/cli/tools/cli-toolkit.ts`; `src/cli/tools/git-toolkit.ts` | Provides workspace-aware read/search/mutation/shell/git tools with permission and snapshot hooks. | ⏳[INV-cli-tools-workspace-root] File tools resolve paths through the workspace boundary <br> ⏳[INV-cli-tools-permission-first] Mutating and shell/git commit tools check permission before side effects |
+| CLI-local tools and safety | `src/cli/tools/cli-toolkit.ts`; `src/cli/tools/git-toolkit.ts`; `src/cli/tools/diagnostics-toolkit.ts` | Provides workspace-aware read/search/mutation/shell/git/diagnostics tools with permission and snapshot hooks. | ⏳[INV-cli-tools-workspace-root] File tools resolve paths through the workspace boundary <br> ⏳[INV-cli-tools-permission-first] Mutating, shell, diagnostics, and git commit tools check permission before side effects |
 | Persistence and workflow services | `src/cli/runtime/session-service.ts`; `src/cli/runtime/snapshot-service.ts` | Stores project-local sessions, metadata, exports, snapshots, references, diagnostics, and config. | ⏳[INV-cli-services-project-local] Session/export/snapshot state lives under project-local `.cliagent/` unless explicitly global config is being read <br> ⏳[INV-cli-services-core-storage-wrapper] Session rewrites are CLI service operations, not core `MessageSource` API changes |
 | Ink TUI view layer | `src/cli/components/App.tsx` | Subscribes to runtime state and renders transcript, panels, approval prompts, autocomplete, input, and status. | ⏳[INV-cli-tui-runtime-only] Does not call `MiniAgent.run()` directly <br> ⏳[INV-cli-tui-panel-state] Panel routing is driven by `CLIViewPanel` state |
 
@@ -129,7 +129,7 @@ node bin
 |---|---|---|
 | `createCLIAgentFactory()` | Loads CLI config and returns a session-aware build function. | ⏳[INV-cli-factory-config-source] Agent construction reads CLI config through the config layer |
 | `createConfiguredSubagentFactory()` | Creates subagent MiniAgent instances from configured subagent entries and parent model/generation state. | ⏳[INV-cli-subagents-share-cli-assembly] Subagents receive CLI runtime extra uses instead of a separate tool stack |
-| `createRuntimeExtraUses()` | Registers CLI toolkit tools, git toolkit tools, and a product permission bridge for non-self-enforcing blueprint tools. | ⏳[INV-cli-extra-uses-permission-bridge] Non-CLI blueprint tools pass through product permission decisions <br> ⏳[INV-cli-extra-uses-no-double-approval] Self-enforcing CLI tools are not approved twice |
+| `createRuntimeExtraUses()` | Registers CLI toolkit tools, git toolkit tools, diagnostics tools, and a product permission bridge for non-self-enforcing blueprint tools. | ⏳[INV-cli-extra-uses-permission-bridge] Non-CLI blueprint tools pass through product permission decisions <br> ⏳[INV-cli-extra-uses-no-double-approval] Self-enforcing CLI tools are not approved twice |
 | `createCLIBlueprint()` | Builds the default semantic blueprint with CLI config fields and removes the low-level `bash` tool. | ⏳[INV-cli-blueprint-no-bash-tool] CLI shell behavior is provided by CLI-local shell tooling |
 
 ↪ code: `src/cli/runtime/agent-factory.ts:204`
@@ -176,6 +176,7 @@ node bin
 | `write` / `delete` / `move` / `edit` / `multi_edit` / `patch` | Performs workspace mutations with exact replacement or conservative patch semantics. | ⏳[INV-cli-mutations-structured] Mutations use structured tool schemas and explicit filesystem operations |
 | `createShellTool()` | Executes commands through `ShellService`, reporting stdout/stderr/status text. | ⏳[INV-cli-shell-service-only] Shell tools do not spawn processes directly |
 | `createGitToolkit()` / `createGitService()` | Exposes read-only git operations and guarded `git_commit` through spawn argument arrays. | ⏳[INV-cli-git-toolkit-guarded-commit] `git_commit` is the only mutating git tool and is permission-gated |
+| `createDiagnosticsToolkit()` | Exposes configured/discovered project diagnostics as an agent tool. | ⏳[INV-cli-diagnostics-tool-permission] The diagnostics tool checks product permissions before running commands |
 
 ↪ code: `src/cli/tools/cli-toolkit.ts:85`
 ↪ code: `src/cli/tools/workspace.ts:8`
@@ -185,6 +186,7 @@ node bin
 ↪ code: `src/cli/tools/cli-toolkit.ts:573`
 ↪ code: `src/cli/tools/git-toolkit.ts:46`
 ↪ code: `src/cli/runtime/git-service.ts:61`
+↪ code: `src/cli/tools/diagnostics-toolkit.ts:53`
 
 > **Rationale** ⏳ pending
 
@@ -285,7 +287,7 @@ Beyond the overview axis, the following subunits are injected or called. This do
 |---|---|---|---|
 | Runtime facade | Main state/event hub | Owns active session, MiniAgent, services, approvals, and user actions. | `to-be-written` |
 | Agent factory | MiniAgent assembly seam | Converts CLI config/mode/session into MiniAgent instances and CLI extra uses. | `to-be-written` |
-| CLI toolkits | Tool registration seam | Exposes workspace-safe file/search/shell/git tools. | `to-be-written` |
+| CLI toolkits | Tool registration seam | Exposes workspace-safe file/search/shell/git/diagnostics tools. | `to-be-written` |
 | Ink TUI app | View seam | Renders runtime state and forwards user actions to runtime methods. | `to-be-written` |
 | Command registry and built-ins | Command seam | Registers slash command metadata and executes command handlers. | `to-be-written` |
 | Persistence services | Runtime service seam | Handles session, export/import, snapshots, config, references, diagnostics, editor, and project instruction workflows. | `to-be-written` |

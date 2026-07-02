@@ -190,6 +190,7 @@ needed:
 - **todo** - Task management (`todo_create`, `todo_update`, `todo_delete`).
 - **git_status**, **git_diff**, **git_log** - Read repository state.
 - **git_commit** - Commit staged changes after permission approval.
+- **diagnostics** - Run configured or discovered project diagnostics after permission approval.
 
 When `.cliagent/config.json` includes `mcp`, `skill`, or `subagent` fields,
 those CLI convenience fields are copied into blueprint component config during

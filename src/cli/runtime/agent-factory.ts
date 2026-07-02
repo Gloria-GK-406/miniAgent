@@ -31,7 +31,9 @@ import {
   type CLIConfig,
 } from "../config.js";
 import { createCLIToolkit } from "../tools/cli-toolkit.js";
+import { createDiagnosticsToolkit } from "../tools/diagnostics-toolkit.js";
 import { createGitToolkit } from "../tools/git-toolkit.js";
+import { createDiagnosticsService } from "./diagnostics-service.js";
 import { createGitService } from "./git-service.js";
 import { createModeAwarePermissionService, type PermissionService } from "./permission-service.js";
 import type { ShellService } from "./shell-service.js";
@@ -52,6 +54,7 @@ const SELF_ENFORCING_PERMISSION_TOOL_NAMES = new Set([
   "multi_edit",
   "patch",
   "shell",
+  "diagnostics",
   "git_status",
   "git_diff",
   "git_log",
@@ -363,9 +366,20 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): AgentUse[] {
     getAutoApprove: options.getAutoApprove,
     requestApproval: options.requestApproval,
   }).tools;
+  const diagnosticsTools = createDiagnosticsToolkit({
+    diagnosticsService: createDiagnosticsService({
+      baseDir: options.baseDir,
+      config: options.getConfig?.().diagnostics ?? {},
+      shellService: options.shellService,
+    }),
+    permissionService,
+    getAutoApprove: options.getAutoApprove,
+    requestApproval: options.requestApproval,
+  }).tools;
   return [
     ...cliTools,
     ...gitTools,
+    ...diagnosticsTools,
     {
       requestApproval: async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
         if (SELF_ENFORCING_PERMISSION_TOOL_NAMES.has(toolName)) {

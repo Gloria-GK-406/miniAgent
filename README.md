@@ -496,11 +496,11 @@ mutating tools and shell commands ask by default, and explicit deny rules always
 win. Session approval decisions match the exact tool arguments, so approving one
 shell command does not open the whole shell tool. Messages beginning with `!` run
 through the configured CLI shell service. The agent also gets git-aware read
-tools and guarded `git_commit`; `/diff`, `/diagnostics`, `/activity`, and
-`/editor` provide local developer workflow panels. Project custom commands can
-be added as `.cliagent/commands/*.md`; exports, imports, undo, and redo are
-project-local under `.cliagent/`. Session exports include model, agent mode, and
-token usage metadata.
+tools, guarded `git_commit`, and a permission-gated `diagnostics` tool; `/diff`,
+`/diagnostics`, `/activity`, and `/editor` provide local developer workflow
+panels. Project custom commands can be added as `.cliagent/commands/*.md`;
+exports, imports, undo, and redo are project-local under `.cliagent/`. Session
+exports include model, agent mode, and token usage metadata.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

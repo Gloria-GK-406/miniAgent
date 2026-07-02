@@ -90,6 +90,7 @@ describe("createCLIAgentFactory", () => {
       "edit",
       "write",
       "shell",
+      "diagnostics",
     ]));
     expect(built.compressor.getCompressedCount()).toBe(0);
   });

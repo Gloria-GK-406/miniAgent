@@ -445,9 +445,10 @@ npm run chat
 CLI 使用产品级权限策略：读/搜索工具默认允许，写入、编辑和 Shell
 命令默认询问，显式拒绝规则始终生效。会话级审批决策会匹配精确的工具参数，
 因此批准一个 Shell 命令不会放开整个 Shell 工具。以 `!` 开头的消息会通过配置的
-CLI shell service 执行。项目自定义命令可以放在 `.cliagent/commands/*.md`；
-导出、导入、撤销和重做都使用项目本地的 `.cliagent/` 数据。会话导出会包含模型、
-Agent 模式和 token 用量等元数据。
+CLI shell service 执行。Agent 还会获得 git 只读工具、受保护的 `git_commit`
+和经权限控制的 `diagnostics` 工具。项目自定义命令可以放在
+`.cliagent/commands/*.md`；导出、导入、撤销和重做都使用项目本地的
+`.cliagent/` 数据。会话导出会包含模型、Agent 模式和 token 用量等元数据。
 
 → [完整 CLI 文档](./document/cli/repl_CN.md)
 
