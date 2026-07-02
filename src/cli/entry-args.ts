@@ -78,6 +78,7 @@ export type CLIEntryAction =
   | { type: "config-paths"; cwd?: string; output?: CLIEntryOutput }
   | { type: "show-config"; cwd?: string; output?: CLIEntryOutput }
   | { type: "init"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
+  | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -93,6 +94,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let doctorMode = false;
   let diagnosticsMode = false;
   let listSessionsMode = false;
+  let listModelsMode = false;
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
@@ -145,6 +147,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-sessions") {
       listSessionsMode = true;
+      continue;
+    }
+    if (arg === "--list-models") {
+      listModelsMode = true;
       continue;
     }
     if (arg === "--export-session") {
@@ -340,6 +346,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || showConfigMode
       || initMode
       || listSessionsMode
+      || listModelsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -356,6 +363,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || doctorMode
       || diagnosticsMode
       || listSessionsMode
+      || listModelsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -374,6 +382,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || diagnosticsMode
       || configPathsMode
       || listSessionsMode
+      || listModelsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -393,6 +402,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || configPathsMode
       || showConfigMode
       || listSessionsMode
+      || listModelsMode
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -422,6 +432,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return { type: "error", message: "Cannot combine --import-session with another headless mode" };
+  }
+  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    return { type: "error", message: "Cannot combine --list-models with another headless mode" };
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
@@ -549,6 +562,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (listModelsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --list-models" };
+    }
+    return {
+      type: "list-models",
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (doctorMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --doctor" };
@@ -585,7 +608,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --list-models, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -619,6 +642,7 @@ export function formatCLIHelp(): string {
     "  -s, --session   Resume a session by id",
     "  --new-session   Create and start in a named session",
     "  --list-sessions List sessions headlessly",
+    "  --list-models   List configured models headlessly",
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",

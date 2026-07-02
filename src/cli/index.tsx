@@ -12,6 +12,7 @@ import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runInitConfig } from "./init-runner.js";
+import { runModelList } from "./model-list-runner.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
@@ -98,6 +99,16 @@ async function main(): Promise<void> {
       process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exitCode = 1;
     }
+    return;
+  }
+  if (action.type === "list-models") {
+    process.exitCode = await runModelList({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
     return;
   }
   if (action.type === "export-session") {

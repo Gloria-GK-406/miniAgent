@@ -177,6 +177,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("lists configured models without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--list-models"])).toEqual({
+      type: "list-models",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--list-models", "--json"])).toEqual({
+      type: "list-models",
+      cwd: "C:/repo",
+      output: "json",
+    });
+  });
+
   it("exports a session without opening the TUI", () => {
     expect(parseCLIEntryArgs([
       "--export-session",
@@ -430,6 +441,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects prompted model listing mode", () => {
+    expect(parseCLIEntryArgs(["--list-models", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --list-models",
+    });
+  });
+
   it("rejects malformed export session options", () => {
     expect(parseCLIEntryArgs(["--export-session", "--format", "xml"])).toEqual({
       type: "error",
@@ -556,7 +574,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --list-models, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -571,6 +589,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--session");
     expect(help).toContain("--new-session");
     expect(help).toContain("--list-sessions");
+    expect(help).toContain("--list-models");
     expect(help).toContain("--diagnostics");
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");
