@@ -71,6 +71,8 @@ export interface CLIAppRuntime {
   renameSession(id: string, name: string): Promise<void>;
   deleteSession(id: string): Promise<void>;
   forkSession(id: string, name?: string): Promise<void>;
+  exportSession(format: "json" | "markdown", outputPath?: string): Promise<string>;
+  importSession(inputPath: string, name?: string): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

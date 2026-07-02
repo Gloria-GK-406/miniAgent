@@ -46,6 +46,13 @@ describe("useRuntime", () => {
       answerApproval: vi.fn(),
       stop: vi.fn(),
       rebuildAgent: vi.fn(),
+      createSession: vi.fn(),
+      switchSession: vi.fn(),
+      renameSession: vi.fn(),
+      deleteSession: vi.fn(),
+      forkSession: vi.fn(),
+      exportSession: vi.fn(),
+      importSession: vi.fn(),
       destroy: vi.fn(),
     };
 

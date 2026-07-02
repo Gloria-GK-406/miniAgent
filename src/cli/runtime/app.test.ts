@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -66,6 +66,26 @@ describe("createCLIRuntime", () => {
       type: "error",
       message: "Cannot delete the last session",
     });
+    await runtime.destroy();
+  });
+
+  it("exports and imports sessions from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-export-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/export json exported.json");
+    const exported = JSON.parse(await readFile(join(baseDir, "exported.json"), "utf-8")) as {
+      version: number;
+      session: { name: string };
+    };
+
+    expect(exported.version).toBe(1);
+    expect(exported.session.name).toBe("default");
+
+    await runtime.submitInput("/import exported.json imported");
+
+    expect(runtime.getState().sessionName).toBe("imported");
     await runtime.destroy();
   });
 });

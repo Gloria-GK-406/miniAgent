@@ -8,6 +8,7 @@ import {
   selectResolvedModelForCLI,
 } from "./agent-factory.js";
 import { createCommandRegistry } from "./command-registry.js";
+import { createExportService } from "./export-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createPermissionService } from "./permission-service.js";
 import { createReferenceService } from "./reference-service.js";
@@ -24,6 +25,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const config = await loadConfig(baseDir);
   const sessionService = await createCLISessionService(baseDir);
   const session = await sessionService.ensureActiveSession();
+  const exportService = createExportService({ baseDir, sessionService });
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
   const approvalResolvers = new Map<string, (decision: boolean) => void>();
@@ -220,6 +222,16 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     forkSession: async (id, name) => {
       await sessionService.forkSession(id, name);
       refreshSessionMetadata();
+    },
+    exportSession: async (format, outputPath) => {
+      if (format === "json") {
+        return exportService.exportJson(state.sessionId, outputPath);
+      }
+      return exportService.exportMarkdown(state.sessionId, outputPath);
+    },
+    importSession: async (inputPath, name) => {
+      await exportService.importJson(inputPath, name);
+      await replaceAgentForActiveSession();
     },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);

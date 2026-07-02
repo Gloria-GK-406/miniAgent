@@ -109,6 +109,20 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.renameSession).toHaveBeenCalledWith("s2", "renamed session");
   });
 
+  it("dispatches export and import commands to runtime methods", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.exportSession = vi.fn(async () => "out.json");
+    commandCtx.runtime.importSession = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/export json exports/session.json");
+    await registry.execute(commandCtx, "/import exports/session.json imported session");
+
+    expect(commandCtx.runtime.exportSession).toHaveBeenCalledWith("json", "exports/session.json");
+    expect(commandCtx.runtime.importSession).toHaveBeenCalledWith("exports/session.json", "imported session");
+  });
+
   it("opens sessions panel with session metadata", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);

@@ -49,6 +49,13 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     answerApproval: vi.fn(),
     stop: vi.fn(),
     rebuildAgent: vi.fn(async () => undefined),
+    createSession: vi.fn(async () => undefined),
+    switchSession: vi.fn(async () => undefined),
+    renameSession: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
+    forkSession: vi.fn(async () => undefined),
+    exportSession: vi.fn(async () => "session.md"),
+    importSession: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   };
 }

@@ -127,6 +127,43 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "export",
+    description: "Export current session",
+    usage: "/export [json|markdown] [path]",
+    execute: async (ctx, args) => {
+      const parts = splitArgs(args);
+      const format = parts[0] ?? "markdown";
+      await runSessionMutation(ctx, async () => {
+        if (format !== "json" && format !== "markdown") {
+          throw new Error("Usage: /export [json|markdown] [path]");
+        }
+        const outputPath = args.trim().slice(format.length).trim();
+        const written = await ctx.runtime.exportSession(
+          format,
+          outputPath.length === 0 ? undefined : outputPath,
+        );
+        ctx.notice("info", `Exported session to ${written}`);
+      });
+    },
+  });
+  registry.register({
+    name: "import",
+    description: "Import a JSON session export",
+    usage: "/import <path> [name]",
+    execute: async (ctx, args) => {
+      const parts = splitArgs(args);
+      await runSessionMutation(ctx, async () => {
+        const inputPath = parts[0];
+        if (inputPath === undefined) {
+          throw new Error("Usage: /import <path> [name]");
+        }
+        const name = args.trim().slice(inputPath.length).trim();
+        await ctx.runtime.importSession(inputPath, name.length === 0 ? undefined : name);
+        ctx.notice("info", `Imported session from ${inputPath}`);
+      });
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",
