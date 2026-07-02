@@ -233,6 +233,31 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("previews runtime context without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--preview-context"])).toEqual({
+      type: "preview-context",
+    });
+    expect(parseCLIEntryArgs([
+      "--cwd",
+      "C:/repo",
+      "--session",
+      "s2",
+      "--agent",
+      "plan",
+      "--model",
+      "openai/fast",
+      "--preview-context",
+      "--json",
+    ])).toEqual({
+      type: "preview-context",
+      agent: "plan",
+      cwd: "C:/repo",
+      model: "openai/fast",
+      sessionId: "s2",
+      output: "json",
+    });
+  });
+
   it("runs read-only git commands without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--git-status"])).toEqual({
       type: "git-headless",
@@ -762,7 +787,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -781,6 +806,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--list-commands");
     expect(help).toContain("--list-tools");
     expect(help).toContain("--list-agents");
+    expect(help).toContain("--preview-context");
     expect(help).toContain("--git-status");
     expect(help).toContain("--git-log");
     expect(help).toContain("--git-diff");

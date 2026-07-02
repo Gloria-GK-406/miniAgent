@@ -10,6 +10,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--list-commands");
     expect(script).toContain("--list-tools");
     expect(script).toContain("--list-agents");
+    expect(script).toContain("--preview-context");
     expect(script).toContain("--git-status");
     expect(script).toContain("--git-log");
     expect(script).toContain("--git-diff");

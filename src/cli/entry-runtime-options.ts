@@ -3,7 +3,7 @@ import type { CLIAppRuntime } from "./runtime/types.js";
 
 export async function applyCLIEntryRuntimeOptions(
   runtime: CLIAppRuntime,
-  action: Extract<CLIEntryAction, { type: "tui" | "print" | "doctor" | "list-tools" | "list-agents" }>,
+  action: Extract<CLIEntryAction, { type: "tui" | "print" | "doctor" | "list-tools" | "list-agents" | "preview-context" }>,
 ): Promise<void> {
   if (action.sessionId !== undefined) {
     await runtime.switchSession(action.sessionId);

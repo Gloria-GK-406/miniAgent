@@ -82,6 +82,7 @@ also accept `--json`.
 | `--list-commands` | Yes | List built-in and project custom slash commands |
 | `--list-tools` | Yes | List runtime tools for the selected agent |
 | `--list-agents` | Yes | List primary mode and configured subagents |
+| `--preview-context` | Yes | Preview the assembled runtime context for the selected session and agent |
 | `--git-status` | Yes | Print short git status |
 | `--git-log [limit]` | Yes | Print recent git commits |
 | `--git-diff [path] [--staged]` | Yes | Print workspace or staged git diff |
@@ -111,6 +112,7 @@ miniagent --list-models --json
 miniagent --list-commands --json
 miniagent --list-tools --agent plan --json
 miniagent --list-agents --json
+miniagent --preview-context --json
 miniagent --git-status
 miniagent --set-permission "shell:npm *" allow
 miniagent --system-prompt-file .cliagent/system.md
