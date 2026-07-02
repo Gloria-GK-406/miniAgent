@@ -24,6 +24,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("opens the TUI with an explicit agent mode", () => {
+    expect(parseCLIEntryArgs(["--agent", "plan"])).toEqual({
+      type: "tui",
+      agent: "plan",
+    });
+  });
+
   it("opens the TUI with an initial prompt", () => {
     expect(parseCLIEntryArgs(["explain", "the", "repo"])).toEqual({
       type: "tui",
@@ -32,8 +39,9 @@ describe("CLI entry args", () => {
   });
 
   it("opens an explicit working directory with an initial prompt", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--model", "openai/fast", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--agent", "plan", "--model", "openai/fast", "fix", "tests"])).toEqual({
       type: "tui",
+      agent: "plan",
       cwd: "C:/repo",
       model: "openai/fast",
       prompt: "fix tests",
@@ -52,8 +60,9 @@ describe("CLI entry args", () => {
   });
 
   it("prints from an explicit working directory", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--model", "openai/fast", "--print", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--agent", "plan", "--model", "openai/fast", "--print", "fix", "tests"])).toEqual({
       type: "print",
+      agent: "plan",
       cwd: "C:/repo",
       model: "openai/fast",
       prompt: "fix tests",
@@ -91,6 +100,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects invalid startup agent modes before starting the TUI", () => {
+    expect(parseCLIEntryArgs(["--agent"])).toEqual({
+      type: "error",
+      message: "Missing mode after --agent",
+    });
+    expect(parseCLIEntryArgs(["--agent", "review"])).toEqual({
+      type: "error",
+      message: "Invalid agent mode: review",
+    });
+  });
+
   it("rejects print mode without a prompt", () => {
     expect(parseCLIEntryArgs(["--print"])).toEqual({
       type: "error",
@@ -102,6 +122,7 @@ describe("CLI entry args", () => {
     const help = formatCLIHelp();
 
     expect(help).toContain("Usage: miniagent");
+    expect(help).toContain("--agent");
     expect(help).toContain("--cwd");
     expect(help).toContain("--model");
     expect(help).toContain("--print");

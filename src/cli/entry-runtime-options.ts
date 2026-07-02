@@ -5,6 +5,9 @@ export async function applyCLIEntryRuntimeOptions(
   runtime: CLIAppRuntime,
   action: Extract<CLIEntryAction, { type: "tui" | "print" }>,
 ): Promise<void> {
+  if (action.agent !== undefined) {
+    await runtime.runCommand("agent", action.agent);
+  }
   if (action.model !== undefined) {
     await runtime.selectModel(action.model);
   }

@@ -1,11 +1,14 @@
+export type CLIEntryAgentMode = "build" | "plan";
+
 export type CLIEntryAction =
-  | { type: "tui"; cwd?: string; model?: string; prompt?: string }
-  | { type: "print"; cwd?: string; model?: string; prompt: string }
+  | { type: "tui"; agent?: CLIEntryAgentMode; cwd?: string; model?: string; prompt?: string }
+  | { type: "print"; agent?: CLIEntryAgentMode; cwd?: string; model?: string; prompt: string }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
 
 export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
+  let agent: CLIEntryAgentMode | undefined;
   let cwd: string | undefined;
   let model: string | undefined;
   let printMode = false;
@@ -21,6 +24,18 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--print" || arg === "-p") {
       printMode = true;
+      continue;
+    }
+    if (arg === "--agent") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing mode after --agent" };
+      }
+      if (next !== "build" && next !== "plan") {
+        return { type: "error", message: `Invalid agent mode: ${next}` };
+      }
+      agent = next;
+      index++;
       continue;
     }
     if (arg === "--cwd") {
@@ -55,6 +70,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     return {
       type: "print",
+      ...(agent !== undefined && { agent }),
       ...(cwd !== undefined && { cwd }),
       ...(model !== undefined && { model }),
       prompt,
@@ -63,6 +79,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
 
   return {
     type: "tui",
+    ...(agent !== undefined && { agent }),
     ...(cwd !== undefined && { cwd }),
     ...(model !== undefined && { model }),
     ...(prompt.length > 0 && { prompt }),
@@ -79,6 +96,7 @@ export function formatCLIHelp(): string {
     "  prompt          Submit an initial prompt after the TUI opens",
     "",
     "Options:",
+    "  --agent <mode>  Start in build or plan mode",
     "  --cwd <path>    Open the TUI for a specific project directory",
     "  -m, --model     Select a configured model by id or provider/id",
     "  -p, --print     Run one prompt headlessly and print the final response",
