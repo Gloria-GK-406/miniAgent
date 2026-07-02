@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Tool } from "../../tool/types.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 import type { ShellService } from "../runtime/shell-service.js";
+import type { SnapshotService } from "../runtime/snapshot-service.js";
 import { resolveWorkspacePath } from "./workspace.js";
 
 const PathParamsSchema = z.object({
@@ -36,6 +37,7 @@ export interface CLIToolkitOptions {
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
   shellService: ShellService;
+  snapshotService?: SnapshotService;
 }
 
 export interface CLIToolkit {
@@ -54,6 +56,18 @@ async function assertPermission(
   if (result.decision === "ask" && !(await options.requestApproval(toolName, args))) {
     throw new Error(`Permission rejected for ${toolName}`);
   }
+}
+
+async function mutateWithSnapshot(
+  options: CLIToolkitOptions,
+  path: string,
+  mutate: () => Promise<void>,
+): Promise<void> {
+  if (options.snapshotService === undefined) {
+    await mutate();
+    return;
+  }
+  await options.snapshotService.recordBeforeMutation(path, mutate);
 }
 
 function createReadTool(options: CLIToolkitOptions): Tool {
@@ -90,8 +104,10 @@ function createWriteTool(options: CLIToolkitOptions): Tool {
       await assertPermission(options, "write", args);
       const parsed = WriteParamsSchema.parse(args);
       const target = resolveWorkspacePath(options.baseDir, parsed.path);
-      await mkdir(dirname(target.absolutePath), { recursive: true });
-      await writeFile(target.absolutePath, parsed.content, "utf-8");
+      await mutateWithSnapshot(options, parsed.path, async () => {
+        await mkdir(dirname(target.absolutePath), { recursive: true });
+        await writeFile(target.absolutePath, parsed.content, "utf-8");
+      });
       return `Wrote ${target.displayPath}`;
     },
   };
@@ -117,7 +133,9 @@ function createEditTool(options: CLIToolkitOptions): Tool {
       const next = parsed.replaceAll === true
         ? content.replaceAll(parsed.oldString, parsed.newString)
         : content.replace(parsed.oldString, parsed.newString);
-      await writeFile(target.absolutePath, next, "utf-8");
+      await mutateWithSnapshot(options, parsed.path, async () => {
+        await writeFile(target.absolutePath, next, "utf-8");
+      });
       return `Edited ${target.displayPath}`;
     },
   };

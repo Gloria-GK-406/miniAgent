@@ -15,6 +15,7 @@ import { createPermissionService } from "./permission-service.js";
 import { createReferenceService } from "./reference-service.js";
 import { createShellService } from "./shell-service.js";
 import { createCLISessionService } from "./session-service.js";
+import { createSnapshotService } from "./snapshot-service.js";
 import type { CLIAppRuntime, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
 
 function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
@@ -32,6 +33,13 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const approvalResolvers = new Map<string, (decision: boolean) => void>();
   const permissionService = createPermissionService(config.permission);
   const shellService = createShellService(config.shell);
+  let activeTurnId: string | null = null;
+  const snapshotService = createSnapshotService({
+    baseDir,
+    sessionService,
+    getActiveSessionId: () => state.sessionId,
+    getActiveTurnId: () => activeTurnId,
+  });
   let state: CLIState;
 
   const factory = await createCLIAgentFactory({
@@ -45,6 +53,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       updateState({ approval: { id, toolName, args, decision: "pending" } });
     }),
     shellService,
+    snapshotService,
   });
   let built = await factory.build(session.id);
 
@@ -196,7 +205,12 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
           type: MessageType.User,
           content: result.content,
         };
-        await built.agent.run(message);
+        activeTurnId = message.id;
+        try {
+          await built.agent.run(message);
+        } finally {
+          activeTurnId = null;
+        }
       }
       if (result.type === "shell") {
         const message: Message = {

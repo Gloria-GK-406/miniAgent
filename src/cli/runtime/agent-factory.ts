@@ -32,6 +32,7 @@ import {
 import { createCLIToolkit } from "../tools/cli-toolkit.js";
 import type { PermissionService } from "./permission-service.js";
 import type { ShellService } from "./shell-service.js";
+import type { SnapshotService } from "./snapshot-service.js";
 
 const DEFAULT_MESSAGE_FILE_NAME = "messages.jsonl";
 const TODO_TOOL_NAMES = ["todo_create", "todo_update", "todo_delete"];
@@ -92,6 +93,7 @@ export interface CLIAgentFactoryOptions {
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
   shellService: ShellService;
+  snapshotService?: SnapshotService;
 }
 
 export interface BuiltRuntimeAgent {
@@ -316,6 +318,7 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typ
     getAutoApprove: options.getAutoApprove,
     requestApproval: options.requestApproval,
     shellService: options.shellService,
+    ...(options.snapshotService !== undefined && { snapshotService: options.snapshotService }),
   }).tools;
 }
 
