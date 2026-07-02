@@ -85,7 +85,6 @@ export function cloneAgentConfig(config: NormalizedAgentConfig): NormalizedAgent
     ...(config.generation !== undefined && {
       generation: cloneGenerationConfig(config.generation),
     }),
-    plugins: new Map(config.plugins),
     paths: { ...config.paths },
   });
 }

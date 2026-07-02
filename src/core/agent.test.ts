@@ -49,7 +49,6 @@ function createConfig(sessiondir: string, overrides: Partial<AgentConfig> = {}):
         models: [{ id: "test-model", name: "test-model" }],
       },
     ],
-    plugins: new Map(),
     paths: { sessiondir },
     ...overrides,
   };
@@ -86,6 +85,17 @@ function createLLM(options: {
       }
     },
   };
+}
+
+function deferred<T = void>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
 function fakeEngine(
@@ -334,8 +344,7 @@ describe("MiniAgent", () => {
     expect(seenRequests).toEqual([]);
   });
 
-  it("notifies provider-only config snapshots when selecting a resolved model", () => {
-    const notified: AgentConfig[] = [];
+  it("updates provider-only config snapshots when selecting a resolved model", () => {
     const llm = new DefaultLLMEngineRegister();
     llm.register(fakeEngine("openai", [
       { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
@@ -349,14 +358,9 @@ describe("MiniAgent", () => {
       }),
     });
 
-    agent.register({
-      setConfig: async (config: AgentConfig): Promise<void> => {
-        notified.push(config);
-      },
-    });
     agent.setResolvedModel({ id: "fast" });
 
-    const latest = notified.at(-1) as AgentConfig & Record<string, unknown>;
+    const latest = agent.getConfig() as AgentConfig & Record<string, unknown>;
     expect(latest.defaultModel).toEqual({
       id: "fast",
       provider: "openai",
@@ -366,10 +370,10 @@ describe("MiniAgent", () => {
     ]);
     expect(latest["model"]).toBeUndefined();
     expect(latest["models"]).toBeUndefined();
+    expect(latest["plugins"]).toBeUndefined();
   });
 
   it("preserves aliased resolved model ids in config snapshots", () => {
-    const notified: AgentConfig[] = [];
     const llm = new DefaultLLMEngineRegister();
     llm.register(fakeEngine("openai", [
       { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
@@ -383,56 +387,126 @@ describe("MiniAgent", () => {
       }),
     });
 
-    agent.register({
-      setConfig: async (config: AgentConfig): Promise<void> => {
-        notified.push(config);
-      },
-    });
     agent.setResolvedModel({ id: "balanced", provider: "openai" });
 
     expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
       id: "balanced",
       name: "gpt-4o-mini",
     }));
-    expect(notified.at(-1)?.defaultModel).toEqual({
+    expect(agent.getConfig().defaultModel).toEqual({
       id: "balanced",
       provider: "openai",
     });
   });
 
-  it("passes isolated config snapshots to each config notifier", () => {
-    const secondSnapshots: AgentConfig[] = [];
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
-      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-    ]));
+  it("does not treat setConfig-only objects as registrable modules", () => {
+    const agent = new MiniAgent({
+      llm: createLLM(),
+      config: createConfig(testDir),
+    });
+    const setConfigOnly = {
+      setConfig: async (): Promise<void> => {},
+    };
+
+    expect(() => agent.register(setConfigOnly as never)).toThrow(
+      "Unsupported agent registration item",
+    );
+  });
+
+  it("destroys registered destroyable modules once in reverse registration order", async () => {
+    const agent = new MiniAgent({
+      llm: createLLM(),
+      config: createConfig(testDir),
+    });
+    const destroyed: string[] = [];
+
+    const first = {
+      destroy: async (): Promise<void> => {
+        destroyed.push("first");
+      },
+    };
+    const second = {
+      destroy: async (): Promise<void> => {
+        await Promise.resolve();
+        destroyed.push("second");
+      },
+    };
+
+    agent.register(first);
+    agent.register(first);
+    agent.register(second);
+
+    await agent.destroy();
+    await agent.destroy();
+
+    expect(destroyed).toEqual(["second", "first"]);
+  });
+
+  it("waits for an active run to settle before destroying registered modules", async () => {
+    const streamStarted = deferred<void>();
+    const releaseStream = deferred<void>();
+    const llm: LLMRequest = {
+      getEngineModels: () => [],
+      async *streamInvoke(): AsyncGenerator<MessageChunk> {
+        streamStarted.resolve();
+        await releaseStream.promise;
+        yield chunkText("done");
+      },
+    };
     const agent = new MiniAgent({
       llm,
-      config: createConfig(testDir, {
-        providers: [{ provider: "openai", key: "test-key" }],
-        defaultModel: { id: "slow" },
-      }),
+      config: createConfig(testDir),
     });
-
+    let runSettled = false;
+    const destroyed: string[] = [];
     agent.register({
-      setConfig: async (config: AgentConfig): Promise<void> => {
-        (config as { defaultModel?: unknown }).defaultModel = { id: "mutated" };
+      destroy: async (): Promise<void> => {
+        destroyed.push(runSettled ? "after-run" : "before-run");
       },
     });
-    agent.register({
-      setConfig: async (config: AgentConfig): Promise<void> => {
-        secondSnapshots.push(config);
-      },
-    });
-    secondSnapshots.length = 0;
 
-    agent.setResolvedModel({ id: "fast" });
-
-    expect(secondSnapshots.at(-1)?.defaultModel).toEqual({
-      id: "fast",
-      provider: "openai",
+    const runPromise = agent.run(userMessage()).finally(() => {
+      runSettled = true;
     });
+    await streamStarted.promise;
+
+    let destroySettled = false;
+    const destroyPromise = agent.destroy().then(() => {
+      destroySettled = true;
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(destroySettled).toBe(false);
+    expect(destroyed).toEqual([]);
+
+    releaseStream.resolve();
+    await destroyPromise;
+    await runPromise;
+
+    expect(destroyed).toEqual(["after-run"]);
+  });
+
+  it("rejects run, register, and execute after destroy", async () => {
+    const agent = new MiniAgent({
+      llm: createLLM(),
+      config: createConfig(testDir),
+    });
+
+    await agent.destroy();
+
+    expect(() => agent.register({ destroy: async (): Promise<void> => {} }))
+      .toThrow("Agent has been destroyed.");
+    await expect(agent.run(userMessage("after-destroy")))
+      .rejects.toThrow("Agent has been destroyed.");
+    await expect(agent.execute({
+      id: "toolcall-1",
+      type: MessageType.ToolCall,
+      content: "",
+      toolCallId: "call-1",
+      toolName: "missing",
+      arguments: {},
+    })).rejects.toThrow("Agent has been destroyed.");
   });
 
   it("publishes the real turn context after buildContext", async () => {

@@ -31,7 +31,6 @@ export class AgentConfigResolver {
             providers: persist.providers.map(cloneProvider),
             ...(defaultModel !== undefined && { defaultModel }),
             ...(persist.generation !== undefined && { generation: persist.generation }),
-            plugins: new Map(persist.plugins),
             paths: runtime.paths,
         });
     }

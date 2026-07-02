@@ -1,8 +1,8 @@
 import type {
     AfterTurnProcessor,
-    ConfigNotifier,
     ContextProcessor,
     ContextProvider,
+    Destroyable,
     ErrorHandler,
     LLMRequire,
     MessageNotifier,
@@ -21,12 +21,12 @@ export type AgentRegistrable =
     | MessageNotifier
     | ErrorHandler
     | AfterTurnProcessor
-    | ConfigNotifier
     | PersistRequire
     | TurnContextConsumer
     | TurnContextAppender
     | ToolApprover
-    | LLMRequire;
+    | LLMRequire
+    | Destroyable;
 
 export type AgentModule = Record<string, unknown>;
 

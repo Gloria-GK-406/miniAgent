@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { AgentConfigSchema } from "./config.js";
 import type { LLMGenerateRequest, ResolvedModel } from "./config.js";
 import type { Store } from "../store/store.js";
 
@@ -302,15 +301,6 @@ export const AfterTurnProcessorSchema = z.object({
 
 export type AfterTurnProcessor = z.infer<typeof AfterTurnProcessorSchema>;
 
-export const ConfigNotifierSchema = z.object({
-  setConfig: z.function(
-    z.tuple([AgentConfigSchema]),
-    z.promise(z.void()),
-  ),
-});
-
-export type ConfigNotifier = z.infer<typeof ConfigNotifierSchema>;
-
 export const PersistRequireSchema = z.object({
   setStore: z.function(
     z.tuple([z.custom<Store>()]),
@@ -328,3 +318,12 @@ export const LLMRequireSchema = z.object({
 });
 
 export type LLMRequire = z.infer<typeof LLMRequireSchema>;
+
+export const DestroyableSchema = z.object({
+  destroy: z.function(
+    z.tuple([]),
+    z.union([z.void(), z.promise(z.void())]),
+  ),
+});
+
+export type Destroyable = z.infer<typeof DestroyableSchema>;

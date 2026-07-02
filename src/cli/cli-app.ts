@@ -1,47 +1,25 @@
 import { join } from "node:path";
 
-import { AgentAssembler, AgentBlueprintRegistry } from "../assembly/assembler.js";
-import type { AgentBlueprint } from "../assembly/blueprint.js";
-import { ContextCompressor } from "../context/compressor.js";
+import { getCapabilityNamespace, isCapabilityEnabled } from "../assembly/capability.js";
+import type { AgentCapabilityRule, AgentCapabilitySelector } from "../assembly/capability.js";
+import { createDefaultBlueprint, registerBuiltinBlueprintImpls } from "../assembly/builtins.js";
+import type { AgentBlueprint, BlueprintUse } from "../assembly/blueprint.js";
+import { BlueprintManager } from "../assembly/manager.js";
 import type { MiniAgent } from "../core/agent.js";
 import {
     AgentConfigSchema,
     type AgentConfig,
     type GenerationConfig,
+    JsonValueSchema,
     type JsonValue,
     type ModelProviderConfig,
     type NormalizedAgentConfig,
     type PathConfig,
     type ResolvedModel,
 } from "../core/config.js";
-import { LLMEngineManager } from "../core/llm.js";
-import type { LLMEngine } from "../core/llm.js";
-import { defineAgentModule } from "../core/module.js";
-import { MessageType } from "../core/types.js";
-import type { Message } from "../core/types.js";
-import {
-    AnthropicEngine,
-    GLMCodePlanEngine,
-    GLMEngine,
-    NVIDIAEngine,
-    OpenAICompatibleEngine,
-    OpenAIEngine,
-} from "../engine/index.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
-import {
-    AgentContextProvider,
-    McpPlugin,
-    SkillPlugin,
-    SubagentPlugin,
-    TodoManager,
-    bashTool,
-    editTool,
-    globTool,
-    grepTool,
-    readTool,
-    writeTool,
-} from "../tool/index.js";
+import type { Message } from "../core/types.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/subagent.js";
 import {
     CLIAGENT_DIR,
@@ -52,31 +30,29 @@ import {
 } from "./config.js";
 import type { CLIConfig } from "./config.js";
 
-const ENGINE_FACTORIES: Record<string, () => LLMEngine> = {
-    anthropic: () => new AnthropicEngine(),
-    openai: () => new OpenAIEngine(),
-    "openai-compatible": () => new OpenAICompatibleEngine(),
-    glm: () => new GLMEngine(),
-    "glm-codeplan": () => new GLMCodePlanEngine(),
-    nvidia: () => new NVIDIAEngine(),
-};
+const DEFAULT_MESSAGE_FILE_NAME = "messages.jsonl";
+const TODO_TOOL_NAMES = ["todo_create", "todo_update", "todo_delete"];
 
-const AUTO_APPROVE_TOOLS = ["read", "glob", "grep"];
+interface CreateCLIBlueprintOptions {
+    config: CLIConfig;
+    engines: string[];
+    persistDir: string;
+    systemPrompt: {
+        prompt: string;
+        baseDir?: string;
+    };
+    baseDir: string;
+    capabilities?: AgentCapabilitySelector;
+}
 
-const SHARED_BLUEPRINT: AgentBlueprint = {
-    uses: [
-        "tool.read",
-        "tool.write",
-        "tool.edit",
-        "tool.glob",
-        "tool.grep",
-        "tool.bash",
-        "tool.todo",
-        "plugin.subagent",
-        "plugin.mcp",
-        "plugin.skill",
-        "plugin.agent-context",
-    ],
+const PLUGIN_CAPABILITY_NAMESPACES = ["mcp", "skill", "subagent"] as const;
+
+type PluginCapabilityNamespace = typeof PLUGIN_CAPABILITY_NAMESPACES[number];
+
+const PLUGIN_BLUEPRINT_KEYS: Record<PluginCapabilityNamespace, "mcp" | "skill" | "subagent"> = {
+    mcp: "mcp",
+    skill: "skill",
+    subagent: "subagent",
 };
 
 export interface CLIAppResult {
@@ -86,13 +62,29 @@ export interface CLIAppResult {
     session: SessionMeta;
     baseDir: string;
     hitlEnabled: boolean;
-    compressor: ContextCompressor;
-    assembler: AgentAssembler;
-    manager: LLMEngineManager;
-    blueprintRegistry: AgentBlueprintRegistry;
+    compressor: CLICompressor;
     setHITL: (enabled: boolean) => void;
     setSystemPrompt: (prompt: string) => void;
     rebuildAgent: (sessionId: string) => Promise<MiniAgent>;
+}
+
+export interface CLICompressor {
+    getCompressedCount(): number;
+    getSummary(): string | null;
+    updateMessages(messages: Message[]): void;
+    maybeCompress(): Promise<void>;
+}
+
+interface BuiltCLIAgent {
+    agent: MiniAgent;
+    compressor: CLICompressor;
+}
+
+interface CreateBuiltinBlueprintManagerOptions {
+    getAgentConfig: () => AgentConfig;
+    subagentFactory: ConfiguredSubagentFactory;
+    getHitlEnabled: () => boolean;
+    onCompressor?: (compressor: CLICompressor) => void;
 }
 
 interface ModelListAgent {
@@ -155,7 +147,6 @@ export interface BuildSubagentAgentConfigOptions {
     providers: ModelProviderConfig[];
     currentModel: ResolvedModel | undefined;
     generation: GenerationConfig;
-    plugins: Map<string, JsonValue>;
     paths: PathConfig;
 }
 
@@ -171,7 +162,6 @@ export function buildSubagentAgentConfig(
             },
         }),
         generation: options.generation,
-        plugins: options.plugins,
         paths: options.paths,
     });
 }
@@ -179,29 +169,24 @@ export function buildSubagentAgentConfig(
 export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     const config = await loadConfig(baseDir);
     const persistDir = join(baseDir, CLIAGENT_DIR);
-    const manager = new LLMEngineManager();
 
     let hitlEnabled = true;
     let userSystemPrompt = config.systemPrompt ?? "You are a helpful assistant.";
     let currentParentAgent: MiniAgent | undefined;
-
-    registerEngines(manager, config);
+    let currentCompressor: CLICompressor | undefined;
+    let rebuildQueue: Promise<void> = Promise.resolve();
+    const compressor = createCompressorProxy(() => currentCompressor);
 
     const sessionManager = new SessionManager(persistDir);
     await sessionManager.load();
 
-    const blueprintRegistry = createBlueprintRegistry(
+    const subagentFactory = createConfiguredSubagentFactory(
+        sessionManager,
+        config,
         baseDir,
-        () => createConfiguredSubagentFactory(
-            sessionManager,
-            assembler,
-            manager,
-            config,
-            baseDir,
-            () => currentParentAgent,
-        ),
+        () => currentParentAgent,
+        () => hitlEnabled,
     );
-    const assembler = new AgentAssembler(blueprintRegistry);
 
     const sessions = sessionManager.list();
     let session: SessionMeta;
@@ -212,130 +197,62 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
         session = await sessionManager.create("default");
     }
 
-    const compressor = new ContextCompressor({
-        maxMessages: 60,
-        keepRecent: 15,
-    });
-
-    const agent = await buildAgentInner(
+    const built = await buildAgentInner(
         session.id,
         baseDir,
         config,
-        manager,
-        assembler,
-        compressor,
+        subagentFactory,
         userSystemPrompt,
+        () => currentParentAgent?.getConfig(),
         () => hitlEnabled,
     );
-    currentParentAgent = agent;
+    currentParentAgent = built.agent;
+    currentCompressor = built.compressor;
 
     return {
-        agent,
+        agent: built.agent,
         config,
         sessionManager,
         session,
         baseDir,
         hitlEnabled,
         compressor,
-        assembler,
-        manager,
-        blueprintRegistry,
         setHITL: (enabled: boolean) => { hitlEnabled = enabled; },
         setSystemPrompt: (prompt: string) => { userSystemPrompt = prompt; },
         rebuildAgent: async (sessionId: string) => {
-            const rebuilt = await buildAgentInner(
-                sessionId,
-                baseDir,
-                config,
-                manager,
-                assembler,
-                compressor,
-                userSystemPrompt,
-                () => hitlEnabled,
+            const rebuildTask = rebuildQueue.then(async (): Promise<MiniAgent> => {
+                const previousAgent = currentParentAgent;
+                const rebuilt = await buildAgentInner(
+                    sessionId,
+                    baseDir,
+                    config,
+                    subagentFactory,
+                    userSystemPrompt,
+                    () => currentParentAgent?.getConfig(),
+                    () => hitlEnabled,
+                );
+                await previousAgent?.destroy();
+                currentParentAgent = rebuilt.agent;
+                currentCompressor = rebuilt.compressor;
+                return rebuilt.agent;
+            });
+            rebuildQueue = rebuildTask.then(
+                () => {},
+                () => {},
             );
-            currentParentAgent = rebuilt;
-            return rebuilt;
+            return rebuildTask;
         },
     };
 }
 
-function registerEngines(manager: LLMEngineManager, config: CLIConfig): void {
-    const seen = new Set<string>();
-    for (const p of config.providers) {
-        if (seen.has(p.engine)) {
-            continue;
-        }
-        const createEngine = ENGINE_FACTORIES[p.engine];
-        if (!createEngine) {
-            throw new Error(
-                `Unsupported engine "${p.engine}". Known engines: ${Object.keys(ENGINE_FACTORIES).join(", ")}`,
-            );
-        }
-        manager.register(createEngine());
-        seen.add(p.engine);
-    }
-}
-
-function createCLIApprover(getHitlEnabled: () => boolean) {
-    const autoApprovedTools = new Set(AUTO_APPROVE_TOOLS);
-
-    return defineAgentModule({
-        requestApproval: async (toolName: string, _args: Record<string, unknown>): Promise<boolean> => {
-            if (autoApprovedTools.has(toolName)) {
-                return true;
-            }
-            if (!getHitlEnabled()) {
-                return true;
-            }
-            return true;
-        },
-    });
-}
-
-function createBlueprintRegistry(
-    baseDir: string,
-    subagentFactory: () => ConfiguredSubagentFactory,
-): AgentBlueprintRegistry {
-    const registry = new AgentBlueprintRegistry();
-
-    registry.register("tool.read", () => readTool);
-    registry.register("tool.write", () => writeTool);
-    registry.register("tool.edit", () => editTool);
-    registry.register("tool.glob", () => globTool);
-    registry.register("tool.grep", () => grepTool);
-    registry.register("tool.bash", () => bashTool);
-    registry.register("tool.todo", () => new TodoManager());
-    registry.register("plugin.subagent", () => new SubagentPlugin(subagentFactory()));
-    registry.register("plugin.mcp", () => new McpPlugin());
-    registry.register("plugin.skill", () => new SkillPlugin());
-    registry.register("plugin.agent-context", () => new AgentContextProvider(baseDir));
-
-    return registry;
-}
-
-function clonePluginConfig(config: CLIConfig): Map<string, JsonValue> {
-    const plugins = new Map<string, JsonValue>();
-    if (config.mcp) {
-        plugins.set("mcp", JSON.parse(JSON.stringify(config.mcp)) as JsonValue);
-    }
-    if (config.skill) {
-        plugins.set("skill", JSON.parse(JSON.stringify(config.skill)) as JsonValue);
-    }
-    if (config.subagent) {
-        plugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
-    }
-    return plugins;
-}
-
 function createConfiguredSubagentFactory(
     sessionManager: SessionManager,
-    assembler: AgentAssembler,
-    manager: LLMEngineManager,
     config: CLIConfig,
     baseDir: string,
     getParentAgent: () => MiniAgent | undefined,
+    getHitlEnabled: () => boolean,
 ): ConfiguredSubagentFactory {
-    return async (request: SubagentInvocation): Promise<MiniAgent> => {
+    const factory: ConfiguredSubagentFactory = async (request: SubagentInvocation): Promise<MiniAgent> => {
         const parentAgent = getParentAgent();
         if (!parentAgent) {
             throw new Error("Parent agent is not initialized for subagent creation.");
@@ -344,7 +261,6 @@ function createConfiguredSubagentFactory(
         const active = sessionManager.getActive();
         const sessionId = active?.id ?? "temp";
         const persistDir = sessionManager.getSessionPersistDir(sessionId);
-        const plugins = clonePluginConfig(config);
         const currentModel = request.entry.model !== undefined
             ? findResolvedModelForCLI(parentAgent.getModels(), request.entry.model)
             : parentAgent.getCurrentResolvedModel();
@@ -352,81 +268,208 @@ function createConfiguredSubagentFactory(
             providers: toAgentProviders(config),
             currentModel,
             generation: parentAgent.getGenerationConfig(),
-            plugins,
             paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
         });
-        const assembleOpts: Parameters<typeof assembler.assemble>[0] = {
-            llm: manager,
+
+        const manager = createBuiltinBlueprintManager(
+            {
+                getAgentConfig: () => agentConfig,
+                subagentFactory: factory,
+                getHitlEnabled,
+            },
+        );
+        const blueprint = createCLIBlueprint({
+            config,
+            engines: uniqueEngines(config),
+            persistDir: agentConfig.paths.sessiondir,
+            systemPrompt: {
+                prompt: request.entry.prompt,
+                baseDir,
+            },
+            baseDir,
+            ...(request.entry.capabilities !== undefined && {
+                capabilities: request.entry.capabilities,
+            }),
+        });
+
+        return manager.assemble({
             config: agentConfig,
-            blueprint: SHARED_BLUEPRINT,
-            extraUses: [
-                defineAgentModule({
-                    priority: 0,
-                    collect: async (): Promise<Message[]> => [
-                        {
-                            id: "system-prompt",
-                            type: MessageType.System,
-                            content: [
-                                request.entry.prompt,
-                                "",
-                                `Subagent id: ${request.entry.id}`,
-                                `Working directory: ${baseDir}`,
-                            ].join("\n"),
-                        },
-                    ],
-                }),
-            ],
-        };
-        if (request.entry.capabilities !== undefined) {
-            assembleOpts.capabilities = request.entry.capabilities;
-        }
-        return assembler.assemble(assembleOpts);
+            blueprint,
+        });
     };
+    return factory;
 }
 
 async function buildAgentInner(
     sessionId: string,
     baseDir: string,
     config: CLIConfig,
-    manager: LLMEngineManager,
-    assembler: AgentAssembler,
-    compressor: ContextCompressor,
+    subagentFactory: ConfiguredSubagentFactory,
     userSystemPrompt: string,
+    getCurrentAgentConfig: () => AgentConfig | undefined,
     getHitlEnabled: () => boolean,
-): Promise<MiniAgent> {
+): Promise<BuiltCLIAgent> {
     const persistDir = new SessionManager(join(baseDir, CLIAGENT_DIR)).getSessionPersistDir(sessionId);
-    const plugins = clonePluginConfig(config);
     const defaultModel = parseDefaultModel(config);
     const generation = toAgentGenerationConfig(config);
-    const agentConfig: AgentConfig = {
+    const agentConfig: AgentConfig = AgentConfigSchema.parse({
         providers: toAgentProviders(config),
         ...(defaultModel !== undefined && { defaultModel }),
         ...(generation !== undefined && { generation }),
-        plugins,
         paths: { sessiondir: persistDir },
+    });
+    let createdCompressor: CLICompressor | undefined;
+    const manager = createBuiltinBlueprintManager({
+        getAgentConfig: () => getCurrentAgentConfig() ?? agentConfig,
+        subagentFactory,
+        getHitlEnabled,
+        onCompressor: (compressor) => {
+            createdCompressor = compressor;
+        },
+    });
+    const blueprint = createCLIBlueprint({
+        config,
+        engines: uniqueEngines(config),
+        persistDir,
+        systemPrompt: {
+            prompt: buildSystemPrompt(baseDir, userSystemPrompt),
+        },
+        baseDir,
+    });
+
+    const agent = await manager.assemble({ config: agentConfig, blueprint });
+    if (createdCompressor === undefined) {
+        throw new Error("Expected assembled CLI agent to include a context compressor.");
+    }
+    return {
+        agent,
+        compressor: createdCompressor,
+    };
+}
+
+function createBuiltinBlueprintManager(
+    options: CreateBuiltinBlueprintManagerOptions,
+): BlueprintManager {
+    const manager = new BlueprintManager();
+    registerBuiltinBlueprintImpls(manager, {
+        getAgentConfig: options.getAgentConfig,
+        getHITL: options.getHitlEnabled,
+        subagentFactory: options.subagentFactory,
+        onCompressor: options.onCompressor,
+    });
+    return manager;
+}
+
+function uniqueEngines(config: CLIConfig): string[] {
+    return [...new Set(config.providers.map((provider) => provider.engine))];
+}
+
+function createCLIBlueprint(options: CreateCLIBlueprintOptions): AgentBlueprint {
+    const blueprint = createDefaultBlueprint({
+        engines: options.engines,
+        persistence: {
+            rootDir: options.persistDir,
+            fileName: DEFAULT_MESSAGE_FILE_NAME,
+        },
+        ...(options.config.mcp !== undefined && { mcp: options.config.mcp }),
+        ...(options.config.skill !== undefined && { skill: options.config.skill }),
+        ...(options.config.subagent !== undefined && { subagent: options.config.subagent }),
+        systemPrompt: options.systemPrompt,
+        agentContext: { baseDir: options.baseDir },
+    });
+    blueprint.approval = { use: "allow-all" };
+
+    if (options.capabilities === undefined) {
+        return blueprint;
+    }
+
+    return applySubagentCapabilities(blueprint, options.capabilities);
+}
+
+function applySubagentCapabilities(
+    blueprint: AgentBlueprint,
+    capabilities: AgentCapabilitySelector,
+): AgentBlueprint {
+    const next: AgentBlueprint = { ...blueprint };
+
+    if (next.tools !== undefined) {
+        next.tools = next.tools.filter((tool) =>
+            isToolBlueprintUseEnabled(tool, capabilities.tool));
+    }
+
+    for (const namespace of PLUGIN_CAPABILITY_NAMESPACES) {
+        const key = PLUGIN_BLUEPRINT_KEYS[namespace];
+        const use = next[key];
+        const updatedUse = injectPluginCapabilities(use, capabilities, namespace);
+        if (updatedUse !== undefined) {
+            next[key] = updatedUse;
+        }
+    }
+
+    return next;
+}
+
+function isToolBlueprintUseEnabled(
+    tool: BlueprintUse,
+    rule: AgentCapabilityRule | undefined,
+): boolean {
+    return getToolCapabilityNames(tool.use).some((toolName) =>
+        isCapabilityEnabled(toolName, rule));
+}
+
+function getToolCapabilityNames(use: string): string[] {
+    return use === "todo" ? TODO_TOOL_NAMES : [use];
+}
+
+function injectPluginCapabilities(
+    use: BlueprintUse | undefined,
+    capabilities: AgentCapabilitySelector,
+    namespace: PluginCapabilityNamespace,
+): BlueprintUse | undefined {
+    if (use === undefined) {
+        return undefined;
+    }
+    const namespaceCapabilities = getCapabilityNamespace(capabilities, namespace);
+    if (namespaceCapabilities === undefined) {
+        return use;
+    }
+
+    const parsedCapabilities = JsonValueSchema.parse(namespaceCapabilities);
+    const config = use.config ?? {};
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+        throw new Error(`Cannot inject ${namespace} capabilities into non-object blueprint config.`);
+    }
+
+    return {
+        ...use,
+        config: {
+            ...(config as Record<string, JsonValue>),
+            capabilities: parsedCapabilities,
+        },
+    };
+}
+
+function createCompressorProxy(
+    getCompressor: () => CLICompressor | undefined,
+): CLICompressor {
+    const requireCompressor = (): CLICompressor => {
+        const compressor = getCompressor();
+        if (compressor === undefined) {
+            throw new Error("Context compressor is not initialized.");
+        }
+        return compressor;
     };
 
-    return assembler.assemble({
-        llm: manager,
-        config: agentConfig,
-        blueprint: SHARED_BLUEPRINT,
-        extraUses: [
-            defineAgentModule({
-                priority: 0,
-                collect: async (): Promise<Message[]> => [
-                    {
-                        id: "system-prompt",
-                        type: MessageType.System,
-                        content: buildSystemPrompt(baseDir, userSystemPrompt),
-                    },
-                ],
-            }),
-            compressor,
-            (createdAgent: MiniAgent): void => {
-                createdAgent.register(createCLIApprover(getHitlEnabled));
-            },
-        ],
-    });
+    return {
+        getCompressedCount: () => requireCompressor().getCompressedCount(),
+        getSummary: () => requireCompressor().getSummary(),
+        updateMessages: (messages: Message[]): void => {
+            requireCompressor().updateMessages(messages);
+        },
+        maybeCompress: async (): Promise<void> => {
+            await requireCompressor().maybeCompress();
+        },
+    };
 }
 
 function buildSystemPrompt(baseDir: string, userSystemPrompt: string): string {

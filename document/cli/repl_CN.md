@@ -62,7 +62,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 
 ## 内置工具
 
-CLI Agent 通过共享蓝图预配置了以下工具：
+CLI Agent 通过语义蓝图预配置了以下工具：
 
 - **read** — 读取文件和目录
 - **write** — 写入文件

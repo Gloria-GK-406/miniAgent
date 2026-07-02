@@ -62,6 +62,7 @@ describe("config service", () => {
       thinking: "low",
     });
     expect(result.agentConfig.paths.sessiondir).toBe(tempDir);
+    expect(Object.prototype.hasOwnProperty.call(result.agentConfig, "plugins")).toBe(false);
   });
 
   it("replaces duplicate providers by name during aggregation", async () => {
@@ -102,29 +103,17 @@ describe("config service", () => {
     });
   });
 
-  it("normalizes persisted plugin records to a Map and lets later entries override earlier entries", async () => {
+  it("rejects legacy plugin records in persisted config files", async () => {
     await writeConfig("base.json", {
       plugins: {
         alpha: { enabled: true },
-        shared: "base",
-      },
-    });
-    await writeConfig("override.json", {
-      plugins: {
-        shared: "override",
-        beta: 2,
       },
     });
 
-    const result = await service.load({
-      configFiles: [join(tempDir, "base.json"), join(tempDir, "override.json")],
+    await expect(service.load({
+      configFiles: [join(tempDir, "base.json")],
       runtime: { paths: { sessiondir: tempDir } },
-    });
-
-    expect(result.agentConfig.plugins).toBeInstanceOf(Map);
-    expect(result.agentConfig.plugins.get("alpha")).toEqual({ enabled: true });
-    expect(result.agentConfig.plugins.get("shared")).toBe("override");
-    expect(result.agentConfig.plugins.get("beta")).toBe(2);
+    })).rejects.toThrow("plugins");
   });
 
   it("includes file path in validation errors", async () => {

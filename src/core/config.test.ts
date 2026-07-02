@@ -4,6 +4,7 @@ import {
   GenerationConfigSchema,
   normalizeGenerationConfig,
   ModelProviderConfigSchema,
+  PersistConfigFileSchema,
   PersistConfigSchema,
   ResolvedModelSchema,
   ThinkingLevel,
@@ -72,7 +73,6 @@ describe("model provider config", () => {
         },
       ],
       defaultModel: { id: "fast", provider: "openai" },
-      plugins: new Map(),
       paths: { sessiondir: "/tmp/session" },
     });
 
@@ -90,7 +90,6 @@ describe("model provider config", () => {
       ],
       defaultModel: { id: "qwen" },
       generation: { temperature: 0.7, thinking: ThinkingLevel.Medium },
-      plugins: new Map(),
       paths: { sessiondir: "/tmp/session" },
     };
 
@@ -105,7 +104,6 @@ describe("provider-only config schemas", () => {
       model: { provider: "openai", model: "gpt-4o" },
       models: new Map(),
       providers: [],
-      plugins: new Map(),
       paths: { sessiondir: "/tmp/session" },
     });
 
@@ -126,11 +124,20 @@ describe("provider-only config schemas", () => {
         temperature: 0.7,
         thinking: ThinkingLevel.Medium,
       },
-      plugins: new Map(),
       paths: { sessiondir: "/tmp/session" },
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("rejects plugins in agent config", () => {
+    const result = AgentConfigSchema.safeParse({
+      providers: [],
+      plugins: new Map(),
+      paths: { sessiondir: "/tmp/session" },
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("rejects legacy persisted models", () => {
@@ -165,5 +172,16 @@ describe("provider-only config schemas", () => {
 
     expect(result.success).toBe(true);
     expect(result.data.defaultModel).toEqual({ id: "fast" });
+  });
+
+  it("rejects plugins in persisted config files", () => {
+    const result = PersistConfigFileSchema.safeParse({
+      providers: [],
+      plugins: {
+        search: { enabled: true },
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 });

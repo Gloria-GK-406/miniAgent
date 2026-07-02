@@ -27,7 +27,6 @@ function createConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
     providers: [{ provider: "openai", key: "test-key" }],
     defaultModel: { id: "fast" },
-    plugins: new Map(),
     paths: { sessiondir: "test-session" },
     ...overrides,
   };
@@ -53,6 +52,12 @@ function textChunk(text: string): MessageChunk {
 }
 
 describe("ContextCompressor", () => {
+  it("throws when no agent config source is provided", () => {
+    expect(() =>
+      new ContextCompressor({ maxMessages: 3, keepRecent: 1 } as never),
+    ).toThrow("ContextCompressor requires agentConfig or getAgentConfig");
+  });
+
   it("builds a request-mode summarization call", async () => {
     const capturedRequests: LLMGenerateRequest[] = [];
     const llm: LLMRequest = {
@@ -63,12 +68,15 @@ describe("ContextCompressor", () => {
         yield textChunk("text");
       },
     };
-    const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      agentConfig: createConfig({
+        generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
+      }),
+    });
 
     await compressor.setLLMRequest(llm);
-    await compressor.setConfig(createConfig({
-      generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
-    }));
     compressor.updateMessages(createMessages(4));
 
     await compressor.maybeCompress();
@@ -107,18 +115,21 @@ describe("ContextCompressor", () => {
         yield textChunk("summary");
       },
     };
-    const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      agentConfig: createConfig({
+        providers: [
+          {
+            provider: "openai",
+            key: "test-key",
+            models: [{ id: "fast", name: "gpt-4o-mini" }],
+          },
+        ],
+      }),
+    });
 
     await compressor.setLLMRequest(llm);
-    await compressor.setConfig(createConfig({
-      providers: [
-        {
-          provider: "openai",
-          key: "test-key",
-          models: [{ id: "fast", name: "gpt-4o-mini" }],
-        },
-      ],
-    }));
     compressor.updateMessages(createMessages(4));
     await compressor.maybeCompress();
 
@@ -135,6 +146,58 @@ describe("ContextCompressor", () => {
     }));
   });
 
+  it("uses the latest getAgentConfig values on subsequent compression calls", async () => {
+    const capturedRequests: LLMGenerateRequest[] = [];
+    let currentConfig = createConfig({
+      defaultModel: { id: "fast" },
+      generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
+    });
+    const llm: LLMRequest = {
+      getEngineModels: () => [
+        createResolvedModel({ id: "fast", name: "gpt-4o-mini" }),
+        createResolvedModel({ id: "slow", name: "gpt-4o" }),
+      ],
+      async *streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
+        capturedRequests.push(request);
+        yield textChunk(`summary ${capturedRequests.length}`);
+      },
+    };
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      getAgentConfig: () => currentConfig,
+    });
+
+    await compressor.setLLMRequest(llm);
+    compressor.updateMessages(createMessages(4));
+    await compressor.maybeCompress();
+
+    currentConfig = createConfig({
+      defaultModel: { id: "slow" },
+      generation: { temperature: 1.1, thinking: ThinkingLevel.High },
+    });
+    compressor.updateMessages(createMessages(5));
+    await compressor.maybeCompress();
+
+    expect(capturedRequests).toHaveLength(2);
+    expect(capturedRequests[0]!.model).toEqual(expect.objectContaining({
+      id: "fast",
+      name: "gpt-4o-mini",
+    }));
+    expect(capturedRequests[0]!.generation).toEqual({
+      temperature: 0.2,
+      thinking: ThinkingLevel.Low,
+    });
+    expect(capturedRequests[1]!.model).toEqual(expect.objectContaining({
+      id: "slow",
+      name: "gpt-4o",
+    }));
+    expect(capturedRequests[1]!.generation).toEqual({
+      temperature: 1.1,
+      thinking: ThinkingLevel.High,
+    });
+  });
+
   it("applies default generation config when config has no generation", async () => {
     const capturedRequests: LLMGenerateRequest[] = [];
     const llm: LLMRequest = {
@@ -144,10 +207,13 @@ describe("ContextCompressor", () => {
         yield textChunk("default summary");
       },
     };
-    const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      agentConfig: createConfig(),
+    });
 
     await compressor.setLLMRequest(llm);
-    await compressor.setConfig(createConfig());
     compressor.updateMessages(createMessages(4));
 
     await compressor.maybeCompress();
@@ -167,14 +233,16 @@ describe("ContextCompressor", () => {
         yield textChunk("should not run");
       },
     };
-    const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      agentConfig: {
+        providers: [{ provider: "openai", key: "test-key" }],
+        paths: { sessiondir: "test-session" },
+      },
+    });
 
     await compressor.setLLMRequest(llm);
-    await compressor.setConfig({
-      providers: [{ provider: "openai", key: "test-key" }],
-      plugins: new Map(),
-      paths: { sessiondir: "test-session" },
-    });
     compressor.updateMessages(createMessages(4));
 
     await compressor.maybeCompress();
@@ -192,10 +260,13 @@ describe("ContextCompressor", () => {
         throw new Error("stream failed");
       },
     };
-    const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      agentConfig: createConfig(),
+    });
 
     await compressor.setLLMRequest(llm);
-    await compressor.setConfig(createConfig());
     compressor.updateMessages([
       userMessage("user-1", "a".repeat(250)),
       userMessage("user-2", "important detail"),
@@ -221,10 +292,13 @@ describe("ContextCompressor", () => {
         };
       },
     };
-    const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
+    const compressor = new ContextCompressor({
+      maxMessages: 3,
+      keepRecent: 1,
+      agentConfig: createConfig(),
+    });
 
     await compressor.setLLMRequest(llm);
-    await compressor.setConfig(createConfig());
     compressor.updateMessages(createMessages(4));
 
     await compressor.maybeCompress();
@@ -237,5 +311,11 @@ describe("ContextCompressor", () => {
         content: expect.stringContaining("message 1"),
       }),
     ]);
+  });
+
+  it("does not expose a setConfig registration hook", () => {
+    const compressor = new ContextCompressor({ agentConfig: createConfig() });
+
+    expect((compressor as Record<string, unknown>)["setConfig"]).toBeUndefined();
   });
 });

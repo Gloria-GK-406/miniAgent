@@ -5,12 +5,10 @@ import os from "node:os";
 import type { Tool } from "../types.js";
 import { MessageType } from "../../core/types.js";
 import type { Message } from "../../core/types.js";
-import type { NormalizedAgentConfig } from "../../core/config.js";
-import { getCapabilityNamespace, isCapabilityEnabled } from "../../assembly/capability.js";
-import type { AgentCapabilitySelector } from "../../assembly/capability.js";
+import { isCapabilityEnabled } from "../../assembly/capability.js";
 import { parseFrontmatter } from "../../utils/frontmatter.js";
-import { SkillCapabilitySelectorSchema, SkillPluginConfigSchema } from "./types.js";
-import type { SkillCapabilitySelector, SkillPluginConfig, SkillEntry } from "./types.js";
+import { SkillPluginConfigSchema } from "./types.js";
+import type { SkillCapabilitySelector, SkillPluginConfig, SkillPluginConfigInput, SkillEntry } from "./types.js";
 
 const SKILL_MANIFEST = "SKILL.md";
 
@@ -18,45 +16,20 @@ export class SkillPlugin {
     priority = 100;
 
     private skills = new Map<string, SkillEntry>();
-    private config: SkillPluginConfig | null = null;
-    private capabilities: SkillCapabilitySelector = {};
+    private config: SkillPluginConfig;
+    private capabilities: SkillCapabilitySelector;
 
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
-        const raw = getCapabilityNamespace(capabilities, "skill");
-        if (raw === undefined) {
-            this.capabilities = {};
-            return true;
-        }
-
-        const parsed = SkillCapabilitySelectorSchema.safeParse(raw);
-        if (!parsed.success) {
-            throw new Error(`Invalid skill capability selector: ${parsed.error.message}`);
-        }
-
-        this.capabilities = parsed.data;
-        return true;
-    }
-
-    async setConfig(agentConfig: NormalizedAgentConfig): Promise<void> {
-        const pluginConfig = agentConfig.plugins.get("skill");
-        if (pluginConfig === undefined || pluginConfig === null) {
-            this.config = null;
-            this.skills.clear();
-            return;
-        }
-
-        const parsed = SkillPluginConfigSchema.safeParse(pluginConfig);
+    constructor(config: SkillPluginConfigInput) {
+        const parsed = SkillPluginConfigSchema.safeParse(config);
         if (!parsed.success) {
             throw new Error(`Invalid skill plugin config: ${parsed.error.message}`);
         }
 
-        const newConfig = parsed.data;
+        this.config = parsed.data;
+        this.capabilities = parsed.data.capabilities ?? {};
+    }
 
-        if (this.config && this.configChanged(this.config, newConfig)) {
-            this.skills.clear();
-        }
-
-        this.config = newConfig;
+    async initialize(): Promise<void> {
         await this.scanAll();
     }
 
@@ -124,13 +97,7 @@ export class SkillPlugin {
         );
     }
 
-    private configChanged(old: SkillPluginConfig, next: SkillPluginConfig): boolean {
-        return JSON.stringify(old) !== JSON.stringify(next);
-    }
-
     private async scanAll(): Promise<void> {
-        if (!this.config) return;
-
         this.skills.clear();
         for (const dir of this.config.directories) {
             const expanded = dir.startsWith("~/")

@@ -38,11 +38,18 @@ export class McpClient {
     }
 
     async disconnect(): Promise<void> {
-        if (this.connected) {
-            await this.client.close();
+        const transport = this.transport;
+        try {
+            if (this.connected) {
+                await this.client.close().catch(() => {});
+            }
+            if (transport !== null) {
+                await transport.close().catch(() => {});
+            }
+        } finally {
             this.connected = false;
+            this.transport = null;
         }
-        this.transport = null;
     }
 
     async listTools(): Promise<McpToolEntry[]> {

@@ -18,7 +18,6 @@ function createConfig(basepersistdir: string): AgentConfig {
             baseUrl: "http://localhost",
             models: [{ id: "test-model", name: "test-model" }],
         }],
-        plugins: new Map(),
         paths: { sessiondir: basepersistdir },
     };
 }

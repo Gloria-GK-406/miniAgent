@@ -7,11 +7,9 @@ import type { Tool, ToolProvider } from "./types.js";
 import type { Message } from "../core/types.js";
 import { MessageType } from "../core/types.js";
 import type { MiniAgent } from "../core/agent.js";
-import type { NormalizedAgentConfig } from "../core/config.js";
 import {
     AgentCapabilityRuleSchema,
     AgentCapabilitySelectorSchema,
-    getCapabilityNamespace,
     isCapabilityEnabled,
 } from "../assembly/capability.js";
 import type { AgentCapabilitySelector } from "../assembly/capability.js";
@@ -25,15 +23,17 @@ const SubAgentParamsSchema = z.object({
     system_prompt: z.string().optional().describe("Custom system prompt for the sub-agent"),
 });
 
-export const SubagentPluginConfigSchema = z.object({
-    path: z.string().default("subagent/"),
-});
-
-export type SubagentPluginConfig = z.infer<typeof SubagentPluginConfigSchema>;
-
 export const SubagentCapabilitySelectorSchema = AgentCapabilityRuleSchema;
 
 export type SubagentCapabilitySelector = z.infer<typeof SubagentCapabilitySelectorSchema>;
+
+export const SubagentPluginConfigSchema = z.object({
+    path: z.string().default("subagent/"),
+    capabilities: SubagentCapabilitySelectorSchema.optional(),
+});
+
+export type SubagentPluginConfig = z.infer<typeof SubagentPluginConfigSchema>;
+export type SubagentPluginConfigInput = z.input<typeof SubagentPluginConfigSchema>;
 
 export const SubagentDefinitionSchema = z.object({
     id: z.string().min(1),
@@ -82,18 +82,16 @@ export class SubAgentProvider implements ToolProvider {
                 parameters: SubAgentParamsSchema,
                 execute: async (args: Record<string, unknown>, signal?: AbortSignal): Promise<string> => {
                     const parsed = SubAgentParamsSchema.parse(args);
+                    if (signal?.aborted) {
+                        return "Sub-agent aborted before start.";
+                    }
+
                     const agent = await this.factory(parsed.task, parsed.system_prompt ?? "");
 
                     const onAbort = (): void => {
                         agent.stop();
                     };
-                    if (signal) {
-                        if (signal.aborted) {
-                            onAbort();
-                        } else {
-                            signal.addEventListener("abort", onAbort, { once: true });
-                        }
-                    }
+                    let listenerAttached = false;
 
                     const inputMsg: Message = {
                         id: crypto.randomUUID(),
@@ -101,20 +99,34 @@ export class SubAgentProvider implements ToolProvider {
                         content: parsed.task,
                     };
 
-                    const messages = await agent.run(inputMsg);
-                    if (signal) {
-                        signal.removeEventListener("abort", onAbort);
+                    try {
+                        if (signal?.aborted) {
+                            onAbort();
+                            return "Sub-agent aborted before start.";
+                        }
+
+                        if (signal) {
+                            signal.addEventListener("abort", onAbort, { once: true });
+                            listenerAttached = true;
+                        }
+
+                        const messages = await agent.run(inputMsg);
+                        const lastMsg = messages[messages.length - 1];
+                        if (lastMsg && lastMsg.type === MessageType.Assist) {
+                            const content = typeof lastMsg.content === "string"
+                                ? lastMsg.content
+                                : lastMsg.content.type === "text"
+                                    ? lastMsg.content.text
+                                    : "";
+                            return content;
+                        }
+                        return "Sub-agent completed the task but produced no text response.";
+                    } finally {
+                        if (listenerAttached && signal !== undefined) {
+                            signal.removeEventListener("abort", onAbort);
+                        }
+                        await agent.destroy();
                     }
-                    const lastMsg = messages[messages.length - 1];
-                    if (lastMsg && lastMsg.type === MessageType.Assist) {
-                        const content = typeof lastMsg.content === "string"
-                            ? lastMsg.content
-                            : lastMsg.content.type === "text"
-                                ? lastMsg.content.text
-                                : "";
-                        return content;
-                    }
-                    return "Sub-agent completed the task but produced no text response.";
                 },
             },
         ];
@@ -126,48 +138,21 @@ export class SubagentPlugin {
 
     private factory: ConfiguredSubagentFactory;
     private entries = new Map<string, SubagentEntry>();
-    private config: SubagentPluginConfig | null = null;
-    private capabilities: SubagentCapabilitySelector = {};
+    private config: SubagentPluginConfig;
+    private capabilities: SubagentCapabilitySelector;
 
-    constructor(factory: ConfiguredSubagentFactory) {
-        this.factory = factory;
-    }
-
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
-        const raw = getCapabilityNamespace(capabilities, "subagent");
-        if (raw === undefined) {
-            this.capabilities = {};
-            return true;
-        }
-
-        const parsed = SubagentCapabilitySelectorSchema.safeParse(raw);
-        if (!parsed.success) {
-            throw new Error(`Invalid subagent capability selector: ${parsed.error.message}`);
-        }
-
-        this.capabilities = parsed.data;
-        return true;
-    }
-
-    async setConfig(agentConfig: NormalizedAgentConfig): Promise<void> {
-        const pluginConfig = agentConfig.plugins.get("subagent");
-        if (pluginConfig === undefined || pluginConfig === null) {
-            this.config = null;
-            this.entries.clear();
-            return;
-        }
-
-        const parsed = SubagentPluginConfigSchema.safeParse(pluginConfig);
+    constructor(config: SubagentPluginConfigInput, factory: ConfiguredSubagentFactory) {
+        const parsed = SubagentPluginConfigSchema.safeParse(config);
         if (!parsed.success) {
             throw new Error(`Invalid subagent plugin config: ${parsed.error.message}`);
         }
 
-        const nextConfig = parsed.data;
-        if (this.config && JSON.stringify(this.config) !== JSON.stringify(nextConfig)) {
-            this.entries.clear();
-        }
+        this.config = parsed.data;
+        this.capabilities = parsed.data.capabilities ?? {};
+        this.factory = factory;
+    }
 
-        this.config = nextConfig;
+    async initialize(): Promise<void> {
         await this.scanAll();
     }
 
@@ -217,6 +202,14 @@ export class SubagentPlugin {
                     return `Subagent "${parsed.agent}" not found. Available subagents: ${available}`;
                 }
 
+                if (signal?.aborted) {
+                    return [
+                        `<subagent_result id="${entry.id}" name="${entry.name}">`,
+                        "Subagent aborted before start.",
+                        "</subagent_result>",
+                    ].join("\n");
+                }
+
                 const agent = await this.factory({
                     entry,
                     task: parsed.task,
@@ -226,13 +219,7 @@ export class SubagentPlugin {
                 const onAbort = (): void => {
                     agent.stop();
                 };
-                if (signal) {
-                    if (signal.aborted) {
-                        onAbort();
-                    } else {
-                        signal.addEventListener("abort", onAbort, { once: true });
-                    }
-                }
+                let listenerAttached = false;
 
                 const inputMsg: Message = {
                     id: crypto.randomUUID(),
@@ -240,16 +227,34 @@ export class SubagentPlugin {
                     content: buildSubagentInput(parsed.task, parsed.context),
                 };
 
-                const messages = await agent.run(inputMsg);
-                if (signal) {
-                    signal.removeEventListener("abort", onAbort);
+                try {
+                    if (signal?.aborted) {
+                        onAbort();
+                        return [
+                            `<subagent_result id="${entry.id}" name="${entry.name}">`,
+                            "Subagent aborted before start.",
+                            "</subagent_result>",
+                        ].join("\n");
+                    }
+
+                    if (signal) {
+                        signal.addEventListener("abort", onAbort, { once: true });
+                        listenerAttached = true;
+                    }
+
+                    const messages = await agent.run(inputMsg);
+                    const finalMessage = getFinalMessageText(messages);
+                    return [
+                        `<subagent_result id="${entry.id}" name="${entry.name}">`,
+                        finalMessage,
+                        "</subagent_result>",
+                    ].join("\n");
+                } finally {
+                    if (listenerAttached && signal !== undefined) {
+                        signal.removeEventListener("abort", onAbort);
+                    }
+                    await agent.destroy();
                 }
-                const finalMessage = getFinalMessageText(messages);
-                return [
-                    `<subagent_result id="${entry.id}" name="${entry.name}">`,
-                    finalMessage,
-                    "</subagent_result>",
-                ].join("\n");
             },
         }];
     }
@@ -265,10 +270,6 @@ export class SubagentPlugin {
     }
 
     private async scanAll(): Promise<void> {
-        if (!this.config) {
-            return;
-        }
-
         const root = this.config.path.startsWith("~/")
             ? path.join(os.homedir(), this.config.path.slice(2))
             : path.resolve(this.config.path);

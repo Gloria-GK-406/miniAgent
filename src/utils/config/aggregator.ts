@@ -46,7 +46,6 @@ export class PersistentConfigAggregator {
             ...(override.defaultModel !== undefined && { defaultModel: override.defaultModel }),
             providers: [...providers.values()],
             ...(Object.keys(generation).length > 0 && { generation }),
-            plugins: new Map([...base.plugins, ...override.plugins]),
         });
     }
 }

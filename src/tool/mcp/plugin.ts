@@ -1,56 +1,29 @@
 import type { Tool } from "../types.js";
-import type { NormalizedAgentConfig } from "../../core/config.js";
 import { McpClient } from "./client.js";
 import { convertMcpTool, prefixToolName } from "./convert.js";
-import { getCapabilityNamespace, isCapabilityEnabled } from "../../assembly/capability.js";
-import type { AgentCapabilitySelector } from "../../assembly/capability.js";
-import { McpCapabilitySelectorSchema, McpPluginConfigSchema } from "./types.js";
-import type { McpCapabilitySelector, McpPluginConfig } from "./types.js";
+import { isCapabilityEnabled } from "../../assembly/capability.js";
+import { McpPluginConfigSchema } from "./types.js";
+import type { McpCapabilitySelector, McpPluginConfig, McpPluginConfigInput } from "./types.js";
 
 export class McpPlugin {
     private clients = new Map<string, McpClient>();
     private cachedTools: Tool[] = [];
-    private config: McpPluginConfig | null = null;
-    private capabilities: McpCapabilitySelector = {};
+    private config: McpPluginConfig;
+    private capabilities: McpCapabilitySelector;
 
-    async consumeAgentCapabilities(capabilities: AgentCapabilitySelector): Promise<boolean> {
-        const raw = getCapabilityNamespace(capabilities, "mcp");
-        const nextCapabilities = raw === undefined
-            ? {}
-            : McpCapabilitySelectorSchema.parse(raw);
-
-        const changed = JSON.stringify(this.capabilities) !== JSON.stringify(nextCapabilities);
-        this.capabilities = nextCapabilities;
-
-        if (changed && this.config) {
-            await this.disconnectAll();
-            await this.connectAll();
-        }
-
-        return true;
-    }
-
-    async setConfig(agentConfig: NormalizedAgentConfig): Promise<void> {
-        const pluginConfig = agentConfig.plugins.get("mcp");
-        if (pluginConfig === undefined || pluginConfig === null) {
-            await this.disconnectAll();
-            this.config = null;
-            this.cachedTools = [];
-            return;
-        }
-
-        const parsed = McpPluginConfigSchema.safeParse(pluginConfig);
+    constructor(config: McpPluginConfigInput) {
+        const parsed = McpPluginConfigSchema.safeParse(config);
         if (!parsed.success) {
             throw new Error(`Invalid MCP plugin config: ${parsed.error.message}`);
         }
 
-        const newConfig = parsed.data;
+        this.config = parsed.data;
+        this.capabilities = parsed.data.capabilities ?? {};
+    }
 
-        if (this.config && this.configChanged(this.config, newConfig)) {
-            await this.disconnectAll();
-        }
-
-        this.config = newConfig;
+    async initialize(): Promise<void> {
+        await this.disconnectAll();
+        this.cachedTools = [];
         await this.connectAll();
     }
 
@@ -60,17 +33,10 @@ export class McpPlugin {
 
     async destroy(): Promise<void> {
         await this.disconnectAll();
-    }
-
-    private configChanged(old: McpPluginConfig, next: McpPluginConfig): boolean {
-        return JSON.stringify(old) !== JSON.stringify(next);
+        this.cachedTools = [];
     }
 
     private async connectAll(): Promise<void> {
-        if (!this.config) {
-            return;
-        }
-
         const tools: Tool[] = [];
         const serverEntries = Object.entries(this.config.servers);
 
@@ -94,6 +60,8 @@ export class McpPlugin {
                         tools.push(convertMcpTool(name, entry, client));
                     }
                 } catch (e) {
+                    await client.disconnect().catch(() => {});
+                    this.clients.delete(name);
                     console.error(`Failed to connect MCP server "${name}":`, e);
                 }
             }),

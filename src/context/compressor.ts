@@ -1,4 +1,4 @@
-import type { Message, ContextProvider, LLMRequest, ConfigNotifier, LLMRequire } from "../core/types.js";
+import type { Message, ContextProvider, LLMRequest, LLMRequire } from "../core/types.js";
 import { LLMStreamChunkType, MessageType } from "../core/types.js";
 import {
     AgentConfigSchema,
@@ -49,32 +49,34 @@ export interface CompressionConfig {
     keepRecent: number;
 }
 
-export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNotifier {
+export type ContextCompressorOptions = Partial<CompressionConfig> & (
+    | { agentConfig: AgentConfig; getAgentConfig?: never }
+    | { getAgentConfig: () => AgentConfig; agentConfig?: never }
+);
+
+export class ContextCompressor implements ContextProvider, LLMRequire {
     priority = -1000;
     private llm: LLMRequest | null = null;
-    private agentConfig: NormalizedAgentConfig | null = null;
-    private generationConfig: GenerationConfig = { ...DEFAULT_GENERATION_CONFIG };
+    private readonly getAgentConfig: () => AgentConfig;
     private config: CompressionConfig;
     private messages: Message[] = [];
     private summary: string | null = null;
     private compressedCount = 0;
 
-    constructor(config: Partial<CompressionConfig> = {}) {
+    constructor(config: ContextCompressorOptions);
+    constructor(config?: ContextCompressorOptions) {
+        if (config?.agentConfig === undefined && config?.getAgentConfig === undefined) {
+            throw new Error("ContextCompressor requires agentConfig or getAgentConfig");
+        }
         this.config = {
             maxMessages: config.maxMessages ?? 50,
             keepRecent: config.keepRecent ?? 10,
         };
+        this.getAgentConfig = config.getAgentConfig ?? (() => config.agentConfig);
     }
 
     async setLLMRequest(llm: LLMRequest): Promise<void> {
         this.llm = llm;
-    }
-
-    async setConfig(config: AgentConfig): Promise<void> {
-        this.agentConfig = AgentConfigSchema.parse(config);
-        this.generationConfig = normalizeGenerationConfig(
-            this.agentConfig.generation ?? DEFAULT_GENERATION_CONFIG,
-        );
     }
 
     getCompressedCount(): number {
@@ -100,12 +102,16 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
     }
 
     private async compress(messages: Message[]): Promise<void> {
-        if (!this.llm || !this.agentConfig) return;
+        if (!this.llm) return;
 
-        const selectedModel = this.selectSummaryModel();
+        const agentConfig = AgentConfigSchema.parse(this.getAgentConfig());
+        const generationConfig = normalizeGenerationConfig(
+            agentConfig.generation ?? DEFAULT_GENERATION_CONFIG,
+        );
+        const selectedModel = this.selectSummaryModel(agentConfig);
         if (!selectedModel) return;
 
-        const provider = this.getProviderConfigForModel(selectedModel);
+        const provider = this.getProviderConfigForModel(agentConfig, selectedModel);
         if (!provider) return;
 
         const conversationText = messages
@@ -129,7 +135,7 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
                     summarizeRequest,
                 ],
                 tools: [],
-                generation: { ...this.generationConfig },
+                generation: generationConfig,
             };
             let summary = "";
             for await (const chunk of this.llm.streamInvoke(request)) {
@@ -148,14 +154,17 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
         }
     }
 
-    private selectSummaryModel(): ResolvedModel | undefined {
-        if (!this.llm || !this.agentConfig) return undefined;
-        const resolvedModels = resolveModelsFromProviders(this.agentConfig.providers, this.llm);
-        return selectResolvedModel(resolvedModels, this.agentConfig.defaultModel);
+    private selectSummaryModel(config: NormalizedAgentConfig): ResolvedModel | undefined {
+        if (!this.llm) return undefined;
+        const resolvedModels = resolveModelsFromProviders(config.providers, this.llm);
+        return selectResolvedModel(resolvedModels, config.defaultModel);
     }
 
-    private getProviderConfigForModel(model: ResolvedModel): ModelProviderConfig | undefined {
-        const provider = this.agentConfig?.providers.find((entry) => entry.provider === model.provider);
+    private getProviderConfigForModel(
+        config: NormalizedAgentConfig,
+        model: ResolvedModel,
+    ): ModelProviderConfig | undefined {
+        const provider = config.providers.find((entry) => entry.provider === model.provider);
         return provider ? cloneProviderConfig(provider) : undefined;
     }
 

@@ -139,6 +139,50 @@ describe("CLI config provider mode", () => {
     ]);
   });
 
+  it("keeps mcp, skill, and subagent convenience config on CLIConfig only", () => {
+    const config = CLIConfigSchema.parse({
+      providers: [
+        {
+          engine: "openai",
+          key: "test-key",
+          models: [{ id: "fast", name: "gpt-4o-mini" }],
+        },
+      ],
+      mcp: {
+        servers: {
+          fs: {
+            transport: "stdio",
+            command: "mcp-fs",
+          },
+        },
+      },
+      skill: {
+        directories: ["/tmp/skills"],
+      },
+      subagent: {
+        path: "/tmp/subagents",
+      },
+    });
+
+    expect(config.mcp).toEqual({
+      servers: {
+        fs: {
+          transport: "stdio",
+          command: "mcp-fs",
+        },
+      },
+    });
+    expect(config.skill).toEqual({ directories: ["/tmp/skills"] });
+    expect(config.subagent).toEqual({ path: "/tmp/subagents" });
+    expect(toAgentProviders(config)).toEqual([
+      {
+        provider: "openai",
+        key: "test-key",
+        models: [{ id: "fast", name: "gpt-4o-mini" }],
+      },
+    ]);
+  });
+
   it("does not derive generation from model presets", () => {
     const config = CLIConfigSchema.parse({
       providers: [

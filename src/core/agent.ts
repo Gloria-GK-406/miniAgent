@@ -2,9 +2,9 @@ import type {
     Action,
     AfterTurnProcessor,
     AgentContextControl,
-    ConfigNotifier,
     ContextProcessor,
     ContextProvider,
+    Destroyable,
     ErrorHandler,
     LLMRequest,
     LLMRequire,
@@ -23,9 +23,9 @@ import type {
 import {
     ActionType,
     AfterTurnProcessorSchema,
-    ConfigNotifierSchema,
     ContextProcessorSchema,
     ContextProviderSchema,
+    DestroyableSchema,
     ErrorHandlerSchema,
     LLMRequireSchema,
     LLMStreamChunkType,
@@ -144,17 +144,19 @@ export class MiniAgent {
     private notifiers: MessageNotifier[] = [];
     private errorHandlers: ErrorHandler[] = [];
     private afterTurnProcessors: AfterTurnProcessor[] = [];
-    private configNotifiers: ConfigNotifier[] = [];
     private turnContextConsumers: TurnContextConsumer[] = [];
     private turnContextAppenders: TurnContextAppender[] = [];
     private approvers: ToolApprover[] = [];
+    private destroyables: Destroyable[] = [];
     private store: Store;
     private emitter = new EventEmitter();
     private running = false;
     private stopped = false;
+    private destroyed = false;
     private contextCount: TokenCount = emptyTokenCount();
     private toolAbortController: AbortController | null = null;
     private activeStream: AsyncGenerator<MessageChunk> | null = null;
+    private activeRunPromise: Promise<Message[]> | undefined;
 
     constructor(options: MiniAgentCreateOptions);
     constructor(llm: LLMRequest, config: AgentConfig, options?: MiniAgentOptions);
@@ -228,16 +230,8 @@ export class MiniAgent {
             providers: this.providerConfigs.map(cloneProviderConfig),
             ...(defaultModel !== undefined && { defaultModel }),
             generation: cloneGenerationConfig(this.generationConfig),
-            plugins: new Map(this.config.plugins),
             paths: { ...this.config.paths },
         });
-    }
-
-    private notifyConfigChanged(): void {
-        this.syncEffectiveConfig();
-        for (const notifier of this.configNotifiers) {
-            void notifier.setConfig(this.getConfig());
-        }
     }
 
     getConfig(): NormalizedAgentConfig {
@@ -285,7 +279,7 @@ export class MiniAgent {
             );
         }
         this.currentModel = selected;
-        this.notifyConfigChanged();
+        this.syncEffectiveConfig();
     }
 
     getGenerationConfig(): GenerationConfig {
@@ -297,7 +291,7 @@ export class MiniAgent {
             ...this.generationConfig,
             ...config,
         });
-        this.notifyConfigChanged();
+        this.syncEffectiveConfig();
     }
 
     getContextCount(): TokenCount {
@@ -311,15 +305,21 @@ export class MiniAgent {
     register(notifier: MessageNotifier): void;
     register(errorHandler: ErrorHandler): void;
     register(afterTurnProcessor: AfterTurnProcessor): void;
-    register(configNotifier: ConfigNotifier): void;
     register(persistRequire: PersistRequire): void;
     register(turnContextConsumer: TurnContextConsumer): void;
     register(turnContextAppender: TurnContextAppender): void;
     register(approver: ToolApprover): void;
+    register(destroyable: Destroyable): void;
     register(module: AgentModule): void;
     register(item: AgentRegistrable | AgentModule): void {
+        this.ensureNotDestroyed();
         let matched = false;
         const candidate = item as AgentRegistrable;
+
+        if (DestroyableSchema.safeParse(candidate).success) {
+            matched = true;
+            this.trackDestroyable(candidate as Destroyable);
+        }
 
         if (ToolProviderSchema.safeParse(candidate).success) {
             matched = true;
@@ -364,14 +364,6 @@ export class MiniAgent {
                 this.errorHandlers.push(candidate as ErrorHandler);
             }
         }
-        if (ConfigNotifierSchema.safeParse(candidate).success) {
-            matched = true;
-            if (!this.configNotifiers.includes(candidate as ConfigNotifier)) {
-                const notifier = candidate as ConfigNotifier;
-                void notifier.setConfig(this.getConfig());
-                this.configNotifiers.push(notifier);
-            }
-        }
         if (PersistRequireSchema.safeParse(candidate).success) {
             matched = true;
             const req = candidate as PersistRequire;
@@ -403,6 +395,40 @@ export class MiniAgent {
 
         if (!matched) {
             throw new Error("Unsupported agent registration item");
+        }
+    }
+
+    private trackDestroyable(destroyable: Destroyable): void {
+        if (!this.destroyables.includes(destroyable)) {
+            this.destroyables.push(destroyable);
+        }
+    }
+
+    private ensureNotDestroyed(): void {
+        if (this.destroyed) {
+            throw new Error("Agent has been destroyed.");
+        }
+    }
+
+    async destroy(): Promise<void> {
+        if (this.destroyed) {
+            return;
+        }
+        this.destroyed = true;
+        this.stop();
+        const activeRunPromise = this.activeRunPromise;
+        if (activeRunPromise !== undefined) {
+            await activeRunPromise.catch(() => {});
+        }
+
+        const destroyables = [...this.destroyables].reverse();
+        this.destroyables = [];
+        for (const destroyable of destroyables) {
+            try {
+                await destroyable.destroy();
+            } catch {
+                // Best-effort cleanup should continue through all registered modules.
+            }
         }
     }
 
@@ -542,6 +568,7 @@ export class MiniAgent {
     }
 
     async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage> {
+        this.ensureNotDestroyed();
         this.emitter.emit("tool:execute", { toolCall });
         const approved = await this.requestApproval(
             toolCall.toolName,
@@ -693,9 +720,22 @@ export class MiniAgent {
     }
 
     async run(input: Message): Promise<Message[]> {
+        this.ensureNotDestroyed();
         if (this.running) {
             throw new Error("Agent is already running");
         }
+        const runPromise = this.runActive(input);
+        this.activeRunPromise = runPromise;
+        try {
+            return await runPromise;
+        } finally {
+            if (this.activeRunPromise === runPromise) {
+                this.activeRunPromise = undefined;
+            }
+        }
+    }
+
+    private async runActive(input: Message): Promise<Message[]> {
         this.running = true;
         this.stopped = false;
         this.emitter.emit("run:start", { input });

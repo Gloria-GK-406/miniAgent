@@ -2,13 +2,14 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { MiniAgent } from "../core/agent.js";
 import { ThinkingLevel } from "../core/config.js";
 import type {
   GenerationConfig,
-  JsonValue,
   ModelProviderConfig,
   ResolvedModel,
 } from "../core/config.js";
+import { MessageType, type Message, type ToolCallMessage } from "../core/types.js";
 import {
   buildSubagentAgentConfig,
   createCLIApp,
@@ -27,6 +28,25 @@ function resolvedModel(
     provider,
     name,
     thinkingLevels: [ThinkingLevel.None],
+  };
+}
+
+function messages(count: number): Message[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `message-${index}`,
+    type: MessageType.User,
+    content: `message ${index}`,
+  }));
+}
+
+function toolCall(toolName: string): ToolCallMessage {
+  return {
+    id: crypto.randomUUID(),
+    type: MessageType.ToolCall,
+    content: "",
+    toolCallId: crypto.randomUUID(),
+    toolName,
+    arguments: {},
   };
 }
 
@@ -75,6 +95,108 @@ describe("createCLIApp", () => {
     expect(app.agent.getModels().map(formatResolvedModelPath)).toEqual(["openai/fast"]);
     expect(app.agent.getConfig()).not.toHaveProperty("model");
     expect(app.agent.getConfig()).not.toHaveProperty("models");
+    expect(app.agent.getConfig()).not.toHaveProperty("plugins");
+    expect(app.compressor.getCompressedCount()).toBe(0);
+    expect(app).not.toHaveProperty("assembler");
+    expect(app).not.toHaveProperty("manager");
+    expect(app).not.toHaveProperty("blueprintRegistry");
+  });
+
+  it("destroys the previous agent before replacing it during rebuild", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
+    const configDir = join(baseDir, ".cliagent");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      join(configDir, "config.json"),
+      JSON.stringify({
+        providers: [],
+      }),
+      "utf-8",
+    );
+
+    const app = await createCLIApp(baseDir);
+    const firstAgent = app.agent;
+    const destroySpy = vi.spyOn(
+      firstAgent as typeof firstAgent & { destroy: () => Promise<void> },
+      "destroy",
+    );
+
+    const rebuilt = await app.rebuildAgent(app.session.id);
+
+    expect(destroySpy).toHaveBeenCalledOnce();
+    expect(rebuilt).not.toBe(firstAgent);
+  });
+
+  it("serializes concurrent rebuilds so overwritten rebuilt agents are destroyed", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
+    const configDir = join(baseDir, ".cliagent");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      join(configDir, "config.json"),
+      JSON.stringify({
+        providers: [],
+      }),
+      "utf-8",
+    );
+
+    const app = await createCLIApp(baseDir);
+    const destroySpy = vi.spyOn(MiniAgent.prototype, "destroy");
+
+    try {
+      const [firstRebuilt, secondRebuilt] = await Promise.all([
+        app.rebuildAgent(app.session.id),
+        app.rebuildAgent(app.session.id),
+      ]);
+
+      expect(firstRebuilt).not.toBe(secondRebuilt);
+      expect(destroySpy.mock.contexts).toContain(app.agent);
+      expect(destroySpy.mock.contexts).toContain(firstRebuilt);
+    } finally {
+      destroySpy.mockRestore();
+    }
+  });
+
+  it("uses the active agent config when the CLI compressor runs", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
+    const configDir = join(baseDir, ".cliagent");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      join(configDir, "config.json"),
+      JSON.stringify({
+        providers: [],
+      }),
+      "utf-8",
+    );
+
+    const app = await createCLIApp(baseDir);
+    const getConfigSpy = vi.spyOn(app.agent, "getConfig");
+
+    app.agent.setGenerationConfig({
+      temperature: 0.2,
+      thinking: ThinkingLevel.High,
+    });
+    app.compressor.updateMessages(messages(61));
+    await app.compressor.maybeCompress();
+
+    expect(getConfigSpy).toHaveBeenCalled();
+  });
+
+  it("allows non-auto-approved tools while CLI HITL is enabled", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
+    const configDir = join(baseDir, ".cliagent");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      join(configDir, "config.json"),
+      JSON.stringify({
+        providers: [],
+      }),
+      "utf-8",
+    );
+
+    const app = await createCLIApp(baseDir);
+
+    await expect(app.agent.execute(toolCall("bash")))
+      .resolves.toEqual(expect.objectContaining({ content: "tool not found: bash" }));
   });
 
   it("formats resolved models for CLI display", () => {
@@ -151,15 +273,10 @@ describe("createCLIApp", () => {
       temperature: 0.6,
       thinking: ThinkingLevel.Medium,
     };
-    const plugins = new Map<string, JsonValue>([
-      ["skill", { directories: ["/tmp/skills"] }],
-    ]);
-
     const config = buildSubagentAgentConfig({
       providers,
       currentModel: resolvedModel("fast", "openai", "gpt-4o-mini"),
       generation,
-      plugins,
       paths: { sessiondir: "/tmp/subagent-session" },
     });
 
@@ -167,11 +284,11 @@ describe("createCLIApp", () => {
       providers,
       defaultModel: { id: "fast", provider: "openai" },
       generation,
-      plugins,
       paths: { sessiondir: "/tmp/subagent-session" },
     });
     expect(config).not.toHaveProperty("model");
     expect(config).not.toHaveProperty("models");
+    expect(config).not.toHaveProperty("plugins");
   });
 
   it("rejects unknown provider engines at startup", async () => {
@@ -194,7 +311,7 @@ describe("createCLIApp", () => {
     );
 
     await expect(createCLIApp(baseDir)).rejects.toThrow(
-      'Unsupported engine "not-real"',
+      "Unknown blueprint implementation: engine/not-real.",
     );
   });
 });

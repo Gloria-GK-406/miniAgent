@@ -7,29 +7,34 @@ Connect to MCP (Model Context Protocol) servers and expose their tools to the ag
 ```typescript
 import { McpPlugin } from "@piaoxianguo/miniagent/tool/mcp";
 
-const mcp = new McpPlugin();
+const mcp = new McpPlugin({
+  servers: {
+    filesystem: {
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    },
+  },
+});
+await mcp.initialize();
 agent.register(mcp);
 ```
 
 ## Configuration
 
-Configure MCP servers in the agent config's `plugins.mcp`:
+Pass MCP server configuration to the plugin constructor:
 
 ```json
 {
-  "plugins": {
-    "mcp": {
-      "servers": {
-        "filesystem": {
-          "transport": "stdio",
-          "command": "npx",
-          "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-        },
-        "remote": {
-          "transport": "streamable-http",
-          "url": "http://localhost:3000/mcp"
-        }
-      }
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    },
+    "remote": {
+      "transport": "streamable-http",
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
@@ -46,6 +51,6 @@ Configure MCP servers in the agent config's `plugins.mcp`:
 ## Behavior
 
 - MCP tools are registered as `mcp__{serverName}__{toolName}` to avoid naming conflicts
-- `McpPlugin` implements both `ToolProvider` and `ConfigNotifier`
+- `McpPlugin` implements `ToolProvider`
 - Tool list is dynamically rebuilt each turn
 - Failed server connections are silently skipped

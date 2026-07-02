@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { McpPlugin } from "./plugin.js";
-import { AgentConfigSchema, type JsonValue, type NormalizedAgentConfig } from "../../core/config.js";
+import type { McpCapabilitySelector, McpPluginConfig } from "./types.js";
 
 interface MockClient {
     serverName: string;
@@ -39,21 +39,17 @@ vi.mock("./client.js", () => ({
     },
 }));
 
-function makeAgentConfig(plugins = new Map<string, JsonValue>()): NormalizedAgentConfig {
-    return AgentConfigSchema.parse({
-        providers: [{ provider: "test", key: "key" }],
-        plugins,
-        paths: { sessiondir: "/tmp" },
-    });
-}
-
-function makeConfig(servers: Record<string, object>): NormalizedAgentConfig {
-    return makeAgentConfig(new Map([["mcp", { servers } as unknown as JsonValue]]));
+function makeConfig(
+    servers: Record<string, object>,
+    capabilities?: McpCapabilitySelector,
+): McpPluginConfig {
+    return {
+        servers: servers as McpPluginConfig["servers"],
+        ...(capabilities !== undefined && { capabilities }),
+    };
 }
 
 describe("McpPlugin", () => {
-    let plugin: McpPlugin;
-
     beforeEach(() => {
         vi.clearAllMocks();
         mockClients.length = 0;
@@ -63,34 +59,26 @@ describe("McpPlugin", () => {
             description: "Read file",
             inputSchema: { type: "object" },
         }];
-        plugin = new McpPlugin();
     });
 
-    it("returns empty tools when no config", async () => {
-        const config = makeAgentConfig();
-        await plugin.setConfig(config);
-        const tools = await plugin.getTools();
-        expect(tools).toEqual([]);
-    });
-
-    it("returns empty tools when config is null", async () => {
-        const config = makeAgentConfig(new Map([["mcp", null]]));
-        await plugin.setConfig(config);
+    it("returns empty tools when no servers are configured", async () => {
+        const plugin = new McpPlugin({ servers: {} });
+        await plugin.initialize();
         const tools = await plugin.getTools();
         expect(tools).toEqual([]);
     });
 
     it("throws on invalid config", async () => {
-        const config = makeConfig({});
-        config.plugins.set("mcp", { bad: true });
-        await expect(plugin.setConfig(config)).rejects.toThrow("Invalid MCP plugin config");
+        expect(() => new McpPlugin({ bad: true } as unknown as McpPluginConfig))
+            .toThrow("Invalid MCP plugin config");
     });
 
     it("connects to servers and collects tools", async () => {
         const config = makeConfig({
             fs: { transport: "stdio", command: "npx", args: ["-y", "fs-server"] },
         });
-        await plugin.setConfig(config);
+        const plugin = new McpPlugin(config);
+        await plugin.initialize();
 
         expect(mockClients).toHaveLength(1);
         expect(mockClients[0]!.connect).toHaveBeenCalledOnce();
@@ -101,7 +89,8 @@ describe("McpPlugin", () => {
         const config = makeConfig({
             fs: { transport: "stdio", command: "npx" },
         });
-        await plugin.setConfig(config);
+        const plugin = new McpPlugin(config);
+        await plugin.initialize();
 
         const tools = await plugin.getTools();
         expect(tools).toHaveLength(1);
@@ -118,10 +107,25 @@ describe("McpPlugin", () => {
             bad: { transport: "stdio", command: "fail" },
             good: { transport: "stdio", command: "ok" },
         });
-        await plugin.setConfig(config);
+        const plugin = new McpPlugin(config);
+        await plugin.initialize();
 
         expect(consoleSpy).toHaveBeenCalled();
         expect(mockClients.find((c) => c.serverName === "good")).toBeDefined();
+        consoleSpy.mockRestore();
+    });
+
+    it("disconnects a client when connect fails", async () => {
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        failServers.add("bad");
+
+        const plugin = new McpPlugin(makeConfig({
+            bad: { transport: "stdio", command: "fail" },
+        }));
+        await plugin.initialize();
+
+        expect(mockClients).toHaveLength(1);
+        expect(mockClients[0]!.disconnect).toHaveBeenCalledOnce();
         consoleSpy.mockRestore();
     });
 
@@ -129,70 +133,54 @@ describe("McpPlugin", () => {
         const config = makeConfig({
             fs: { transport: "stdio", command: "npx" },
         });
-        await plugin.setConfig(config);
+        const plugin = new McpPlugin(config);
+        await plugin.initialize();
 
         const client = mockClients[0]!;
         await plugin.destroy();
         expect(client.disconnect).toHaveBeenCalled();
     });
 
-    it("reconnects when config changes", async () => {
-        const config1 = makeConfig({
-            fs: { transport: "stdio", command: "v1" },
-        });
-        await plugin.setConfig(config1);
-
-        const firstClient = mockClients[0]!;
-        expect(firstClient.disconnect).not.toHaveBeenCalled();
-
-        const config2 = makeConfig({
-            fs: { transport: "stdio", command: "v2" },
-        });
-        await plugin.setConfig(config2);
-
-        expect(firstClient.disconnect).toHaveBeenCalled();
-    });
-
-    it("does not disconnect when config unchanged", async () => {
-        const config = makeConfig({
+    it("clears cached tools on destroy", async () => {
+        const plugin = new McpPlugin(makeConfig({
             fs: { transport: "stdio", command: "npx" },
-        });
-        await plugin.setConfig(config);
-
-        const firstClient = mockClients[0]!;
-        await plugin.setConfig(config);
-
-        expect(firstClient.disconnect).not.toHaveBeenCalled();
-    });
-
-    it("clears tools when config is set to null after being set", async () => {
-        const config = makeConfig({
-            fs: { transport: "stdio", command: "npx" },
-        });
-        await plugin.setConfig(config);
+        }));
+        await plugin.initialize();
         expect(await plugin.getTools()).toHaveLength(1);
 
-        const noConfig = makeAgentConfig();
-        await plugin.setConfig(noConfig);
+        await plugin.destroy();
 
-        const tools = await plugin.getTools();
-        expect(tools).toEqual([]);
+        expect(await plugin.getTools()).toEqual([]);
+    });
+
+    it("reinitializes by disconnecting existing clients before reconnecting", async () => {
+        const plugin = new McpPlugin(makeConfig({
+            fs: { transport: "stdio", command: "npx" },
+        }));
+        await plugin.initialize();
+        const firstClient = mockClients[0]!;
+
+        await plugin.initialize();
+
+        expect(firstClient.disconnect).toHaveBeenCalledOnce();
+        expect(mockClients).toHaveLength(2);
+        expect(await plugin.getTools()).toHaveLength(1);
     });
 
     it("filters servers by capability selector", async () => {
-        await plugin.consumeAgentCapabilities({
-            mcp: {
+        const config = makeConfig(
+            {
+                good: { transport: "stdio", command: "ok" },
+                blocked: { transport: "stdio", command: "nope" },
+            },
+            {
                 server: {
                     allow: ["good"],
                 },
             },
-        });
-
-        const config = makeConfig({
-            good: { transport: "stdio", command: "ok" },
-            blocked: { transport: "stdio", command: "nope" },
-        });
-        await plugin.setConfig(config);
+        );
+        const plugin = new McpPlugin(config);
+        await plugin.initialize();
 
         expect(mockClients).toHaveLength(1);
         expect(mockClients[0]!.serverName).toBe("good");
@@ -212,18 +200,18 @@ describe("McpPlugin", () => {
             },
         ];
 
-        await plugin.consumeAgentCapabilities({
-            mcp: {
+        const config = makeConfig(
+            {
+                fs: { transport: "stdio", command: "npx" },
+            },
+            {
                 tool: {
                     allow: ["mcp__fs__read_file"],
                 },
             },
-        });
-
-        const config = makeConfig({
-            fs: { transport: "stdio", command: "npx" },
-        });
-        await plugin.setConfig(config);
+        );
+        const plugin = new McpPlugin(config);
+        await plugin.initialize();
 
         const tools = await plugin.getTools();
         expect(tools.map((tool) => tool.name)).toEqual(["mcp__fs__read_file"]);

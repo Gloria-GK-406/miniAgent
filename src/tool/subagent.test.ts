@@ -3,20 +3,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { MessageType } from "../core/types.js";
-import { AgentConfigSchema, type JsonValue, type NormalizedAgentConfig } from "../core/config.js";
-import { SubagentPlugin } from "./subagent.js";
-
-function makeAgentConfig(plugins = new Map<string, JsonValue>()): NormalizedAgentConfig {
-    return AgentConfigSchema.parse({
-        providers: [{ provider: "test", key: "key" }],
-        plugins,
-        paths: { sessiondir: "/tmp" },
-    });
-}
-
-function makeConfig(path: string): NormalizedAgentConfig {
-    return makeAgentConfig(new Map([["subagent", { path }]]));
-}
+import {
+    SubAgentProvider,
+    SubagentPlugin,
+    type AgentFactory,
+    type ConfiguredSubagentFactory,
+    type SubagentInvocation,
+} from "./subagent.js";
 
 function makeManifest(
     lines: string[],
@@ -41,6 +34,12 @@ describe("SubagentPlugin", () => {
         await rm(testDir, { recursive: true, force: true });
     });
 
+    it("accepts an empty config and applies schema defaults", () => {
+        expect(() => new SubagentPlugin({}, async () => {
+            throw new Error("not used");
+        })).not.toThrow();
+    });
+
     it("lists valid markdown subagents from the configured path", async () => {
         const subagentDir = join(testDir, "agents");
         await mkdir(subagentDir);
@@ -61,10 +60,10 @@ describe("SubagentPlugin", () => {
             "utf-8",
         );
 
-        const plugin = new SubagentPlugin(async () => {
+        const plugin = new SubagentPlugin({ path: subagentDir }, async () => {
             throw new Error("not used");
         });
-        await plugin.setConfig(makeConfig(subagentDir));
+        await plugin.initialize();
 
         const messages = await plugin.collect();
         expect(messages).toHaveLength(1);
@@ -97,7 +96,8 @@ describe("SubagentPlugin", () => {
             "utf-8",
         );
 
-        const factory = vi.fn(async (request) => ({
+        const destroy = vi.fn(async () => {});
+        const factory = vi.fn(async (request: SubagentInvocation) => ({
             run: vi.fn(async () => ([
                 {
                     id: "assist-1",
@@ -105,10 +105,11 @@ describe("SubagentPlugin", () => {
                     content: `Handled: ${request.task}`,
                 },
             ])),
-        })) as Parameters<typeof SubagentPlugin>[0];
+            destroy,
+        })) as ConfiguredSubagentFactory;
 
-        const plugin = new SubagentPlugin(factory);
-        await plugin.setConfig(makeConfig(subagentDir));
+        const plugin = new SubagentPlugin({ path: subagentDir }, factory);
+        await plugin.initialize();
 
         const tools = await plugin.getTools();
         const result = await tools[0]!.execute({
@@ -137,6 +138,7 @@ describe("SubagentPlugin", () => {
         });
         expect(result).toContain("<subagent_result");
         expect(result).toContain("Handled: Review the latest patch");
+        expect(destroy).toHaveBeenCalledOnce();
     });
 
     it("parses JSON5 frontmatter manifests", async () => {
@@ -159,10 +161,10 @@ describe("SubagentPlugin", () => {
             "utf-8",
         );
 
-        const plugin = new SubagentPlugin(async () => {
+        const plugin = new SubagentPlugin({ path: subagentDir }, async () => {
             throw new Error("not used");
         });
-        await plugin.setConfig(makeConfig(subagentDir));
+        await plugin.initialize();
 
         const messages = await plugin.collect();
         expect(messages[0]!.content).toContain("planner");
@@ -183,18 +185,166 @@ describe("SubagentPlugin", () => {
             "utf-8",
         );
 
-        const plugin = new SubagentPlugin(async () => {
-            throw new Error("not used");
-        });
-        await plugin.consumeAgentCapabilities({
-            subagent: {
+        const plugin = new SubagentPlugin({
+            path: subagentDir,
+            capabilities: {
                 allow: ["reviewer"],
             },
+        }, async () => {
+            throw new Error("not used");
         });
-        await plugin.setConfig(makeConfig(subagentDir));
+        await plugin.initialize();
 
         const messages = await plugin.collect();
         expect(messages[0]!.content).toContain("reviewer");
         expect(messages[0]!.content).not.toContain("planner");
+    });
+
+    it("does not run a configured subagent when the signal is already aborted", async () => {
+        const subagentDir = join(testDir, "agents");
+        await mkdir(subagentDir);
+        await writeFile(
+            join(subagentDir, "reviewer.md"),
+            makeManifest(["id: reviewer", "name: Reviewer"]),
+            "utf-8",
+        );
+
+        const factory = vi.fn(async () => {
+            throw new Error("factory should not be called");
+        }) as unknown as ConfiguredSubagentFactory;
+        const plugin = new SubagentPlugin({ path: subagentDir }, factory);
+        await plugin.initialize();
+
+        const controller = new AbortController();
+        controller.abort();
+        const tools = await plugin.getTools();
+        const result = await tools[0]!.execute({
+            agent: "reviewer",
+            task: "Review this",
+        }, controller.signal);
+
+        expect(factory).not.toHaveBeenCalled();
+        expect(result).toContain("aborted");
+    });
+
+    it("removes configured subagent abort listener when run rejects", async () => {
+        const subagentDir = join(testDir, "agents");
+        await mkdir(subagentDir);
+        await writeFile(
+            join(subagentDir, "reviewer.md"),
+            makeManifest(["id: reviewer", "name: Reviewer"]),
+            "utf-8",
+        );
+
+        const run = vi.fn(async () => {
+            throw new Error("run failed");
+        });
+        const stop = vi.fn();
+        const destroy = vi.fn(async () => {});
+        const factory = vi.fn(async () => ({ run, stop, destroy })) as unknown as ConfiguredSubagentFactory;
+        const plugin = new SubagentPlugin({ path: subagentDir }, factory);
+        await plugin.initialize();
+
+        const controller = new AbortController();
+        const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+        const tools = await plugin.getTools();
+
+        await expect(tools[0]!.execute({
+            agent: "reviewer",
+            task: "Review this",
+        }, controller.signal)).rejects.toThrow("run failed");
+
+        expect(removeSpy).toHaveBeenCalledOnce();
+        expect(destroy).toHaveBeenCalledOnce();
+    });
+
+    it("destroys a configured subagent when aborted after creation", async () => {
+        const subagentDir = join(testDir, "agents");
+        await mkdir(subagentDir);
+        await writeFile(
+            join(subagentDir, "reviewer.md"),
+            makeManifest(["id: reviewer", "name: Reviewer"]),
+            "utf-8",
+        );
+
+        const controller = new AbortController();
+        const run = vi.fn(async () => []);
+        const stop = vi.fn();
+        const destroy = vi.fn(async () => {});
+        const factory = vi.fn(async () => {
+            controller.abort();
+            return { run, stop, destroy };
+        }) as unknown as ConfiguredSubagentFactory;
+        const plugin = new SubagentPlugin({ path: subagentDir }, factory);
+        await plugin.initialize();
+        const tools = await plugin.getTools();
+
+        const result = await tools[0]!.execute({
+            agent: "reviewer",
+            task: "Review this",
+        }, controller.signal);
+
+        expect(result).toContain("aborted");
+        expect(run).not.toHaveBeenCalled();
+        expect(stop).toHaveBeenCalledOnce();
+        expect(destroy).toHaveBeenCalledOnce();
+    });
+});
+
+describe("SubAgentProvider", () => {
+    it("destroys spawned subagents after successful runs", async () => {
+        const destroy = vi.fn(async () => {});
+        const factory = vi.fn(async () => ({
+            run: vi.fn(async () => ([
+                {
+                    id: "assist-1",
+                    type: MessageType.Assist,
+                    content: "done",
+                },
+            ])),
+            destroy,
+        })) as unknown as AgentFactory;
+        const provider = new SubAgentProvider(factory);
+        const tools = await provider.getTools();
+
+        const result = await tools[0]!.execute({ task: "Do work" });
+
+        expect(result).toBe("done");
+        expect(destroy).toHaveBeenCalledOnce();
+    });
+
+    it("does not run a subagent when the signal is already aborted", async () => {
+        const factory = vi.fn(async () => {
+            throw new Error("factory should not be called");
+        }) as unknown as AgentFactory;
+        const provider = new SubAgentProvider(factory);
+        const tools = await provider.getTools();
+
+        const controller = new AbortController();
+        controller.abort();
+        const result = await tools[0]!.execute({ task: "Do work" }, controller.signal);
+
+        expect(factory).not.toHaveBeenCalled();
+        expect(result).toContain("aborted");
+    });
+
+    it("removes abort listener when subagent run rejects", async () => {
+        const run = vi.fn(async () => {
+            throw new Error("run failed");
+        });
+        const stop = vi.fn();
+        const destroy = vi.fn(async () => {});
+        const factory = vi.fn(async () => ({ run, stop, destroy })) as unknown as AgentFactory;
+        const provider = new SubAgentProvider(factory);
+        const tools = await provider.getTools();
+
+        const controller = new AbortController();
+        const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+
+        await expect(tools[0]!.execute({ task: "Do work" }, controller.signal))
+            .rejects.toThrow("run failed");
+
+        expect(removeSpy).toHaveBeenCalledOnce();
+        expect(destroy).toHaveBeenCalledOnce();
     });
 });

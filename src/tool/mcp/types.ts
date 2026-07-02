@@ -32,18 +32,20 @@ export const McpServerConfigSchema = z.union([
 
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
-export const McpPluginConfigSchema = z.object({
-    servers: z.record(McpServerConfigSchema),
-});
-
-export type McpPluginConfig = z.infer<typeof McpPluginConfigSchema>;
-
 export const McpCapabilitySelectorSchema = z.object({
     server: AgentCapabilityRuleSchema.optional(),
     tool: AgentCapabilityRuleSchema.optional(),
 });
 
 export type McpCapabilitySelector = z.infer<typeof McpCapabilitySelectorSchema>;
+
+export const McpPluginConfigSchema = z.object({
+    servers: z.record(McpServerConfigSchema),
+    capabilities: McpCapabilitySelectorSchema.optional(),
+});
+
+export type McpPluginConfig = z.infer<typeof McpPluginConfigSchema>;
+export type McpPluginConfigInput = z.input<typeof McpPluginConfigSchema>;
 
 export interface McpToolInfo {
     serverName: string;

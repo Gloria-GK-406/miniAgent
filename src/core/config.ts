@@ -134,11 +134,6 @@ export const PathConfigSchema = z.object({
 
 export type PathConfig = z.infer<typeof PathConfigSchema>;
 
-const PluginRegistrySchema = z.union([
-    z.map(z.string(), JsonValueSchema),
-    z.record(JsonValueSchema).transform((plugins) => new Map(Object.entries(plugins))),
-]);
-
 const PersistModelSelectorSchema = z.union([
     z.string().min(1).transform((id) => ({ id })),
     ModelSelectorSchema,
@@ -149,7 +144,6 @@ export const PersistConfigFileSchema = z
         providers: z.array(ModelProviderConfigSchema).default([]),
         defaultModel: PersistModelSelectorSchema.optional(),
         generation: GenerationConfigSchema.partial().optional(),
-        plugins: PluginRegistrySchema.default(() => new Map()),
     })
     .strict();
 
@@ -178,7 +172,6 @@ export const AgentConfigSchema = z
         providers: z.array(ModelProviderConfigSchema).default([]),
         defaultModel: ModelSelectorSchema.optional(),
         generation: GenerationConfigSchema.optional(),
-        plugins: PluginRegistrySchema.default(() => new Map()),
         paths: PathConfigSchema,
     })
     .strict();

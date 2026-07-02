@@ -95,7 +95,7 @@ describe("model-config-utils", () => {
     });
   });
 
-  it("cloneAgentConfig returns independent plugin, provider, generation, and default model snapshots", () => {
+  it("cloneAgentConfig returns independent provider, generation, and default model snapshots without plugins", () => {
     const config: NormalizedAgentConfig = AgentConfigSchema.parse({
       providers: [
         {
@@ -116,19 +116,17 @@ describe("model-config-utils", () => {
         temperature: 0.2,
         thinking: ThinkingLevel.Low,
       },
-      plugins: new Map([["search", { enabled: true }]]),
       paths: { sessiondir: "session-a" },
     });
 
     const cloned = cloneAgentConfig(config);
 
-    cloned.plugins.set("extra", { enabled: false });
     cloned.providers[0]!.models[0]!.metadata!.owner = { team: "mutated" };
     cloned.generation!.temperature = 1.2;
     cloned.defaultModel = { id: "slow", provider: "openai" };
     cloned.paths.sessiondir = "session-b";
 
-    expect(config.plugins.has("extra")).toBe(false);
+    expect((cloned as Record<string, unknown>)["plugins"]).toBeUndefined();
     expect(config.providers[0]!.models[0]!.metadata).toEqual({
       owner: { team: "core" },
     });

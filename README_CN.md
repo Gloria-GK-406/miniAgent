@@ -194,10 +194,10 @@ const processor = {
 | `ErrorHandler` | 处理 Agent 循环内的错误（重试、降级等） |
 | `ToolApprover` | 工具执行前的人工审批 |
 | `AfterTurnProcessor` | 每次 Agent 运行完成后执行逻辑 |
-| `ConfigNotifier` | 模型配置变更时收到通知 |
 | `PersistRequire` | 接收 `Store` 实例用于持久化 |
 | `TurnContextConsumer` | 接收每个 turn 的完整上下文 |
 | `TurnContextAppender` | 在其他上下文提供者之前注入消息 |
+| `Destroyable` | 调用 `MiniAgent.destroy()` 时清理资源 |
 
 ## LLMRequest 和 LLMEngine
 
@@ -251,51 +251,70 @@ interface LLMEngine {
 
 ### 蓝图
 
-蓝图是对 Agent 所需组件的声明式描述：
+蓝图是对 Agent 级组件的声明式描述。每个槽位都使用统一的 `{ use, config }` 形状，但槽位本身赋予组件语义：
 
 ```typescript
-interface AgentBlueprint {
-  uses: string[];  // 组件 ID 列表
-}
+const blueprint = {
+  engines: [{ use: "openai" }],
+  persistence: {
+    use: "file",
+    config: { rootDir: ".miniagent", fileName: "session.json" },
+  },
+  compression: {
+    use: "summary",
+    config: { maxMessages: 60, keepRecent: 15 },
+  },
+  tools: [{ use: "read" }, { use: "grep" }, { use: "bash" }],
+  mcp: { use: "config", config: { servers: {} } },
+};
 ```
 
-### 注册表与组装器
+### 蓝图管理器
 
-注册组件工厂，然后从蓝图组装 Agent：
+注册语义组件槽位的实现，然后从蓝图组装 Agent：
 
 ```typescript
-import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+import {
+  BlueprintManager,
+  registerBuiltinBlueprintImpls,
+} from "@piaoxianguo/miniagent";
 
-// 注册工厂
-const registry = new AgentBlueprintRegistry();
-registry.register("tool.read", () => readTool);
-registry.register("tool.write", () => writeTool);
-registry.register("plugin.mcp", () => new McpPlugin());
-registry.register("plugin.skill", () => new SkillPlugin());
+const manager = new BlueprintManager();
+registerBuiltinBlueprintImpls(manager, {
+  subagentFactory,
+  getAgentConfig: () => agentConfig,
+});
 
-// 组装
-const assembler = new AgentAssembler(registry);
-const agent = await assembler.assemble({
-  llm: engines,
+const agent = await manager.assemble({
   config: agentConfig,
-  blueprint: { uses: ["tool.read", "tool.write", "plugin.mcp", "plugin.skill"] },
-  capabilities: { tool: { deny: ["bash"] } },  // 可选：控制可见性
+  blueprint,
 });
 ```
 
 ### 能力系统
 
-蓝图配合能力系统控制工具、插件和子 Agent 的可见性：
+部分蓝图实现会在自己的 `config` 中接收能力规则，用来控制 MCP 服务/工具、skill 或子 Agent 的可见性：
 
 ```typescript
-const capabilities = {
-  tool: { allow: ["read", "glob", "grep"], deny: ["bash"] },
+const blueprint = {
   mcp: {
-    server: { allow: ["filesystem"] },
-    tool: { deny: ["mcp__filesystem__write_file"] },
+    use: "config",
+    config: {
+      servers,
+      capabilities: {
+        server: { allow: ["filesystem"] },
+        tool: { deny: ["mcp__filesystem__write_file"] },
+      },
+    },
   },
-  skill: { allow: ["*"] },
-  subagent: { deny: ["dangerous-agent"] },
+  skill: {
+    use: "local-directory",
+    config: { directories: ["skill/"], capabilities: { allow: ["*"] } },
+  },
+  subagent: {
+    use: "local-directory-sync",
+    config: { path: "subagent/", capabilities: { deny: ["dangerous-agent"] } },
+  },
 };
 ```
 

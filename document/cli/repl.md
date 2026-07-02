@@ -56,7 +56,7 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 ## Built-in Tools
 
-The CLI agent comes pre-configured with the following tools from the shared blueprint:
+The CLI agent comes pre-configured with the following tools from its semantic blueprint:
 
 - **read** — Read files and directories
 - **write** — Write files

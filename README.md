@@ -194,10 +194,10 @@ const processor = {
 | `ErrorHandler` | Handle errors within the agent loop (retry, fallback, etc.) |
 | `ToolApprover` | Human-in-the-loop approval before tool execution |
 | `AfterTurnProcessor` | Run logic after each agent run completes |
-| `ConfigNotifier` | Notified when model config changes |
 | `PersistRequire` | Receive the `Store` instance for persistence |
 | `TurnContextConsumer` | Receive the full context of each turn |
 | `TurnContextAppender` | Prepend messages before other context providers |
+| `Destroyable` | Clean up resources when `MiniAgent.destroy()` is called |
 
 ## LLMRequest and LLMEngine
 
@@ -253,51 +253,74 @@ For real-world applications, you don't want to register every component manually
 
 ### Blueprint
 
-A blueprint is a declarative description of what an agent needs:
+A blueprint is a declarative description of agent-level components. Each slot
+uses the same `{ use, config }` shape, but the slot gives the component semantic
+meaning:
 
 ```typescript
-interface AgentBlueprint {
-  uses: string[];  // List of component IDs to include
-}
+const blueprint = {
+  engines: [{ use: "openai" }],
+  persistence: {
+    use: "file",
+    config: { rootDir: ".miniagent", fileName: "session.json" },
+  },
+  compression: {
+    use: "summary",
+    config: { maxMessages: 60, keepRecent: 15 },
+  },
+  tools: [{ use: "read" }, { use: "grep" }, { use: "bash" }],
+  mcp: { use: "config", config: { servers: {} } },
+};
 ```
 
-### Registry and Assembler
+### Blueprint Manager
 
-Register component factories, then assemble an agent from a blueprint:
+Register implementations for semantic component slots, then assemble an agent
+from the blueprint:
 
 ```typescript
-import { AgentAssembler, AgentBlueprintRegistry } from "@piaoxianguo/miniagent";
+import {
+  BlueprintManager,
+  registerBuiltinBlueprintImpls,
+} from "@piaoxianguo/miniagent";
 
-// Register factories
-const registry = new AgentBlueprintRegistry();
-registry.register("tool.read", () => readTool);
-registry.register("tool.write", () => writeTool);
-registry.register("plugin.mcp", () => new McpPlugin());
-registry.register("plugin.skill", () => new SkillPlugin());
+const manager = new BlueprintManager();
+registerBuiltinBlueprintImpls(manager, {
+  subagentFactory,
+  getAgentConfig: () => agentConfig,
+});
 
-// Assemble
-const assembler = new AgentAssembler(registry);
-const agent = await assembler.assemble({
-  llm: engines,
+const agent = await manager.assemble({
   config: agentConfig,
-  blueprint: { uses: ["tool.read", "tool.write", "plugin.mcp", "plugin.skill"] },
-  capabilities: { tool: { deny: ["bash"] } },  // Optional: control visibility
+  blueprint,
 });
 ```
 
 ### Capability System
 
-Blueprints work with a capability system to control what tools, plugins, and subagents are visible:
+Some blueprint implementations accept capability rules in their own `config` to
+control which MCP servers/tools, skills, or subagents are visible:
 
 ```typescript
-const capabilities = {
-  tool: { allow: ["read", "glob", "grep"], deny: ["bash"] },
+const blueprint = {
   mcp: {
-    server: { allow: ["filesystem"] },
-    tool: { deny: ["mcp__filesystem__write_file"] },
+    use: "config",
+    config: {
+      servers,
+      capabilities: {
+        server: { allow: ["filesystem"] },
+        tool: { deny: ["mcp__filesystem__write_file"] },
+      },
+    },
   },
-  skill: { allow: ["*"] },
-  subagent: { deny: ["dangerous-agent"] },
+  skill: {
+    use: "local-directory",
+    config: { directories: ["skill/"], capabilities: { allow: ["*"] } },
+  },
+  subagent: {
+    use: "local-directory-sync",
+    config: { path: "subagent/", capabilities: { deny: ["dangerous-agent"] } },
+  },
 };
 ```
 

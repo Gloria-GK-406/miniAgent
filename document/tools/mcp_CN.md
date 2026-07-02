@@ -7,29 +7,34 @@
 ```typescript
 import { McpPlugin } from "@piaoxianguo/miniagent/tool/mcp";
 
-const mcp = new McpPlugin();
+const mcp = new McpPlugin({
+  servers: {
+    filesystem: {
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    },
+  },
+});
+await mcp.initialize();
 agent.register(mcp);
 ```
 
 ## 配置
 
-在 Agent 配置的 `plugins.mcp` 中配置 MCP 服务器：
+将 MCP 服务器配置传给插件构造函数：
 
 ```json
 {
-  "plugins": {
-    "mcp": {
-      "servers": {
-        "filesystem": {
-          "transport": "stdio",
-          "command": "npx",
-          "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-        },
-        "remote": {
-          "transport": "streamable-http",
-          "url": "http://localhost:3000/mcp"
-        }
-      }
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    },
+    "remote": {
+      "transport": "streamable-http",
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
@@ -46,6 +51,6 @@ agent.register(mcp);
 ## 行为
 
 - MCP 工具以 `mcp__{serverName}__{toolName}` 格式注册，避免命名冲突
-- `McpPlugin` 同时实现 `ToolProvider` 和 `ConfigNotifier`
+- `McpPlugin` 实现 `ToolProvider`
 - 每个 turn 动态重建工具列表
 - 连接失败的服务器会被静默跳过

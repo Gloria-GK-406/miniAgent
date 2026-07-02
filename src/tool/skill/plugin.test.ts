@@ -3,20 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SkillPlugin } from "./plugin.js";
-import { AgentConfigSchema, type JsonValue, type NormalizedAgentConfig } from "../../core/config.js";
 import { MessageType } from "../../core/types.js";
-
-function makeAgentConfig(plugins = new Map<string, JsonValue>()): NormalizedAgentConfig {
-    return AgentConfigSchema.parse({
-        providers: [{ provider: "test", key: "key" }],
-        plugins,
-        paths: { sessiondir: "/tmp" },
-    });
-}
-
-function makeConfig(directories: string[]): NormalizedAgentConfig {
-    return makeAgentConfig(new Map([["skill", { directories }]]));
-}
 
 function makeSkillManifest(id: string, name?: string, description?: string, content?: string): string {
     const lines = ["---"];
@@ -30,37 +17,20 @@ function makeSkillManifest(id: string, name?: string, description?: string, cont
 
 describe("SkillPlugin", () => {
     let testDir: string;
-    let plugin: SkillPlugin;
 
     beforeEach(async () => {
         testDir = await mkdtemp(join(tmpdir(), "skill-test-"));
-        plugin = new SkillPlugin();
     });
 
     afterEach(async () => {
         await rm(testDir, { recursive: true, force: true });
     });
 
-    describe("setConfig", () => {
-        it("clears skills when no config", async () => {
-            const config = makeAgentConfig();
-            await plugin.setConfig(config);
-            const tools = await plugin.getTools();
-            expect(tools).toEqual([]);
-        });
+    it("accepts an empty config and applies schema defaults", () => {
+        expect(() => new SkillPlugin({})).not.toThrow();
+    });
 
-        it("clears skills when config is null", async () => {
-            const config = makeAgentConfig(new Map([["skill", null]]));
-            await plugin.setConfig(config);
-            const tools = await plugin.getTools();
-            expect(tools).toEqual([]);
-        });
-
-        it("throws on invalid config", async () => {
-            const config = makeAgentConfig(new Map([["skill", { directories: 123 }]]));
-            await expect(plugin.setConfig(config)).rejects.toThrow("Invalid skill plugin config");
-        });
-
+    describe("initialize", () => {
         it("scans directories and loads skills", async () => {
             const skillDir = join(testDir, "my-skill");
             await mkdir(skillDir);
@@ -70,7 +40,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const messages = await plugin.collect();
             expect(messages).toHaveLength(1);
             expect(messages[0]!.type).toBe(MessageType.System);
@@ -82,8 +53,8 @@ describe("SkillPlugin", () => {
 
     describe("collect", () => {
         it("returns empty array when no skills loaded", async () => {
-            const config = makeAgentConfig();
-            await plugin.setConfig(config);
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const messages = await plugin.collect();
             expect(messages).toEqual([]);
         });
@@ -97,7 +68,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const messages = await plugin.collect();
             expect(messages[0]!.content).toContain("load_skill");
         });
@@ -105,8 +77,8 @@ describe("SkillPlugin", () => {
 
     describe("getTools", () => {
         it("returns empty array when no skills", async () => {
-            const config = makeAgentConfig();
-            await plugin.setConfig(config);
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);
         });
@@ -120,7 +92,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             expect(tools).toHaveLength(1);
             expect(tools[0]!.name).toBe("load_skill");
@@ -135,7 +108,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             const result = await tools[0]!.execute({ id: "exec-skill" });
             expect(result).toContain("Detailed instructions");
@@ -150,7 +124,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             const result = await tools[0]!.execute({ id: "unknown-skill" });
             expect(result).toContain("unknown-skill");
@@ -167,7 +142,8 @@ describe("SkillPlugin", () => {
             );
             await writeFile(join(skillDir, "helper.ts"), "export const x = 1;", "utf-8");
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             const result = await tools[0]!.execute({ id: "file-skill" });
             expect(result).toContain("<skill_files>");
@@ -191,12 +167,13 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.consumeAgentCapabilities({
-                skill: {
+            const plugin = new SkillPlugin({
+                directories: [testDir],
+                capabilities: {
                     allow: ["skill-a"],
                 },
             });
-            await plugin.setConfig(makeConfig([testDir]));
+            await plugin.initialize();
 
             const messages = await plugin.collect();
             expect(messages[0]!.content).toContain("skill-a");
@@ -214,7 +191,8 @@ describe("SkillPlugin", () => {
             const emptyDir = join(testDir, "no-manifest");
             await mkdir(emptyDir);
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);
         });
@@ -228,7 +206,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);
         });
@@ -242,7 +221,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const messages = await plugin.collect();
             expect(messages[0]!.content).toContain("name: noname");
         });
@@ -256,7 +236,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const messages = await plugin.collect();
             expect(messages[0]!.content).toContain("description: ");
         });
@@ -270,7 +251,8 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([testDir]));
+            const plugin = new SkillPlugin({ directories: [testDir] });
+            await plugin.initialize();
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);
         });
@@ -299,30 +281,11 @@ describe("SkillPlugin", () => {
                 "utf-8",
             );
 
-            await plugin.setConfig(makeConfig([dir1, dir2]));
+            const plugin = new SkillPlugin({ directories: [dir1, dir2] });
+            await plugin.initialize();
             const messages = await plugin.collect();
             expect(messages[0]!.content).toContain("skill-a");
             expect(messages[0]!.content).toContain("skill-b");
-        });
-    });
-
-    describe("config change", () => {
-        it("reloads skills when config changes", async () => {
-            const skillDir = join(testDir, "change-skill");
-            await mkdir(skillDir);
-            await writeFile(
-                join(skillDir, "SKILL.md"),
-                makeSkillManifest("change-skill", "Change", "Desc"),
-                "utf-8",
-            );
-
-            await plugin.setConfig(makeConfig([testDir]));
-            let tools = await plugin.getTools();
-            expect(tools).toHaveLength(1);
-
-            await plugin.setConfig(makeConfig(["/nonexistent"]));
-            tools = await plugin.getTools();
-            expect(tools).toEqual([]);
         });
     });
 });
