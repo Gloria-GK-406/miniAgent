@@ -9,6 +9,9 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--print");
     expect(script).toContain("--list-commands");
     expect(script).toContain("--list-tools");
+    expect(script).toContain("--git-status");
+    expect(script).toContain("--git-log");
+    expect(script).toContain("--git-diff");
     expect(script).toContain("--set-permission");
     expect(script).toContain("--set-system-prompt");
     expect(script).toContain("--init-instructions");

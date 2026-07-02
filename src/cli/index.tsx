@@ -12,6 +12,7 @@ import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
+import { runGitHeadless } from "./git-headless-runner.js";
 import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
@@ -156,6 +157,20 @@ async function main(): Promise<void> {
   if (action.type === "list-commands") {
     process.exitCode = await runCommandList({
       baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "git-headless") {
+    process.exitCode = await runGitHeadless({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      action: action.action,
+      ...(action.limit !== undefined && { limit: action.limit }),
+      ...(action.path !== undefined && { path: action.path }),
+      ...(action.staged !== undefined && { staged: action.staged }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

@@ -221,6 +221,26 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("runs read-only git commands without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--git-status"])).toEqual({
+      type: "git-headless",
+      action: "status",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--git-log", "3", "--json"])).toEqual({
+      type: "git-headless",
+      action: "log",
+      cwd: "C:/repo",
+      limit: 3,
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--git-diff", "src/cli", "--staged"])).toEqual({
+      type: "git-headless",
+      action: "diff",
+      path: "src/cli",
+      staged: true,
+    });
+  });
+
   it("exports a session without opening the TUI", () => {
     expect(parseCLIEntryArgs([
       "--export-session",
@@ -670,6 +690,21 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed git headless options", () => {
+    expect(parseCLIEntryArgs(["--git-log", "src"])).toEqual({
+      type: "error",
+      message: "Invalid limit after --git-log: src",
+    });
+    expect(parseCLIEntryArgs(["--staged"])).toEqual({
+      type: "error",
+      message: "Cannot use --staged without --git-diff",
+    });
+    expect(parseCLIEntryArgs(["--git-status", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --git-status",
+    });
+  });
+
   it("rejects malformed permission update options", () => {
     expect(parseCLIEntryArgs(["--set-permission"])).toEqual({
       type: "error",
@@ -715,7 +750,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -733,6 +768,9 @@ describe("CLI entry args", () => {
     expect(help).toContain("--list-models");
     expect(help).toContain("--list-commands");
     expect(help).toContain("--list-tools");
+    expect(help).toContain("--git-status");
+    expect(help).toContain("--git-log");
+    expect(help).toContain("--git-diff");
     expect(help).toContain("--diagnostics");
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");

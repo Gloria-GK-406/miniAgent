@@ -3,6 +3,7 @@ export type CLIEntryOutput = "text" | "json";
 export type CLIEntryExportFormat = "json" | "markdown";
 export type CLIEntryCompletionShell = "bash" | "zsh" | "fish" | "powershell";
 export type CLIEntryPermissionDecision = "allow" | "ask" | "deny";
+export type CLIEntryGitAction = "status" | "log" | "diff";
 
 export type CLIEntryAction =
   | {
@@ -83,6 +84,15 @@ export type CLIEntryAction =
   | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-commands"; cwd?: string; output?: CLIEntryOutput }
   | {
+    type: "git-headless";
+    action: CLIEntryGitAction;
+    cwd?: string;
+    limit?: number;
+    path?: string;
+    staged?: boolean;
+    output?: CLIEntryOutput;
+  }
+  | {
     type: "list-tools";
     agent?: CLIEntryAgentMode;
     autoApprove?: boolean;
@@ -126,6 +136,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let listModelsMode = false;
   let listCommandsMode = false;
   let listToolsMode = false;
+  let gitAction: CLIEntryGitAction | undefined;
+  let gitLogLimit: number | undefined;
+  let gitDiffPath: string | undefined;
+  let gitDiffStaged = false;
   let permissionAction: "set" | "unset" | undefined;
   let permissionTarget: string | undefined;
   let permissionDecision: CLIEntryPermissionDecision | undefined;
@@ -201,6 +215,45 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-tools") {
       listToolsMode = true;
+      continue;
+    }
+    if (arg === "--git-status") {
+      if (gitAction !== undefined) {
+        return { type: "error", message: "Cannot combine git headless modes" };
+      }
+      gitAction = "status";
+      continue;
+    }
+    if (arg === "--git-log") {
+      if (gitAction !== undefined) {
+        return { type: "error", message: "Cannot combine git headless modes" };
+      }
+      gitAction = "log";
+      const next = args[index + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        const parsed = Number.parseInt(next, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0 || parsed.toString() !== next) {
+          return { type: "error", message: `Invalid limit after --git-log: ${next}` };
+        }
+        gitLogLimit = parsed;
+        index++;
+      }
+      continue;
+    }
+    if (arg === "--git-diff") {
+      if (gitAction !== undefined) {
+        return { type: "error", message: "Cannot combine git headless modes" };
+      }
+      gitAction = "diff";
+      const next = args[index + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        gitDiffPath = next;
+        index++;
+      }
+      continue;
+    }
+    if (arg === "--staged") {
+      gitDiffStaged = true;
       continue;
     }
     if (arg === "--set-permission") {
@@ -432,6 +485,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (force && !initMode && !initInstructionsMode) {
     return { type: "error", message: "Cannot use --force without --init or --init-instructions" };
   }
+  if (gitDiffStaged && gitAction !== "diff") {
+    return { type: "error", message: "Cannot use --staged without --git-diff" };
+  }
   if (systemPrompt !== undefined && systemPromptFile !== undefined) {
     return { type: "error", message: "Cannot combine --set-system-prompt with --system-prompt-file" };
   }
@@ -455,6 +511,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || listToolsMode
+      || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -476,6 +533,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || listToolsMode
+      || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -500,6 +558,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || listToolsMode
+      || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -526,6 +585,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || listToolsMode
+      || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -550,6 +610,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || listToolsMode
+      || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -561,13 +622,13 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   ) {
     return { type: "error", message: "Cannot combine --init-instructions with another headless mode" };
   }
-  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode)) {
+  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || gitAction !== undefined || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
   }
-  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
+  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --rename-session with another headless mode" };
   }
-  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
+  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
     return { type: "error", message: "Cannot combine --fork-session with another headless mode" };
   }
   if (listSessionsMode && printMode) {
@@ -582,19 +643,23 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return { type: "error", message: "Cannot combine --import-session with another headless mode" };
   }
-  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || listToolsMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-models with another headless mode" };
   }
-  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listToolsMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-commands with another headless mode" };
   }
-  if (listToolsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listToolsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-tools with another headless mode" };
   }
-  if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (gitAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
+    return { type: "error", message: `Cannot combine ${flag} with another headless mode` };
+  }
+  if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: `Cannot combine --${permissionAction}-permission with another headless mode` };
   }
-  if (systemPromptAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || permissionAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (systemPromptAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || gitAction !== undefined || permissionAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     const flag = systemPromptAction === "set"
       ? (systemPromptFile === undefined ? "--set-system-prompt" : "--system-prompt-file")
       : "--unset-system-prompt";
@@ -801,6 +866,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (gitAction !== undefined) {
+    const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
+    if (prompt.length > 0) {
+      return { type: "error", message: `Unexpected prompt for ${flag}` };
+    }
+    return {
+      type: "git-headless",
+      action: gitAction,
+      ...(cwd !== undefined && { cwd }),
+      ...(gitLogLimit !== undefined && { limit: gitLogLimit }),
+      ...(gitDiffPath !== undefined && { path: gitDiffPath }),
+      ...(gitDiffStaged && { staged: true }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (doctorMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --doctor" };
@@ -837,7 +917,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -874,6 +954,9 @@ export function formatCLIHelp(): string {
     "  --list-models   List configured models headlessly",
     "  --list-commands List slash commands headlessly",
     "  --list-tools    List runtime tools headlessly",
+    "  --git-status    Print git status headlessly",
+    "  --git-log       Print recent git commits headlessly",
+    "  --git-diff      Print git diff headlessly",
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",
