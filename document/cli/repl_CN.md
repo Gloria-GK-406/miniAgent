@@ -7,6 +7,7 @@
 - `/editor [initial text]`：用外部编辑器撰写下一条提示，非空内容会走正常输入路径提交。
 - `/diagnostics`：运行配置的诊断命令，或从 `package.json` 自动发现 `npm run typecheck`、`npm run lint`、`npm test`。
 - `/activity`：查看最近工具调用和子 Agent 形态工具调用的活动时间线。
+- `/permissions`：查看当前 allow/ask/deny 权限策略。
 
 CLI Agent 还会注入 `git_status`、`git_diff`、`git_log` 和受权限保护的
 `git_commit` 工具。`editor` 配置可指定 `executable`、`args` 和 `wait`；

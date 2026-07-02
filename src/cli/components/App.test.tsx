@@ -342,4 +342,30 @@ describe("App", () => {
     expect(output).toContain("DONE AGENT run_subagent");
     expect(output).toContain("subtask complete");
   });
+
+  it("renders permissions panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        autoApprove: true,
+        panel: {
+          type: "permissions",
+          permission: {
+            "*": "ask",
+            read: "allow",
+            shell: {
+              "*": "ask",
+              "rm *": "deny",
+            },
+          },
+          autoApprove: true,
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Permissions");
+    expect(output).toContain("Auto approval: on");
+    expect(output).toContain("ALLOW read");
+    expect(output).toContain("DENY shell:rm *");
+  });
 });

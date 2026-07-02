@@ -19,6 +19,7 @@ const COMMANDS = [
   "/model",
   "/models",
   "/new",
+  "/permissions",
   "/quit",
   "/redo",
   "/session",

@@ -18,6 +18,7 @@ export type CLIViewPanel =
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[] }
   | { type: "tools"; tools: Tool[] }
+  | { type: "permissions"; permission: CLIConfig["permission"]; autoApprove: boolean }
   | { type: "git"; title: string; content: string }
   | { type: "diff"; title: string; content: string }
   | { type: "diagnostics"; results: DiagnosticResult[] }

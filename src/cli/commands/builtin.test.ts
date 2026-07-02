@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { CLIConfigSchema } from "../config.js";
 import { createCommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext, CLIState } from "../runtime/types.js";
 import { registerBuiltinCommands } from "./builtin.js";
@@ -6,7 +7,7 @@ import { registerBuiltinCommands } from "./builtin.js";
 function state(): CLIState {
   return {
     baseDir: process.cwd(),
-    config: {} as CLIState["config"],
+    config: CLIConfigSchema.parse({}),
     mode: "build",
     modelName: "openai/fast",
     modelPaths: ["openai/fast"],
@@ -138,6 +139,7 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.runDiagnostics = vi.fn(async () => undefined);
     commandCtx.runtime.showActivity = vi.fn(async () => undefined);
 
+    await registry.execute(commandCtx, "/permissions");
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
     await registry.execute(commandCtx, "/compact");
@@ -155,6 +157,11 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "permissions",
+      permission: commandCtx.getState().config.permission,
+      autoApprove: false,
+    });
   });
 
   it("submits edited content from the external editor command", async () => {

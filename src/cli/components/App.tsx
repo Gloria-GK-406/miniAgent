@@ -14,6 +14,7 @@ import { PanelView } from "./PanelView.js";
 import { DiffView } from "./DiffView.js";
 import { ActivityView } from "./ActivityView.js";
 import { ApprovalPrompt } from "./ApprovalPrompt.js";
+import { PermissionsView } from "./PermissionsView.js";
 
 export interface AppProps {
   runtime: CLIAppRuntime;
@@ -74,8 +75,8 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
     <Box flexDirection="column">
       <Text bold color="cyan">Help</Text>
       <Text>/help /history /context /tools /models /sessions /activity</Text>
-      <Text>/agent build|plan /auto /details /thinking /quit</Text>
-      <Text>/git /diff /editor /diagnostics</Text>
+      <Text>/permissions /agent build|plan /auto /details /thinking</Text>
+      <Text>/git /diff /editor /diagnostics /quit</Text>
       <Text dimColor>ESC is handled by focused panels. Use /panel-close to close.</Text>
       <Text dimColor>{runtime.getState().mode} mode</Text>
     </Box>
@@ -274,6 +275,16 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "tools") {
     return <ToolsPanel panel={state.panel} />;
+  }
+
+  if (state.panel.type === "permissions") {
+    return (
+      <PermissionsView
+        permission={state.panel.permission}
+        autoApprove={state.panel.autoApprove}
+        onClose={() => closePanel(runtime)}
+      />
+    );
   }
 
   if (state.panel.type === "sessions") {

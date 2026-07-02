@@ -88,6 +88,7 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/di")).toEqual(["/diff", "/diagnostics"]);
     expect(matchSuggestions("/ed")).toEqual(["/editor"]);
     expect(matchSuggestions("/ac")).toEqual(["/activity"]);
+    expect(matchSuggestions("/pe")).toEqual(["/permissions"]);
   });
 });
 

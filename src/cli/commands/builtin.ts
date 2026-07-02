@@ -55,6 +55,22 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "permissions",
+    aliases: ["permission"],
+    description: "Show permission policy",
+    usage: "/permissions",
+    execute: async (ctx) => {
+      const state = ctx.getState();
+      ctx.updateState({
+        panel: {
+          type: "permissions",
+          permission: state.config.permission,
+          autoApprove: state.autoApprove,
+        },
+      });
+    },
+  });
+  registry.register({
     name: "models",
     aliases: ["model"],
     description: "Show model selector",

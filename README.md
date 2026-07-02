@@ -431,6 +431,7 @@ are shallow-merged.
 | `/thinking` | Toggle reasoning visibility |
 | `/models` | Open the model selector |
 | `/model <id\|provider/id>` | Switch active model by resolved id |
+| `/permissions` | Show the active allow/ask/deny policy |
 | `/new [name]` | Create and switch to a new session |
 | `/tools` | List registered tools |
 | `/history` | View conversation history |
