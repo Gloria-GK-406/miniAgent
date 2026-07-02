@@ -20,6 +20,11 @@ import {
   getResolvedModelPaths,
   selectResolvedModelForCLI,
 } from "./agent-factory.js";
+import {
+  addCommandRegistrationNames,
+  findCommandNamespaceConflict,
+  getCommandRegistrationNames,
+} from "./command-namespace.js";
 import { createCommandRegistry } from "./command-registry.js";
 import { createDiagnosticsService } from "./diagnostics-service.js";
 import { createDoctorService } from "./doctor-service.js";
@@ -88,25 +93,6 @@ function getCommandHelpItems(
       usage: command.usage,
       source,
     }));
-}
-
-function getCommandRegistrationNames(command: CLICommand): string[] {
-  return [command.name, ...(command.aliases ?? [])]
-    .map((name) => name.startsWith("/") ? name.slice(1) : name);
-}
-
-function findRegisteredCommandNameConflict(
-  command: CLICommand,
-  registeredCommandNames: Set<string>,
-): string | undefined {
-  const commandNames = new Set<string>();
-  for (const name of getCommandRegistrationNames(command)) {
-    if (registeredCommandNames.has(name) || commandNames.has(name)) {
-      return name;
-    }
-    commandNames.add(name);
-  }
-  return undefined;
 }
 
 interface RedoEntry {
@@ -256,7 +242,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const registeredCommandNames = new Set(builtinCommands.flatMap(getCommandRegistrationNames));
   const customCommands: CLICommand[] = [];
   for (const command of await loadCustomCommands(baseDir)) {
-    const conflict = findRegisteredCommandNameConflict(command, registeredCommandNames);
+    const conflict = findCommandNamespaceConflict(command, registeredCommandNames);
     if (conflict !== undefined) {
       emit({
         type: "notice",
@@ -267,9 +253,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     }
     registry.register(command);
     customCommands.push(command);
-    for (const name of getCommandRegistrationNames(command)) {
-      registeredCommandNames.add(name);
-    }
+    addCommandRegistrationNames(registeredCommandNames, command);
   }
   updateState({
     commandSuggestions: getCommandSuggestions(registry.list()),

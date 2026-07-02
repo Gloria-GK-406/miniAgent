@@ -1,6 +1,11 @@
 import { registerBuiltinCommands } from "./commands/builtin.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
+import {
+  addCommandRegistrationNames,
+  findCommandNamespaceConflict,
+  getCommandRegistrationNames,
+} from "./runtime/command-namespace.js";
 import { createCommandRegistry } from "./runtime/command-registry.js";
 import { loadCustomCommands } from "./runtime/custom-command-service.js";
 import type { CLICommand } from "./runtime/types.js";
@@ -45,12 +50,15 @@ export async function listAvailableCommands(baseDir: string): Promise<CommandLis
   const registry = createCommandRegistry();
   registerBuiltinCommands(registry);
   const builtinCommands = registry.list();
-  const reservedNames = new Set(builtinCommands.flatMap((command) => [
-    command.name,
-    ...(command.aliases ?? []),
-  ]));
-  const customCommands = (await loadCustomCommands(baseDir))
-    .filter((command) => !reservedNames.has(command.name));
+  const reservedNames = new Set(builtinCommands.flatMap(getCommandRegistrationNames));
+  const customCommands: CLICommand[] = [];
+  for (const command of await loadCustomCommands(baseDir)) {
+    if (findCommandNamespaceConflict(command, reservedNames) !== undefined) {
+      continue;
+    }
+    customCommands.push(command);
+    addCommandRegistrationNames(reservedNames, command);
+  }
 
   return [
     ...visibleCommandItems(builtinCommands, "builtin"),

@@ -88,6 +88,23 @@ describe("listAvailableCommands", () => {
     expect(commands.filter((command) => command.name === "help")).toHaveLength(1);
     expect(commands.every((command) => command.name !== "panel-close")).toBe(true);
   });
+
+  it("excludes custom commands whose aliases conflict with built-ins", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-command-list-alias-conflict-"));
+    await writeCustomCommand(baseDir, "review", [
+      "---",
+      "description: Review changes",
+      "aliases:",
+      "  - h",
+      "---",
+      "",
+      "Review: {{args}}",
+    ].join("\n"));
+
+    const commands = await listAvailableCommands(baseDir);
+
+    expect(commands.some((command) => command.name === "review")).toBe(false);
+  });
 });
 
 describe("runCommandList", () => {
