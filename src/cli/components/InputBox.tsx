@@ -4,6 +4,7 @@ import { Box, Text, useInput } from "ink";
 interface InputBoxProps {
   onSubmit: (text: string) => void;
   onChange?: (text: string) => void;
+  onCancel?: () => void;
   disabled?: boolean;
   focused?: boolean;
   placeholder?: string;
@@ -16,6 +17,7 @@ interface InputBoxProps {
 export function InputBox({
   onSubmit,
   onChange,
+  onCancel,
   disabled = false,
   focused = true,
   placeholder,
@@ -35,7 +37,8 @@ export function InputBox({
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
-      process.exit(0);
+      onCancel?.();
+      return;
     }
     if (disabled) return;
     if (key.return) {

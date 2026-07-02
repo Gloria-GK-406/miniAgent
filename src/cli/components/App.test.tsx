@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "ink";
-import { App, getMessageWindow, padMessageWindow } from "./App.js";
+import {
+  App,
+  EXIT_CONFIRM_TEXT,
+  getMessageWindow,
+  padMessageWindow,
+  resolveCtrlCAction,
+} from "./App.js";
 import { buildRenderableLines } from "./MessageList.js";
 import { MessageType } from "../../core/types.js";
 import type { CLIAppRuntime, CLIEvent, CLIRuntimeSubscriber, CLIState } from "../runtime/types.js";
@@ -87,6 +93,12 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
 }
 
 describe("App", () => {
+  it("resolves Ctrl+C behavior from run and exit confirmation state", () => {
+    expect(resolveCtrlCAction(true, false)).toBe("stop");
+    expect(resolveCtrlCAction(false, false)).toBe("arm-exit");
+    expect(resolveCtrlCAction(false, true)).toBe("exit");
+  });
+
   it("anchors the message window to the bottom by default", () => {
     const messages = Array.from({ length: 6 }, (_, index) => ({
       id: String(index + 1),
@@ -151,6 +163,10 @@ describe("App", () => {
       <App runtime={createMockRuntime()} />,
     );
     expect(output).toContain("/help for commands");
+  });
+
+  it("exports Ctrl+C confirmation text for the idle exit prompt", () => {
+    expect(EXIT_CONFIRM_TEXT).toBe("Press Ctrl+C again to exit");
   });
 
   it("renders focused approval prompt instead of normal input when approval is pending", () => {

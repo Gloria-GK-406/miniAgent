@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import type { Message } from "../../core/types.js";
 import { useRuntime } from "../hooks/useRuntime.js";
@@ -22,6 +22,17 @@ export interface AppProps {
 }
 
 const BOTTOM_RESERVED = 6;
+const EXIT_CONFIRM_MS = 2000;
+export const EXIT_CONFIRM_TEXT = "Press Ctrl+C again to exit";
+
+export type CtrlCAction = "stop" | "arm-exit" | "exit";
+
+export function resolveCtrlCAction(isRunning: boolean, exitArmed: boolean): CtrlCAction {
+  if (isRunning) {
+    return "stop";
+  }
+  return exitArmed ? "exit" : "arm-exit";
+}
 
 export interface MessageWindow {
   visibleLines: RenderLine[];
@@ -171,6 +182,8 @@ export function App({ runtime }: AppProps) {
   } = useSuggestion({ modelPaths: state.modelPaths });
   const { stdout } = useStdout();
   const [scrollFromBottom, setScrollFromBottom] = useState(0);
+  const [exitArmed, setExitArmed] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const terminalHeight = stdout?.rows ?? 24;
   const terminalWidth = stdout?.columns ?? 80;
@@ -223,16 +236,55 @@ export function App({ runtime }: AppProps) {
     setScrollFromBottom((prev) => Math.min(prev, maxScrollFromBottom));
   }, [maxScrollFromBottom]);
 
+  const clearExitArmed = useCallback(() => {
+    if (exitTimer.current !== null) {
+      clearTimeout(exitTimer.current);
+      exitTimer.current = null;
+    }
+    setExitArmed(false);
+  }, []);
+
+  useEffect(() => () => {
+    if (exitTimer.current !== null) {
+      clearTimeout(exitTimer.current);
+    }
+  }, []);
+
   const isScrolledUp = clampedScrollFromBottom > 0;
   const canScrollUp = clampedScrollFromBottom < maxScrollFromBottom;
 
   const handleSubmit = useCallback(
     (text: string) => {
+      clearExitArmed();
       setScrollFromBottom(0);
       void runtime.submitInput(text);
     },
-    [runtime],
+    [clearExitArmed, runtime],
   );
+
+  const handleCancel = useCallback(() => {
+    const action = resolveCtrlCAction(state.isRunning, exitArmed);
+    if (action === "stop") {
+      clearExitArmed();
+      runtime.stop();
+      return;
+    }
+    if (action === "exit") {
+      void runtime.destroy().finally(() => {
+        process.exit(0);
+      });
+      return;
+    }
+
+    setExitArmed(true);
+    if (exitTimer.current !== null) {
+      clearTimeout(exitTimer.current);
+    }
+    exitTimer.current = setTimeout(() => {
+      exitTimer.current = null;
+      setExitArmed(false);
+    }, EXIT_CONFIRM_MS);
+  }, [clearExitArmed, exitArmed, runtime, state.isRunning]);
 
   const handleInputChange = useCallback((text: string) => {
     updateInput(text);
@@ -394,6 +446,7 @@ export function App({ runtime }: AppProps) {
         <InputBox
           onSubmit={handleSubmit}
           onChange={handleInputChange}
+          onCancel={handleCancel}
           disabled={state.isRunning}
           focused={true}
           hasSuggestions={hasSuggestions}
@@ -414,6 +467,9 @@ export function App({ runtime }: AppProps) {
           <Text color="yellow">
             Approval requested: {state.approval.toolName}
           </Text>
+        )}
+        {exitArmed && !state.isRunning && (
+          <Text color="yellow">{EXIT_CONFIRM_TEXT}</Text>
         )}
       </Box>
     </Box>
