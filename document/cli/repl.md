@@ -241,8 +241,9 @@ normal runtime path with `{{args}}` or `$ARGUMENTS` replaced by user arguments.
 ## Export, Import, Undo
 
 `/export markdown` writes a readable transcript, while `/export json` writes a
-schema-validated session export. `/import` creates a new session from a JSON
-export and switches to it.
+schema-validated session export. Both formats include session metadata such as
+the selected model, agent mode, and token usage. `/import` creates a new session
+from a JSON export and switches to it.
 
 Mutating workspace tools record per-turn file snapshots. `/undo` removes the
 last user turn and restores files when their current content still matches the

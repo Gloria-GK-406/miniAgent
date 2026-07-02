@@ -495,7 +495,8 @@ win. Messages beginning with `!` run through the configured CLI shell service.
 The agent also gets git-aware read tools and guarded `git_commit`; `/diff`,
 `/diagnostics`, `/activity`, and `/editor` provide local developer workflow
 panels. Project custom commands can be added as `.cliagent/commands/*.md`;
-exports, imports, undo, and redo are project-local under `.cliagent/`.
+exports, imports, undo, and redo are project-local under `.cliagent/`. Session
+exports include model, agent mode, and token usage metadata.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

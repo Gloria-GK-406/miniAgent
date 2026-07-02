@@ -172,7 +172,8 @@ Windows 默认使用 PowerShell；配置可以切换到 Git Bash、WSL、cmd 或
 ## 导出、导入、撤销
 
 `/export markdown` 写出可读 transcript，`/export json` 写出经过 schema 校验的会话导出。
-`/import` 会从 JSON 导出创建新会话并切换过去。
+两种格式都会包含所选模型、Agent 模式和 token 用量等会话元数据。`/import` 会从 JSON
+导出创建新会话并切换过去。
 
 会修改工作区的工具会记录每个 turn 的文件快照。`/undo` 删除最后一个用户 turn，并在
 当前文件内容仍匹配记录的修改后内容时恢复文件。`/redo` 会在没有冲突时重新应用被撤销的

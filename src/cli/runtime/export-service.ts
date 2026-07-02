@@ -4,12 +4,17 @@ import { z } from "zod";
 import { SessionMetaSchema, type SessionMeta } from "../../core/session.js";
 import { MessageSchema, type Message, type MessageContent } from "../../core/types.js";
 import { resolveWorkspacePath } from "../tools/workspace.js";
-import type { CLISessionService } from "./session-service.js";
+import {
+  CLISessionRuntimeMetadataSchema,
+  type CLISessionRuntimeMetadata,
+  type CLISessionService,
+} from "./session-service.js";
 
 export const CLISessionExportSchema = z.object({
   version: z.literal(1),
   exportedAt: z.string(),
   session: SessionMetaSchema,
+  runtime: CLISessionRuntimeMetadataSchema.optional(),
   messages: z.array(MessageSchema),
 });
 
@@ -46,13 +51,24 @@ function contentToMarkdown(content: MessageContent): string {
   return `[image:${content.mediaType}]`;
 }
 
-function messagesToMarkdown(session: SessionMeta, messages: Message[]): string {
+function formatTokenUsage(metadata: CLISessionRuntimeMetadata): string {
+  return `${metadata.tokenUsage.input} in / ${metadata.tokenUsage.output} out / ${metadata.tokenUsage.total} total`;
+}
+
+function messagesToMarkdown(
+  session: SessionMeta,
+  runtime: CLISessionRuntimeMetadata,
+  messages: Message[],
+): string {
   const lines = [
     `# ${session.name}`,
     "",
     `- Session: ${session.id}`,
     `- Created: ${session.createdAt}`,
     `- Updated: ${session.updatedAt}`,
+    ...(session.model !== undefined ? [`- Model: ${session.model}`] : []),
+    ...(runtime.mode !== undefined ? [`- Agent mode: ${runtime.mode}`] : []),
+    `- Token usage: ${formatTokenUsage(runtime)}`,
     `- Messages: ${messages.length}`,
     "",
   ];
@@ -67,11 +83,16 @@ function messagesToMarkdown(session: SessionMeta, messages: Message[]): string {
   return lines.join("\n");
 }
 
-function buildExport(session: SessionMeta, messages: Message[]): CLISessionExport {
+function buildExport(
+  session: SessionMeta,
+  runtime: CLISessionRuntimeMetadata,
+  messages: Message[],
+): CLISessionExport {
   return CLISessionExportSchema.parse({
     version: 1,
     exportedAt: new Date().toISOString(),
     session,
+    runtime,
     messages,
   });
 }
@@ -87,15 +108,17 @@ export function createExportService(options: ExportServiceOptions): ExportServic
     exportJson: async (sessionId, outputPath) => {
       const session = options.sessionService.getSession(sessionId);
       const messages = await options.sessionService.readMessages(sessionId);
+      const runtime = await options.sessionService.readSessionRuntimeMetadata(sessionId);
       const target = resolveOutputPath(options.baseDir, session, outputPath, "json");
-      const payload = buildExport(session, messages);
+      const payload = buildExport(session, runtime, messages);
       return writeOutput(target, `${JSON.stringify(payload, null, 2)}\n`);
     },
     exportMarkdown: async (sessionId, outputPath) => {
       const session = options.sessionService.getSession(sessionId);
       const messages = await options.sessionService.readMessages(sessionId);
+      const runtime = await options.sessionService.readSessionRuntimeMetadata(sessionId);
       const target = resolveOutputPath(options.baseDir, session, outputPath, "md");
-      return writeOutput(target, messagesToMarkdown(session, messages));
+      return writeOutput(target, messagesToMarkdown(session, runtime, messages));
     },
     importJson: async (inputPath, name) => {
       const sourcePath = resolveWorkspacePath(options.baseDir, inputPath).absolutePath;
@@ -104,6 +127,15 @@ export function createExportService(options: ExportServiceOptions): ExportServic
       );
       const session = await options.sessionService.createSession(name ?? parsed.session.name);
       await options.sessionService.writeMessages(session.id, parsed.messages);
+      if (parsed.session.model !== undefined) {
+        await options.sessionService.updateSessionModel(session.id, parsed.session.model);
+      }
+      if (parsed.runtime !== undefined) {
+        if (parsed.runtime.mode !== undefined) {
+          await options.sessionService.updateSessionMode(session.id, parsed.runtime.mode);
+        }
+        await options.sessionService.updateSessionTokenUsage(session.id, parsed.runtime.tokenUsage);
+      }
       return options.sessionService.getSession(session.id);
     },
   };

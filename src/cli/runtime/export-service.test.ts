@@ -28,6 +28,9 @@ async function setupSession(): Promise<{
     },
   ];
   await service.writeMessages(session.id, messages);
+  await service.updateSessionModel(session.id, "openai/slow");
+  await service.updateSessionMode(session.id, "plan");
+  await service.updateSessionTokenUsage(session.id, { input: 10, output: 5, total: 15 });
   return { baseDir, service, sessionId: session.id, messages };
 }
 
@@ -39,6 +42,9 @@ describe("ExportService", () => {
     const content = await readFile(outputPath, "utf-8");
 
     expect(content).toContain("# default");
+    expect(content).toContain("- Model: openai/slow");
+    expect(content).toContain("- Agent mode: plan");
+    expect(content).toContain("- Token usage: 10 in / 5 out / 15 total");
     expect(content).toContain("## user");
     expect(content).toContain("hello");
     expect(content).toContain("## assist");
@@ -55,6 +61,12 @@ describe("ExportService", () => {
 
     expect(parsed.version).toBe(1);
     expect(parsed.session.id).toBe(sessionId);
+    expect(parsed.session.model).toBe("openai/slow");
+    expect(parsed.runtime).toEqual({
+      version: 1,
+      mode: "plan",
+      tokenUsage: { input: 10, output: 5, total: 15 },
+    });
     expect(parsed.messages).toEqual(messages);
   });
 
@@ -67,5 +79,10 @@ describe("ExportService", () => {
 
     expect(imported.name).toBe("imported");
     expect(await service.readMessages(imported.id)).toEqual(messages);
+    expect(await service.readSessionRuntimeMetadata(imported.id)).toEqual({
+      version: 1,
+      mode: "plan",
+      tokenUsage: { input: 10, output: 5, total: 15 },
+    });
   });
 });
