@@ -40,6 +40,9 @@ async function main(): Promise<void> {
   try {
     const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
     render(<App runtime={runtime} />, { exitOnCtrlC: false });
+    if (action.prompt !== undefined) {
+      void runtime.submitInput(action.prompt);
+    }
   } catch (e: unknown) {
     process.stdout.write("\x1b[?1049l");
     process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);

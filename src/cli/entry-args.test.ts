@@ -13,6 +13,21 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("opens the TUI with an initial prompt", () => {
+    expect(parseCLIEntryArgs(["explain", "the", "repo"])).toEqual({
+      type: "tui",
+      prompt: "explain the repo",
+    });
+  });
+
+  it("opens an explicit working directory with an initial prompt", () => {
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "fix", "tests"])).toEqual({
+      type: "tui",
+      cwd: "C:/repo",
+      prompt: "fix tests",
+    });
+  });
+
   it("recognizes help flags", () => {
     expect(parseCLIEntryArgs(["--help"])).toEqual({ type: "help" });
     expect(parseCLIEntryArgs(["-h"])).toEqual({ type: "help" });
@@ -42,6 +57,7 @@ describe("CLI entry args", () => {
 
     expect(help).toContain("Usage: miniagent");
     expect(help).toContain("--cwd");
+    expect(help).toContain("[prompt]");
     expect(help).toContain("--help");
     expect(help).toContain("--version");
     expect(help).toContain("TUI");
