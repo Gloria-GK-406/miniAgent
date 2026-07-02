@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -101,6 +101,35 @@ describe("createCLIAgentFactory", () => {
       .toContain("Agent mode: build");
     expect(planContext.find((message) => message.type === MessageType.System)?.content)
       .toContain("Agent mode: plan");
+  });
+
+  it("guards mutating tools in plan mode even when global permissions allow", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-agent-factory-plan-permission-"));
+    await writeConfig(baseDir);
+    const requestApproval = vi.fn(async () => false);
+    const factory = await createCLIAgentFactory({
+      baseDir,
+      mode: "plan",
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => true,
+      requestApproval,
+      shellService: createShellService({ windows: "powershell", timeoutMs: 120000 }),
+    });
+    const built = await factory.build("session-plan-permission");
+    try {
+      const write = (await built.agent.getToolList()).find((tool) => tool.name === "write")!;
+
+      await expect(write.execute({ path: "planned.txt", content: "nope" }))
+        .rejects.toThrow("Permission rejected for write");
+      expect(requestApproval).toHaveBeenCalledWith("write", {
+        path: "planned.txt",
+        content: "nope",
+      });
+      await expect(readFile(join(baseDir, "planned.txt"), "utf-8"))
+        .rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await built.agent.destroy();
+    }
   });
 
   it("reads runtime config dynamically for each build", async () => {

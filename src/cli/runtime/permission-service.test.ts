@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { CLIConfigSchema, type CLIPermissionConfig } from "../config.js";
-import { createPermissionService, matchCommandPattern } from "./permission-service.js";
+import {
+  createModeAwarePermissionService,
+  createPermissionService,
+  matchCommandPattern,
+} from "./permission-service.js";
 
 describe("matchCommandPattern", () => {
   it("matches star patterns against shell commands", () => {
@@ -88,6 +92,54 @@ describe("PermissionService", () => {
     expect(service.resolve({ toolName: "write", args: {} }, true)).toEqual({
       decision: "deny",
       reason: "tool rule write",
+    });
+  });
+
+  it("requires approval for plan-mode mutating tools allowed only by global rule", () => {
+    const service = createModeAwarePermissionService({
+      base: createPermissionService({ "*": "allow" }),
+      getMode: () => "plan",
+    });
+
+    expect(service.resolve({ toolName: "write", args: { path: "a.txt" } }, true)).toEqual({
+      decision: "ask",
+      reason: "plan mode default write",
+    });
+    expect(service.resolve({ toolName: "read", args: { path: "a.txt" } }, true)).toEqual({
+      decision: "allow",
+      reason: "global rule *",
+    });
+  });
+
+  it("honors explicit plan-mode mutating tool decisions without auto approval", () => {
+    const service = createModeAwarePermissionService({
+      base: createPermissionService({
+        "*": "allow",
+        edit: "ask",
+        write: "allow",
+        shell: {
+          "*": "ask",
+          "rm -rf *": "deny",
+        },
+      }),
+      getMode: () => "plan",
+    });
+
+    expect(service.resolve({ toolName: "edit", args: { path: "a.txt" } }, true)).toEqual({
+      decision: "ask",
+      reason: "tool rule edit",
+    });
+    expect(service.resolve({ toolName: "write", args: { path: "a.txt" } }, true)).toEqual({
+      decision: "allow",
+      reason: "tool rule write",
+    });
+    expect(service.resolve({ toolName: "shell", args: { command: "npm test" } }, true)).toEqual({
+      decision: "ask",
+      reason: "shell pattern *",
+    });
+    expect(service.resolve({ toolName: "shell", args: { command: "rm -rf dist" } }, true)).toEqual({
+      decision: "deny",
+      reason: "shell pattern rm -rf *",
     });
   });
 });

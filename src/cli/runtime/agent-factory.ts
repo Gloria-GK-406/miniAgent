@@ -32,7 +32,7 @@ import {
 import { createCLIToolkit } from "../tools/cli-toolkit.js";
 import { createGitToolkit } from "../tools/git-toolkit.js";
 import { createGitService } from "./git-service.js";
-import type { PermissionService } from "./permission-service.js";
+import { createModeAwarePermissionService, type PermissionService } from "./permission-service.js";
 import type { ShellService } from "./shell-service.js";
 import type { SnapshotService } from "./snapshot-service.js";
 import { buildEffectiveSystemPrompt, getBaseSystemPrompt } from "./system-prompt.js";
@@ -325,9 +325,13 @@ async function buildAgentInner(
 }
 
 function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typeof createCLIToolkit>["tools"] {
+  const permissionService = createModeAwarePermissionService({
+    base: options.permissionService,
+    getMode: () => resolveMode(options.mode),
+  });
   const cliTools = createCLIToolkit({
     baseDir: options.baseDir,
-    permissionService: options.permissionService,
+    permissionService,
     getAutoApprove: options.getAutoApprove,
     requestApproval: options.requestApproval,
     shellService: options.shellService,
@@ -338,7 +342,7 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typ
   }).tools;
   const gitTools = createGitToolkit({
     gitService: createGitService(options.baseDir),
-    permissionService: options.permissionService,
+    permissionService,
     getAutoApprove: options.getAutoApprove,
     requestApproval: options.requestApproval,
   }).tools;

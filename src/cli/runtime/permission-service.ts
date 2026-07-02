@@ -1,10 +1,26 @@
-import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
+import type { CLIAgentMode, CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 import type { CLIPermissionRequest, CLIPermissionResult } from "./types.js";
 
 export interface PermissionService {
   resolve(request: CLIPermissionRequest, autoApprove: boolean): CLIPermissionResult;
   updateConfig(config: CLIPermissionConfig): void;
 }
+
+export interface ModeAwarePermissionServiceOptions {
+  base: PermissionService;
+  getMode: () => CLIAgentMode;
+}
+
+const PLAN_MUTATING_TOOL_NAMES = new Set([
+  "write",
+  "delete",
+  "move",
+  "edit",
+  "multi_edit",
+  "patch",
+  "shell",
+  "git_commit",
+]);
 
 function isDecision(value: unknown): value is CLIPermissionDecision {
   return value === "allow" || value === "ask" || value === "deny";
@@ -73,6 +89,30 @@ export function createPermissionService(config: CLIPermissionConfig): Permission
     },
     updateConfig: (nextConfig) => {
       permissionConfig = nextConfig;
+    },
+  };
+}
+
+export function createModeAwarePermissionService(
+  options: ModeAwarePermissionServiceOptions,
+): PermissionService {
+  return {
+    resolve: (request, autoApprove): CLIPermissionResult => {
+      if (options.getMode() !== "plan" || !PLAN_MUTATING_TOOL_NAMES.has(request.toolName)) {
+        return options.base.resolve(request, autoApprove);
+      }
+
+      const result = options.base.resolve(request, false);
+      if (result.decision === "allow" && result.reason === "global rule *") {
+        return {
+          decision: "ask",
+          reason: `plan mode default ${request.toolName}`,
+        };
+      }
+      return result;
+    },
+    updateConfig: (config) => {
+      options.base.updateConfig(config);
     },
   };
 }
