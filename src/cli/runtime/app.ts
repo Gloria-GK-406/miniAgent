@@ -59,6 +59,8 @@ import type {
   CLICommandHelpSource,
   CLIEvent,
   CLIInputOverrides,
+  CLIOverviewGitInfo,
+  CLIOverviewInfo,
   CLISessionSearchHit,
   CLIRuntimeSubscriber,
   CLIState,
@@ -114,6 +116,58 @@ function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICo
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function defaultPermissionDecision(config: CLIConfig): CLIPermissionDecision {
+  const fallback = config.permission["*"];
+  return fallback === "allow" || fallback === "deny" || fallback === "ask"
+    ? fallback
+    : "ask";
+}
+
+function parseGitStatusSummary(status: string): Pick<
+  CLIOverviewGitInfo,
+  "changedFiles" | "stagedFiles" | "untrackedFiles" | "summary"
+> {
+  const changedPaths = new Set<string>();
+  const stagedPaths = new Set<string>();
+  const untrackedPaths = new Set<string>();
+
+  for (const rawLine of status.split(/\r?\n/)) {
+    if (rawLine.trim().length === 0) {
+      continue;
+    }
+
+    const indexStatus = rawLine[0] ?? " ";
+    const worktreeStatus = rawLine[1] ?? " ";
+    const rawPath = rawLine.slice(3).trim();
+    const displayPath = rawPath.includes(" -> ")
+      ? rawPath.split(" -> ").at(-1)!
+      : rawPath;
+
+    changedPaths.add(displayPath);
+    if (indexStatus === "?" && worktreeStatus === "?") {
+      untrackedPaths.add(displayPath);
+      continue;
+    }
+    if (indexStatus !== " ") {
+      stagedPaths.add(displayPath);
+    }
+  }
+
+  const changedFiles = changedPaths.size;
+  const stagedFiles = stagedPaths.size;
+  const untrackedFiles = untrackedPaths.size;
+  const summary = changedFiles === 0
+    ? "clean"
+    : `${changedFiles} changed, ${stagedFiles} staged, ${untrackedFiles} untracked`;
+
+  return {
+    changedFiles,
+    stagedFiles,
+    untrackedFiles,
+    summary,
+  };
 }
 
 function getCommandSuggestions(commands: CLICommand[]): string[] {
@@ -522,6 +576,64 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     });
   }
 
+  async function buildOverviewGitInfo(): Promise<CLIOverviewGitInfo> {
+    const repository = await gitService.isRepository();
+    if (!repository) {
+      return {
+        repository: false,
+        changedFiles: 0,
+        stagedFiles: 0,
+        untrackedFiles: 0,
+        summary: "not a git repository",
+      };
+    }
+
+    const branch = await gitService.branchName();
+    return {
+      repository: true,
+      ...(branch.length > 0 && { branch }),
+      ...parseGitStatusSummary(await gitService.statusShort()),
+    };
+  }
+
+  async function buildOverviewInfo(): Promise<CLIOverviewInfo> {
+    const todos = built.todoManager.listTodos();
+    const pendingTodos = todos.filter((todo) => todo.status === "pending").length;
+    const inProgressTodos = todos.filter((todo) => todo.status === "in_progress").length;
+    const completedTodos = todos.filter((todo) => todo.status === "completed").length;
+    const runningActivities = state.activity.filter((entry) => entry.status === "running").length;
+    const doneActivities = state.activity.filter((entry) => entry.status === "done").length;
+    const errorActivities = state.activity.filter((entry) => entry.status === "error").length;
+
+    return {
+      workspace: state.baseDir,
+      sessionId: state.sessionId,
+      sessionName: state.sessionName,
+      sessionCount: state.sessions.length,
+      mode: state.mode,
+      modelName: state.modelName,
+      messageCount: state.messages.length,
+      tokenUsage: state.tokenUsage,
+      autoApprove: state.autoApprove,
+      showReasoning: state.showReasoning,
+      showToolDetails: state.showToolDetails,
+      defaultPermission: defaultPermissionDecision(state.config),
+      todoCounts: {
+        pending: pendingTodos,
+        inProgress: inProgressTodos,
+        completed: completedTodos,
+        total: todos.length,
+      },
+      activityCounts: {
+        running: runningActivities,
+        done: doneActivities,
+        error: errorActivities,
+        total: state.activity.length,
+      },
+      git: await buildOverviewGitInfo(),
+    };
+  }
+
   const runtime: CLIAppRuntime = {
     getState: () => state,
     subscribe: (listener) => {
@@ -611,6 +723,14 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     },
     runCommand: async (name, args) => {
       await registry.execute(createCommandContext(runtime), `/${name} ${args}`.trim());
+    },
+    showOverview: async () => {
+      updateState({
+        panel: {
+          type: "overview",
+          info: await buildOverviewInfo(),
+        },
+      });
     },
     selectModel: async (path) => {
       const modelName = selectCurrentAgentModel(path);

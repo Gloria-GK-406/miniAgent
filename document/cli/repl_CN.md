@@ -105,6 +105,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | 命令 | 说明 |
 |------|------|
 | `/about` | 显示 CLI 版本和运行环境信息 |
+| `/overview` | 汇总工作区、会话、git、todo 和活动状态 |
 | `/agent [build\|plan]` | 查看或切换主 Agent 模式 |
 | `/auto` | 切换自动批准未被拒绝的请求 |
 | `/details` | 切换工具详情显示 |

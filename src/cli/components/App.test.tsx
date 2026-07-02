@@ -86,6 +86,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     stop: vi.fn(),
     requestExit: vi.fn(async () => undefined),
     rebuildAgent: vi.fn(async () => undefined),
+    showOverview: vi.fn(async () => undefined),
     createSession: vi.fn(async () => undefined),
     switchSession: vi.fn(async () => undefined),
     renameSession: vi.fn(async () => undefined),
@@ -420,6 +421,56 @@ describe("App", () => {
     expect(output).toContain("Models: 2");
     expect(output).toContain("Sessions: 3");
     expect(output).toContain("Commands: 30 builtin / 4 custom");
+  });
+
+  it("renders overview panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "overview",
+          info: {
+            workspace: "C:/repo/project",
+            sessionName: "feature work",
+            sessionId: "session-123456",
+            sessionCount: 3,
+            mode: "plan",
+            modelName: "openai/slow",
+            messageCount: 12,
+            tokenUsage: { input: 1200, output: 2400, total: 3600 },
+            autoApprove: true,
+            showReasoning: true,
+            showToolDetails: false,
+            defaultPermission: "ask",
+            todoCounts: { pending: 2, inProgress: 1, completed: 4, total: 7 },
+            activityCounts: { running: 1, done: 5, error: 2, total: 8 },
+            git: {
+              repository: true,
+              branch: "feature/cli",
+              changedFiles: 3,
+              stagedFiles: 1,
+              untrackedFiles: 2,
+              summary: "3 changed, 1 staged, 2 untracked",
+            },
+          },
+        } as never,
+      })}
+      />,
+    );
+
+    expect(output).toContain("Overview");
+    expect(output).toContain("C:/repo/project");
+    expect(output).toContain("feature work");
+    expect(output).toContain("session-");
+    expect(output).toContain("plan");
+    expect(output).toContain("openai/slow");
+    expect(output).toContain("12 messages");
+    expect(output).toContain("1.2k in / 2.4k out / 3.6k total");
+    expect(output).toContain("Todos: 2 pending / 1 active / 4 done");
+    expect(output).toContain("Activity: 1 running / 5 done / 2 errors");
+    expect(output).toContain("Git: feature/cli - 3 changed, 1 staged, 2 untracked");
+    expect(output).toContain("Permissions: ask default, auto on");
+    expect(output).toContain("Reasoning: on");
+    expect(output).toContain("Tool details: off");
   });
 
   it("renders focused approval prompt instead of normal input when approval is pending", () => {

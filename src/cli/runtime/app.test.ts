@@ -169,6 +169,60 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("opens an overview panel with session, todo, activity, and git summaries", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-overview-"));
+    await writeConfig(baseDir);
+    await runGit(baseDir, ["init"]);
+    await runGit(baseDir, ["config", "user.email", "test@example.com"]);
+    await runGit(baseDir, ["config", "user.name", "MiniAgent Test"]);
+    await writeFile(join(baseDir, ".gitignore"), ".cliagent/\n", "utf-8");
+    await writeFile(join(baseDir, "a.txt"), "one\n", "utf-8");
+    await runGit(baseDir, ["add", ".gitignore", "a.txt"]);
+    await runGit(baseDir, ["commit", "-m", "initial"]);
+    await writeFile(join(baseDir, "a.txt"), "two\n", "utf-8");
+    await runGit(baseDir, ["add", "a.txt"]);
+    await writeFile(join(baseDir, "b.txt"), "new\n", "utf-8");
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    await sessionService.writeMessages(session.id, [
+      { id: "u1", type: MessageType.User, content: "Build an overview" },
+      { id: "a1", type: MessageType.Assist, content: "Overview drafted" },
+    ]);
+
+    const runtime = await createCLIRuntime(baseDir);
+    const shellRun = runtime.submitInput("!node -e \"console.log('activity-ok')\"");
+    const approvalId = runtime.getState().approval?.id;
+    expect(approvalId).toEqual(expect.any(String));
+    runtime.answerApproval(approvalId!, false);
+    await shellRun;
+
+    await runtime.submitInput("/overview");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "overview",
+      info: expect.objectContaining({
+        workspace: baseDir,
+        sessionName: "default",
+        sessionId: session.id,
+        sessionCount: 1,
+        mode: "build",
+        modelName: "openai/fast",
+        messageCount: 2,
+        defaultPermission: "ask",
+        todoCounts: { pending: 0, inProgress: 0, completed: 0, total: 0 },
+        activityCounts: { running: 0, done: 0, error: 1, total: 1 },
+        git: expect.objectContaining({
+          repository: true,
+          changedFiles: 2,
+          stagedFiles: 1,
+          untrackedFiles: 1,
+          summary: "2 changed, 1 staged, 1 untracked",
+        }),
+      }),
+    });
+    await runtime.destroy();
+  });
+
   it("selects a model from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-model-command-"));
     await writeConfig(baseDir, {

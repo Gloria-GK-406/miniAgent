@@ -68,6 +68,7 @@ describe("registerBuiltinCommands", () => {
 
     expect(registry.list().map((command) => command.name)).toEqual(expect.arrayContaining([
       "about",
+      "overview",
       "help",
       "keybindings",
       "status",
@@ -135,6 +136,18 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/status");
 
     expect(commandCtx.getState().panel).toEqual({ type: "status" });
+  });
+
+  it("opens overview panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    const showOverview = vi.fn(async () => undefined);
+    (commandCtx.runtime as unknown as { showOverview: typeof showOverview }).showOverview = showOverview;
+
+    await registry.execute(commandCtx, "/dashboard");
+
+    expect(showOverview).toHaveBeenCalledOnce();
   });
 
   it("opens about panel from version alias", async () => {

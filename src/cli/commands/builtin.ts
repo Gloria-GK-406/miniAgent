@@ -246,6 +246,15 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "overview",
+    aliases: ["dashboard", "home"],
+    description: "Show workspace, session, git, todo, and activity summary",
+    usage: "/overview",
+    execute: async (ctx) => {
+      await ctx.runtime.showOverview();
+    },
+  });
+  registry.register({
     name: "help",
     aliases: ["h"],
     description: "Show help",

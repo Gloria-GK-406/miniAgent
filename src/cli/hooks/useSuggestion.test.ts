@@ -33,12 +33,18 @@ describe("matchSuggestions", () => {
 
   it("matches /h to help and history", () => {
     const result = matchSuggestions("/h");
-    expect(result).toEqual(["/help", "/history", "/history-search"]);
+    expect(result).toEqual(["/help", "/history", "/history-search", "/home"]);
   });
 
   it("matches about and version commands", () => {
     expect(matchSuggestions("/ab")).toEqual(["/about"]);
     expect(matchSuggestions("/ver")).toEqual(["/version"]);
+  });
+
+  it("matches overview commands", () => {
+    expect(matchSuggestions("/ov")).toEqual(["/overview"]);
+    expect(matchSuggestions("/dash")).toEqual(["/dashboard"]);
+    expect(matchSuggestions("/ho")).toEqual(["/home"]);
   });
 
   it("matches /agent to build and plan", () => {
@@ -232,7 +238,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/h");
     });
-    expect(result.current.suggestions).toEqual(["/help", "/history", "/history-search"]);
+    expect(result.current.suggestions).toEqual(["/help", "/history", "/history-search", "/home"]);
     expect(result.current.selectedIndex).toBe(0);
   });
 
@@ -258,9 +264,10 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/h");
     });
-    expect(result.current.suggestions).toHaveLength(3);
+    expect(result.current.suggestions).toHaveLength(4);
 
     act(() => {
+      result.current.selectNext();
       result.current.selectNext();
       result.current.selectNext();
       result.current.selectNext();
@@ -277,7 +284,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.selectPrev();
     });
-    expect(result.current.selectedIndex).toBe(2);
+    expect(result.current.selectedIndex).toBe(3);
   });
 
   it("resets selection on new input", () => {
@@ -384,6 +391,11 @@ describe("useSuggestion", () => {
 
   it("adds a trailing space for tools query completion", () => {
     expect(applySuggestion("/too", "/tools")).toBe("/tools ");
+  });
+
+  it("does not add a trailing space for overview completion", () => {
+    expect(applySuggestion("/ov", "/overview")).toBe("/overview");
+    expect(applySuggestion("/dash", "/dashboard")).toBe("/dashboard");
   });
 
   it("adds a trailing space for todo query completion", () => {

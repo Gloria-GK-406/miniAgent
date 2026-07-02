@@ -18,6 +18,7 @@ import type { CLISubagentSummary } from "./subagent-service.js";
 export type CLIViewPanel =
   | { type: "none" }
   | { type: "about"; info: CLIAboutInfo }
+  | { type: "overview"; info: CLIOverviewInfo }
   | { type: "status" }
   | { type: "help"; query?: string }
   | { type: "keybindings" }
@@ -55,6 +56,43 @@ export interface CLIAboutInfo {
   sessionCount: number;
   builtinCommandCount: number;
   customCommandCount: number;
+}
+
+export interface CLIOverviewGitInfo {
+  repository: boolean;
+  branch?: string;
+  changedFiles: number;
+  stagedFiles: number;
+  untrackedFiles: number;
+  summary: string;
+}
+
+export interface CLIOverviewInfo {
+  workspace: string;
+  sessionId: string;
+  sessionName: string;
+  sessionCount: number;
+  mode: CLIAgentMode;
+  modelName: string;
+  messageCount: number;
+  tokenUsage: TokenCount;
+  autoApprove: boolean;
+  showReasoning: boolean;
+  showToolDetails: boolean;
+  defaultPermission: CLIPermissionDecision;
+  todoCounts: {
+    pending: number;
+    inProgress: number;
+    completed: number;
+    total: number;
+  };
+  activityCounts: {
+    running: number;
+    done: number;
+    error: number;
+    total: number;
+  };
+  git: CLIOverviewGitInfo;
 }
 
 export interface CLIApprovalRequest {
@@ -164,6 +202,7 @@ export interface CLIAppRuntime {
   submitInput(input: string): Promise<void>;
   submitInputWithOverrides(input: string, overrides: CLIInputOverrides): Promise<void>;
   runCommand(name: string, args: string): Promise<void>;
+  showOverview(): Promise<void>;
   selectModel(path: string): Promise<void>;
   setAgentMode(mode: CLIAgentMode): Promise<void>;
   rememberInputHistory(input: string): Promise<void>;

@@ -217,10 +217,10 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/about /help /commands /keybindings /status /config /history /input-history</Text>
-          <Text>/context /search /search-all /todos /references /tools /models /sessions</Text>
-          <Text>/activity /snapshots /permissions /system /agent build|plan /auto</Text>
-          <Text>/details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/about /overview /help /commands /keybindings /status /config /history</Text>
+          <Text>/input-history /context /search /search-all /todos /references /tools</Text>
+          <Text>/models /sessions /activity /snapshots /permissions /system /agent build|plan</Text>
+          <Text>/auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -263,6 +263,46 @@ function AboutPanel({
       <Text>
         Commands: {panel.info.builtinCommandCount} builtin / {panel.info.customCommandCount} custom
       </Text>
+    </StaticPanelFrame>
+  );
+}
+
+function OverviewPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "overview" }>;
+  runtime: CLIAppRuntime;
+}) {
+  const gitLine = panel.info.git.repository
+    ? `Git: ${panel.info.git.branch ?? "(detached)"} - ${panel.info.git.summary}`
+    : `Git: ${panel.info.git.summary}`;
+
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">Overview</Text>
+      <Text>Workspace: {panel.info.workspace}</Text>
+      <Text>
+        Session: {panel.info.sessionName} ({panel.info.sessionId}) - {plural(panel.info.sessionCount, "session")}
+      </Text>
+      <Text>Agent: {panel.info.mode}</Text>
+      <Text>Model: {panel.info.modelName}</Text>
+      <Text>Transcript: {plural(panel.info.messageCount, "message")}</Text>
+      <Text>Tokens: {formatTokenUsage(panel.info.tokenUsage)}</Text>
+      <Text>
+        Todos: {panel.info.todoCounts.pending} pending / {panel.info.todoCounts.inProgress} active /{" "}
+        {panel.info.todoCounts.completed} done
+      </Text>
+      <Text>
+        Activity: {panel.info.activityCounts.running} running / {panel.info.activityCounts.done} done /{" "}
+        {panel.info.activityCounts.error} errors
+      </Text>
+      <Text>{gitLine}</Text>
+      <Text>
+        Permissions: {panel.info.defaultPermission} default, auto {panel.info.autoApprove ? "on" : "off"}
+      </Text>
+      <Text>Reasoning: {panel.info.showReasoning ? "on" : "off"}</Text>
+      <Text>Tool details: {panel.info.showToolDetails ? "on" : "off"}</Text>
     </StaticPanelFrame>
   );
 }
@@ -877,6 +917,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "about") {
     return <AboutPanel panel={state.panel} runtime={runtime} />;
+  }
+
+  if (state.panel.type === "overview") {
+    return <OverviewPanel panel={state.panel} runtime={runtime} />;
   }
 
   if (state.panel.type === "keybindings") {
