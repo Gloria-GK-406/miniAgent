@@ -102,6 +102,24 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("runs doctor checks without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--doctor"])).toEqual({ type: "doctor" });
+    expect(parseCLIEntryArgs([
+      "--cwd",
+      "C:/repo",
+      "--session",
+      "s2",
+      "--model",
+      "openai/fast",
+      "--doctor",
+    ])).toEqual({
+      type: "doctor",
+      cwd: "C:/repo",
+      model: "openai/fast",
+      sessionId: "s2",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -191,6 +209,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects conflicting or prompted doctor mode", () => {
+    expect(parseCLIEntryArgs(["--doctor", "--print", "hello"])).toEqual({
+      type: "error",
+      message: "Cannot use --doctor with --print",
+    });
+    expect(parseCLIEntryArgs(["--doctor", "hello"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --doctor",
+    });
+  });
+
   it("formats concise help text", () => {
     const help = formatCLIHelp();
 
@@ -201,6 +230,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--model");
     expect(help).toContain("--session");
     expect(help).toContain("--new-session");
+    expect(help).toContain("--doctor");
     expect(help).toContain("--print");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");

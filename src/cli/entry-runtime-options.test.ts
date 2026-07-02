@@ -3,6 +3,23 @@ import type { CLIAppRuntime } from "./runtime/types.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 
 describe("applyCLIEntryRuntimeOptions", () => {
+  it("accepts doctor actions with startup options", async () => {
+    const runtime = {
+      runCommand: vi.fn(async () => undefined),
+      selectModel: vi.fn(async () => undefined),
+      switchSession: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "doctor",
+      sessionId: "s2",
+      model: "openai/fast",
+    });
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("s2");
+    expect(runtime.selectModel).toHaveBeenCalledWith("openai/fast");
+  });
+
   it("selects the requested startup model when present", async () => {
     const runtime = {
       runCommand: vi.fn(async () => undefined),

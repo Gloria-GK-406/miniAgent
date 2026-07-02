@@ -21,6 +21,15 @@ export type CLIEntryAction =
     newSession?: string;
     prompt: string;
   }
+  | {
+    type: "doctor";
+    agent?: CLIEntryAgentMode;
+    autoApprove?: boolean;
+    cwd?: string;
+    model?: string;
+    sessionId?: string;
+    newSession?: string;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -33,6 +42,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let sessionId: string | undefined;
   let newSession: string | undefined;
   let printMode = false;
+  let doctorMode = false;
   const promptParts: string[] = [];
 
   for (let index = 0; index < args.length; index++) {
@@ -45,6 +55,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--print" || arg === "-p") {
       printMode = true;
+      continue;
+    }
+    if (arg === "--doctor") {
+      doctorMode = true;
       continue;
     }
     if (arg === "--auto-approve" || arg === "-y") {
@@ -110,6 +124,23 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (sessionId !== undefined && newSession !== undefined) {
     return { type: "error", message: "Cannot use --session with --new-session" };
   }
+  if (doctorMode && printMode) {
+    return { type: "error", message: "Cannot use --doctor with --print" };
+  }
+  if (doctorMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --doctor" };
+    }
+    return {
+      type: "doctor",
+      ...(agent !== undefined && { agent }),
+      ...(autoApprove && { autoApprove: true }),
+      ...(cwd !== undefined && { cwd }),
+      ...(model !== undefined && { model }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(newSession !== undefined && { newSession }),
+    };
+  }
 
   if (printMode) {
     if (prompt.length === 0) {
@@ -156,6 +187,7 @@ export function formatCLIHelp(): string {
     "  -s, --session   Resume a session by id",
     "  --new-session   Create and start in a named session",
     "  -m, --model     Select a configured model by id or provider/id",
+    "  --doctor        Run setup checks headlessly",
     "  -p, --print     Run one prompt headlessly and print the final response",
     "  -h, --help      Show this help text",
     "  -v, --version   Show package version",
