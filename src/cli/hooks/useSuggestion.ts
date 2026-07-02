@@ -31,7 +31,7 @@ const COMMANDS = [
   "/undo",
 ];
 
-const AGENT_SUBS = ["build", "plan"];
+const AGENT_SUBS = ["list", "build", "plan"];
 const SESSION_SUBS = ["search", "new", "switch", "fork", "rename", "delete"];
 const SYSTEM_SUBS = ["set", "unset"];
 const COMMANDS_WITH_ARGS = new Set([

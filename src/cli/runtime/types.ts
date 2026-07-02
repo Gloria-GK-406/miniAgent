@@ -10,6 +10,7 @@ import type { Tool } from "../../tool/types.js";
 import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
 import type { DiagnosticResult } from "./diagnostics-service.js";
 import type { ProjectInstructionsResult } from "./project-instructions-service.js";
+import type { CLISubagentSummary } from "./subagent-service.js";
 
 export type CLIViewPanel =
   | { type: "none" }
@@ -18,6 +19,7 @@ export type CLIViewPanel =
   | { type: "context"; messages: Message[] }
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[]; query?: string }
+  | { type: "agents"; mode: CLIAgentMode; subagents: CLISubagentSummary[] }
   | { type: "tools"; tools: Tool[] }
   | { type: "permissions"; permission: CLIConfig["permission"]; autoApprove: boolean }
   | { type: "system"; basePrompt: string; effectivePrompt: string }
@@ -101,6 +103,7 @@ export interface CLIAppRuntime {
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
   showActivity(): Promise<void>;
+  showAgents(): Promise<void>;
   initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;
   setPermissionRule(target: string, decision: CLIPermissionDecision): Promise<void>;
   unsetPermissionRule(target: string): Promise<void>;

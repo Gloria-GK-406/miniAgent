@@ -23,7 +23,7 @@ describe("matchSuggestions", () => {
 
   it("matches /agent to build and plan", () => {
     const result = matchSuggestions("/agent");
-    expect(result).toEqual(["build", "plan"]);
+    expect(result).toEqual(["list", "build", "plan"]);
   });
 
   it("matches /agent pl to plan", () => {

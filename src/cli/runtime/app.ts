@@ -22,6 +22,7 @@ import { createReferenceService } from "./reference-service.js";
 import { createShellService } from "./shell-service.js";
 import { createCLISessionService } from "./session-service.js";
 import { createSnapshotService } from "./snapshot-service.js";
+import { createSubagentService } from "./subagent-service.js";
 import { createSystemPromptConfigService } from "./system-prompt-config-service.js";
 import type { CLIAppRuntime, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
 
@@ -48,6 +49,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const projectInstructionsService = createProjectInstructionsService(baseDir);
   const permissionConfigService = createPermissionConfigService(baseDir);
   const systemPromptConfigService = createSystemPromptConfigService(baseDir);
+  const subagentService = createSubagentService(baseDir, () => config);
   const editorService = createEditorService({ config: config.editor });
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
@@ -436,6 +438,15 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     },
     showActivity: async () => {
       updateState({ panel: { type: "activity", entries: state.activity } });
+    },
+    showAgents: async () => {
+      updateState({
+        panel: {
+          type: "agents",
+          mode: state.mode,
+          subagents: await subagentService.listSubagents(),
+        },
+      });
     },
     initializeProjectInstructions: async (overwrite) => (
       projectInstructionsService.initialize({ overwrite })

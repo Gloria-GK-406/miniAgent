@@ -88,6 +88,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     openEditor: vi.fn(async () => ""),
     runDiagnostics: vi.fn(async () => undefined),
     showActivity: vi.fn(async () => undefined),
+    showAgents: vi.fn(async () => undefined),
     initializeProjectInstructions: vi.fn(async () => ({ written: true, path: "AGENTS.md" })),
     setPermissionRule: vi.fn(async () => undefined),
     unsetPermissionRule: vi.fn(async () => undefined),
@@ -389,6 +390,34 @@ describe("App", () => {
     expect(output).toContain("Activity (1)");
     expect(output).toContain("DONE AGENT run_subagent");
     expect(output).toContain("subtask complete");
+  });
+
+  it("renders agents panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "agents",
+          mode: "build",
+          subagents: [
+            {
+              id: "reviewer",
+              name: "Reviewer",
+              description: "Reviews code changes",
+              model: "openai/fast",
+              filePath: "C:/repo/.cliagent/subagent/reviewer.md",
+            },
+          ],
+        } as never,
+      })}
+      />,
+    );
+
+    expect(output).toContain("Agents");
+    expect(output).toContain("* build");
+    expect(output).toContain("plan");
+    expect(output).toContain("reviewer");
+    expect(output).toContain("Reviews code changes");
+    expect(output).toContain("openai/fast");
   });
 
   it("renders permissions panel from runtime state", () => {

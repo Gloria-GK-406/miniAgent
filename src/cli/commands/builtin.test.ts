@@ -95,6 +95,17 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.rebuildAgent).toHaveBeenCalledWith("switch agent plan");
   });
 
+  it("opens the agent list when /agent has no mode", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.showAgents = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/agent");
+
+    expect(commandCtx.runtime.showAgents).toHaveBeenCalled();
+  });
+
   it("dispatches session subcommands to runtime methods", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);

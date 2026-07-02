@@ -439,10 +439,14 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   });
   registry.register({
     name: "agent",
-    description: "Switch agent mode",
-    usage: "/agent build|plan",
+    description: "Show agents or switch primary mode",
+    usage: "/agent [list|build|plan]",
     execute: async (ctx, args) => {
       const mode = args.trim();
+      if (mode.length === 0 || mode === "list") {
+        await ctx.runtime.showAgents();
+        return;
+      }
       if (mode !== "build" && mode !== "plan") {
         ctx.notice("info", `Current agent: ${ctx.getState().mode}`);
         return;

@@ -177,6 +177,33 @@ function SessionsPanel({ runtime, panel }: { runtime: CLIAppRuntime; panel: Extr
   );
 }
 
+function AgentsPanel({
+  runtime,
+  panel,
+}: {
+  runtime: CLIAppRuntime;
+  panel: Extract<CLIViewPanel, { type: "agents" }>;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">Agents</Text>
+      <Text bold>Primary modes</Text>
+      <Text>{panel.mode === "build" ? "*" : " "} build</Text>
+      <Text>{panel.mode === "plan" ? "*" : " "} plan</Text>
+      <Text bold>Subagents ({panel.subagents.length})</Text>
+      {panel.subagents.map((subagent) => (
+        <Text key={subagent.id}>
+          <Text color="cyan">{subagent.id}</Text>
+          <Text> {subagent.name}</Text>
+          {subagent.description.length > 0 && <Text dimColor> {subagent.description}</Text>}
+          {subagent.model !== undefined && <Text dimColor> [{subagent.model}]</Text>}
+        </Text>
+      ))}
+      {panel.subagents.length === 0 && <Text dimColor>No configured subagents</Text>}
+    </StaticPanelFrame>
+  );
+}
+
 function ErrorPanel({
   panel,
   runtime,
@@ -415,6 +442,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "sessions") {
     return <SessionsPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "agents") {
+    return <AgentsPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "error") {

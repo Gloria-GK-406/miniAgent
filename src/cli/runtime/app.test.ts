@@ -115,6 +115,41 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("opens an agents panel with configured subagents", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-agents-"));
+    await writeConfig(baseDir, {
+      subagent: {
+        path: join(baseDir, ".cliagent", "subagent"),
+      },
+    });
+    await mkdir(join(baseDir, ".cliagent", "subagent"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "subagent", "reviewer.md"), [
+      "---",
+      "id: reviewer",
+      "name: Reviewer",
+      "description: Reviews code changes",
+      "model: openai/fast",
+      "---",
+      "You review code.",
+    ].join("\n"), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/agent");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "agents",
+      mode: "build",
+      subagents: [{
+        id: "reviewer",
+        name: "Reviewer",
+        description: "Reviews code changes",
+        model: "openai/fast",
+        filePath: join(baseDir, ".cliagent", "subagent", "reviewer.md"),
+      }],
+    });
+    await runtime.destroy();
+  });
+
   it("creates, switches, and renames sessions from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-sessions-"));
     await writeConfig(baseDir);

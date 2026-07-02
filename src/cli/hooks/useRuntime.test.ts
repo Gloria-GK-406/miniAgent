@@ -63,6 +63,7 @@ describe("useRuntime", () => {
       openEditor: vi.fn(),
       runDiagnostics: vi.fn(),
       showActivity: vi.fn(),
+      showAgents: vi.fn(),
       initializeProjectInstructions: vi.fn(),
       setPermissionRule: vi.fn(),
       unsetPermissionRule: vi.fn(),
