@@ -510,8 +510,7 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     description: "Exit",
     usage: "/quit",
     execute: async (ctx) => {
-      await ctx.runtime.destroy();
-      process.exit(0);
+      await ctx.runtime.requestExit();
     },
   });
 }

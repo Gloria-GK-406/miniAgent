@@ -210,6 +210,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
   };
 
   const registry = createCommandRegistry();
@@ -726,6 +727,12 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     },
     stop: () => {
       built.agent.stop();
+    },
+    requestExit: async () => {
+      if (state.exitRequested) {
+        return;
+      }
+      updateState({ exitRequested: true });
     },
     rebuildAgent: async (_reason) => {
       await rebuildCurrentAgent();

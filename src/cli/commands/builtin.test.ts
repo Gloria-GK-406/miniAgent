@@ -31,6 +31,7 @@ function state(): CLIState {
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
   };
 }
 
@@ -41,6 +42,7 @@ function ctx(): CLICommandContext {
       setAgentMode: vi.fn(async (mode) => {
         current = { ...current, mode };
       }),
+      requestExit: vi.fn(async () => undefined),
       rebuildAgent: vi.fn(async () => undefined),
       destroy: vi.fn(async () => undefined),
     } as unknown as CLICommandContext["runtime"],
@@ -89,6 +91,25 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/help");
 
     expect(commandCtx.getState().panel).toEqual({ type: "help" });
+  });
+
+  it("requests quit through the runtime without exiting directly", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.requestExit = vi.fn(async () => undefined);
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: string | number | null) => {
+      throw new Error(`unexpected process.exit(${String(code)})`);
+    }) as never);
+
+    try {
+      await registry.execute(commandCtx, "/quit");
+      expect(commandCtx.runtime.requestExit).toHaveBeenCalledOnce();
+      expect(commandCtx.runtime.destroy).not.toHaveBeenCalled();
+      expect(exit).not.toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+    }
   });
 
   it("selects a model when /model receives a selector", async () => {

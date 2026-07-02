@@ -32,6 +32,7 @@ function state(): CLIState {
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
   };
 }
 

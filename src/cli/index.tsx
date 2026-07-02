@@ -425,7 +425,18 @@ async function main(): Promise<void> {
     const cwd = resolve(action.cwd ?? process.cwd());
     const runtime = await createCLIRuntime(cwd);
     await applyCLIEntryRuntimeOptions(runtime, action);
-    render(<App runtime={runtime} />, { exitOnCtrlC: false });
+    const app = render(<App runtime={runtime} />, { exitOnCtrlC: false });
+    let exitStarted = false;
+    runtime.subscribe((event) => {
+      if (event.type !== "state" || !event.state.exitRequested || exitStarted) {
+        return;
+      }
+      exitStarted = true;
+      app.unmount();
+      void runtime.destroy().finally(() => {
+        process.exit(0);
+      });
+    });
     const prompt = await loadEntryPrompt(action, cwd);
     if (prompt !== undefined) {
       void runtime.submitInput(prompt);

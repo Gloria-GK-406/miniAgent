@@ -43,6 +43,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
     ...overrides,
   };
 }
@@ -82,6 +83,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     rememberInputHistory: vi.fn(async () => undefined),
     answerApproval: vi.fn(),
     stop: vi.fn(),
+    requestExit: vi.fn(async () => undefined),
     rebuildAgent: vi.fn(async () => undefined),
     createSession: vi.fn(async () => undefined),
     switchSession: vi.fn(async () => undefined),

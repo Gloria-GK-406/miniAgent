@@ -33,6 +33,7 @@ function state(overrides: Partial<CLIState> = {}): CLIState {
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
     ...overrides,
   };
 }
@@ -72,6 +73,7 @@ function runtime(current: CLIState): CLIAppRuntime {
     unsetSystemPrompt: vi.fn(async () => undefined),
     answerApproval: vi.fn(),
     stop: vi.fn(),
+    requestExit: vi.fn(async () => undefined),
     rebuildAgent: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   };

@@ -56,6 +56,7 @@ function state(overrides: Partial<CLIState> = {}): CLIState {
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
     ...overrides,
   };
 }

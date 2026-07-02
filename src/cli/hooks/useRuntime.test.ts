@@ -32,6 +32,7 @@ function state(): CLIState {
     panel: { type: "none" },
     approval: null,
     error: null,
+    exitRequested: false,
   };
 }
 
@@ -52,6 +53,7 @@ describe("useRuntime", () => {
       rememberInputHistory: vi.fn(),
       answerApproval: vi.fn(),
       stop: vi.fn(),
+      requestExit: vi.fn(),
       rebuildAgent: vi.fn(),
       createSession: vi.fn(),
       switchSession: vi.fn(),

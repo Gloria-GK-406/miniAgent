@@ -59,6 +59,25 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("emits an exit request state for the TUI host", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-exit-request-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    const states: boolean[] = [];
+    runtime.subscribe((event) => {
+      if (event.type === "state") {
+        states.push(event.state.exitRequested);
+      }
+    });
+
+    await runtime.requestExit();
+
+    expect(runtime.getState().exitRequested).toBe(true);
+    expect(states).toContain(true);
+    await runtime.destroy();
+  });
+
   it("refreshes reference paths after project initialization", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-reference-refresh-"));
     await writeConfig(baseDir);

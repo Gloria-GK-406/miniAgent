@@ -82,6 +82,7 @@ export interface CLIState {
   panel: CLIViewPanel;
   approval: CLIApprovalRequest | null;
   error: string | null;
+  exitRequested: boolean;
 }
 
 export interface CLIInputOverrides {
@@ -134,6 +135,7 @@ export interface CLIAppRuntime {
   unsetSystemPrompt(): Promise<void>;
   answerApproval(id: string, decision: CLIApprovalAnswer): void;
   stop(): void;
+  requestExit(): Promise<void>;
   rebuildAgent(reason: string): Promise<void>;
   destroy(): Promise<void>;
 }

@@ -442,9 +442,7 @@ export function App({ runtime }: AppProps) {
       return;
     }
     if (action === "exit") {
-      void runtime.destroy().finally(() => {
-        process.exit(0);
-      });
+      void runtime.requestExit();
       return;
     }
 
