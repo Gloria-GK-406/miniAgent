@@ -87,6 +87,17 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.getState().panel).toEqual({ type: "help" });
   });
 
+  it("selects a model when /model receives a selector", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.selectModel = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/model openai/fast");
+
+    expect(commandCtx.runtime.selectModel).toHaveBeenCalledWith("openai/fast");
+  });
+
   it("switches agent mode and rebuilds the runtime agent", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);

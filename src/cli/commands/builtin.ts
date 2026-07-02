@@ -213,10 +213,18 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register({
     name: "models",
     aliases: ["model"],
-    description: "Show model selector",
-    usage: "/models",
-    execute: async (ctx) => {
-      ctx.updateState({ panel: { type: "models" } });
+    description: "Show model selector or select a model",
+    usage: "/models [selector]",
+    execute: async (ctx, args) => {
+      const selector = args.trim();
+      if (selector.length === 0) {
+        ctx.updateState({ panel: { type: "models" } });
+        return;
+      }
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.selectModel(selector);
+        ctx.notice("info", `Selected model ${ctx.getState().modelName}`);
+      });
     },
   });
   registry.register({

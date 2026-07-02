@@ -91,6 +91,27 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("selects a model from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-model-command-"));
+    await writeConfig(baseDir, {
+      providers: [{
+        engine: "openai",
+        key: "sk-test",
+        models: [
+          { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+          { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
+        ],
+      }],
+      defaultModel: "fast",
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/model openai/slow");
+
+    expect(runtime.getState().modelName).toBe("openai/slow");
+    await runtime.destroy();
+  });
+
   it("edits permission policy from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-permissions-"));
     await writeConfig(baseDir);
