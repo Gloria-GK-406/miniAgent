@@ -1,6 +1,6 @@
 # CLI
 
-The built-in CLI provides an interactive REPL with rich features.
+The built-in CLI provides an interactive single-process TUI for MiniAgent.
 
 ## Quick Start
 
@@ -26,6 +26,21 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
     }
   ],
   "defaultModel": "sonnet",
+  "defaultAgent": "build",
+  "permission": {
+    "*": "ask",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  },
+  "shell": {
+    "windows": "powershell",
+    "timeoutMs": 120000
+  },
+  "tui": {
+    "showReasoning": false,
+    "showToolDetails": false
+  },
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
@@ -37,50 +52,48 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 | Command | Description |
 |---------|-------------|
-| `/models` | List resolved model ids |
-| `/model <id\|provider/id>` | Switch active model by resolved id |
+| `/agent [build|plan]` | Show or switch the primary agent mode |
+| `/auto` | Toggle auto approval for requests that are not denied |
+| `/details` | Toggle expanded tool details |
+| `/thinking` | Toggle reasoning visibility |
+| `/models` | Open the model selector |
+| `/model <id|provider/id>` | Switch active model by resolved id |
 | `/tools` | List registered tools |
-| `/history [page]` | View conversation history |
+| `/history` | View conversation history |
 | `/context` | Preview context sent to LLM |
-| `/compress` | Trigger context compression |
-| `/session` | List all sessions |
-| `/session new` | Create a new session |
-| `/session switch <id>` | Switch to a session |
-| `/session delete <id>` | Delete a session |
-| `/session rename <id> <name>` | Rename a session |
-| `/hitl [on\|off]` | Toggle human-in-the-loop |
-| `/clear` | Clear current conversation |
-| `/system <text>` | Update system prompt |
+| `/sessions` | Show current session information |
 | `/help` | Show help |
 | `/quit` | Exit |
 
-## Built-in Tools
+## Built-In Tools
 
-The CLI agent is assembled from a semantic blueprint. The default blueprint
-always includes:
+The CLI runtime injects workspace-aware tools over the default blueprint where
+needed:
 
-- **read** — Read files and directories
-- **write** — Write files
-- **edit** — Edit files with exact string replacement
-- **glob** — Find files by pattern
-- **grep** — Search file contents
-- **bash** — Execute shell commands
-- **todo** — Task management (todo_create, todo_update, todo_delete)
+- **read** - Read files and directories inside the workspace.
+- **write** - Write workspace files after permission checks.
+- **edit** - Edit workspace files with exact string replacement.
+- **glob** - Find files by pattern.
+- **grep** - Search file contents.
+- **shell** - Execute shell commands through the CLI shell service.
+- **todo** - Task management (`todo_create`, `todo_update`, `todo_delete`).
 
 When `.cliagent/config.json` includes `mcp`, `skill`, or `subagent` fields,
 those CLI convenience fields are copied into blueprint component config during
-assembly:
+assembly.
 
-- **mcp** — Connect to MCP servers and expose prefixed MCP tools
-- **skill** — Load local skill instructions through `load_skill`
-- **subagent** — Delegate tasks to configured file-based subagents
+## Permissions
 
-## HITL (Human-in-the-Loop)
+The CLI uses a product-level permission policy. Read/search tools are allowed by
+default, mutating tools and shell commands ask by default, and explicit deny
+rules are always enforced. `/auto` allows requests that would otherwise ask, but
+it never overrides a deny rule.
 
-The CLI tracks HITL state with `/hitl [on|off]`, but the current default CLI
-blueprint uses the built-in `allow-all` approval implementation. Tool calls are
-not blocked by the HITL toggle until an interactive approval implementation is
-registered.
+## Shell
+
+Messages beginning with `!` run through the CLI shell service and are recorded
+as shell output in the conversation. On Windows the default shell is PowerShell;
+the config can switch to Git Bash, WSL, cmd, or an explicit executable.
 
 ## Context Compression
 
@@ -89,7 +102,7 @@ The CLI uses `ContextCompressor` with the following defaults:
 - `maxMessages`: 60
 - `keepRecent`: 15
 
-Use `/compress` to manually trigger compression.
+Compression runs as part of the assembled agent runtime.
 
 ## Model Configuration
 
@@ -104,5 +117,9 @@ Models are resolved from provider entries in `.cliagent/config.json`.
 | `providers[].models[].id` | Yes | Selector id used by `/model` and `defaultModel` |
 | `providers[].models[].name` | Yes | Provider model name sent to the engine |
 | `defaultModel` | No | Model id such as `sonnet`, or `provider/id` when ambiguous |
+| `defaultAgent` | No | `build` or `plan`; defaults to `build` |
+| `permission` | No | Product-level allow/ask/deny policy |
+| `shell` | No | Cross-platform shell settings |
+| `tui` | No | TUI display preferences |
 | `generation.temperature` | No | Default `0.7` |
 | `generation.thinking` | No | `none`, `low`, `medium`, `high`, or `max`; unsupported levels downgrade inside the engine |

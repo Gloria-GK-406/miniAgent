@@ -388,6 +388,21 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
     }
   ],
   "defaultModel": "sonnet",
+  "defaultAgent": "build",
+  "permission": {
+    "*": "ask",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  },
+  "shell": {
+    "windows": "powershell",
+    "timeoutMs": 120000
+  },
+  "tui": {
+    "showReasoning": false,
+    "showToolDetails": false
+  },
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
@@ -399,21 +414,22 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 | Command | Description |
 |---------|-------------|
-| `/models` | List resolved model ids |
+| `/agent [build\|plan]` | Show or switch the primary agent mode |
+| `/auto` | Toggle auto approval for requests that are not denied |
+| `/details` | Toggle expanded tool details |
+| `/thinking` | Toggle reasoning visibility |
+| `/models` | Open the model selector |
 | `/model <id\|provider/id>` | Switch active model by resolved id |
 | `/tools` | List registered tools |
-| `/history [page]` | View conversation history |
+| `/history` | View conversation history |
 | `/context` | Preview context sent to LLM |
-| `/compress` | Trigger context compression |
-| `/session` | List all sessions |
-| `/session new` | Create a new session |
-| `/session switch <id>` | Switch to a session |
-| `/session delete <id>` | Delete a session |
-| `/session rename <id> <name>` | Rename a session |
-| `/hitl [on\|off]` | Toggle human-in-the-loop |
-| `/clear` | Clear current conversation |
-| `/system <text>` | Update system prompt |
+| `/sessions` | Show current session information |
+| `/help` | Show help |
 | `/quit` | Exit |
+
+The CLI uses product-level permissions: read/search tools are allowed by default,
+mutating tools and shell commands ask by default, and explicit deny rules always
+win. Messages beginning with `!` run through the configured CLI shell service.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

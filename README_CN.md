@@ -382,6 +382,21 @@ npm run chat
     }
   ],
   "defaultModel": "sonnet",
+  "defaultAgent": "build",
+  "permission": {
+    "*": "ask",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  },
+  "shell": {
+    "windows": "powershell",
+    "timeoutMs": 120000
+  },
+  "tui": {
+    "showReasoning": false,
+    "showToolDetails": false
+  },
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
@@ -393,21 +408,22 @@ npm run chat
 
 | 命令 | 说明 |
 |------|------|
-| `/models` | 列出已配置的模型 |
-| `/model <id\|provider/id>` | 切换当前模型 |
+| `/agent [build\|plan]` | 查看或切换主 Agent 模式 |
+| `/auto` | 切换自动批准未被拒绝的请求 |
+| `/details` | 切换工具详情显示 |
+| `/thinking` | 切换推理内容显示 |
+| `/models` | 打开模型选择器 |
+| `/model <id\|provider/id>` | 按解析后的模型 ID 切换活动模型 |
 | `/tools` | 列出已注册的工具 |
-| `/history [page]` | 查看对话历史 |
+| `/history` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
-| `/compress` | 触发上下文压缩 |
-| `/session` | 列出所有会话 |
-| `/session new` | 创建新会话 |
-| `/session switch <id>` | 切换到指定会话 |
-| `/session delete <id>` | 删除指定会话 |
-| `/session rename <id> <name>` | 重命名会话 |
-| `/hitl [on\|off]` | 开关人工审批 |
-| `/clear` | 清空当前对话 |
-| `/system <text>` | 更新系统提示词 |
+| `/sessions` | 显示当前会话信息 |
+| `/help` | 显示帮助 |
 | `/quit` | 退出 |
+
+CLI 使用产品级权限策略：读/搜索工具默认允许，写入、编辑和 Shell
+命令默认询问，显式拒绝规则始终生效。以 `!` 开头的消息会通过配置的 CLI
+shell service 执行。
 
 → [完整 CLI 文档](./document/cli/repl_CN.md)
 

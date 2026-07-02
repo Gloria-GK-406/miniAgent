@@ -26,6 +26,21 @@ npm run chat
     }
   ],
   "defaultModel": "sonnet",
+  "defaultAgent": "build",
+  "permission": {
+    "*": "ask",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  },
+  "shell": {
+    "windows": "powershell",
+    "timeoutMs": 120000
+  },
+  "tui": {
+    "showReasoning": false,
+    "showToolDetails": false
+  },
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
@@ -38,25 +53,23 @@ CLI provider 配置使用 `providers[].engine` 指定内置引擎适配器，`pr
 `{ id, name }` 形状的模型预设数组。`defaultModel` 可填写 `sonnet` 这样的模型
 ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `none`、`low`、
 `medium`、`high` 或 `max`；不支持的级别会在引擎内降级。
+`defaultAgent` 控制默认 Agent 模式，`permission` 控制产品级权限策略，`shell`
+控制跨平台 Shell 执行方式，`tui` 控制界面展示偏好。
 
 ## 命令
 
 | 命令 | 说明 |
 |------|------|
-| `/models` | 列出已配置的模型 |
-| `/model <id\|provider/id>` | 切换活动模型 |
+| `/agent [build\|plan]` | 查看或切换主 Agent 模式 |
+| `/auto` | 切换自动批准未被拒绝的请求 |
+| `/details` | 切换工具详情显示 |
+| `/thinking` | 切换推理内容显示 |
+| `/models` | 打开模型选择器 |
+| `/model <id\|provider/id>` | 按解析后的模型 ID 切换活动模型 |
 | `/tools` | 列出已注册的工具 |
-| `/history [page]` | 查看对话历史 |
+| `/history` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
-| `/compress` | 手动触发上下文压缩 |
-| `/session` | 列出所有会话 |
-| `/session new` | 创建新会话 |
-| `/session switch <id>` | 切换到指定会话 |
-| `/session delete <id>` | 删除指定会话 |
-| `/session rename <id> <name>` | 重命名会话 |
-| `/hitl [on\|off]` | 开关 Human-in-the-Loop |
-| `/clear` | 清空当前对话 |
-| `/system <text>` | 更新系统提示词 |
+| `/sessions` | 显示当前会话信息 |
 | `/help` | 显示帮助 |
 | `/quit` | 退出 |
 
@@ -69,7 +82,7 @@ CLI Agent 通过语义蓝图组装。默认蓝图始终包含：
 - **edit** — 精确字符串替换编辑文件
 - **glob** — 按模式查找文件
 - **grep** — 搜索文件内容
-- **bash** — 执行 Shell 命令
+- **shell** — 通过 CLI shell service 执行 Shell 命令
 - **todo** — 任务管理（todo_create、todo_update、todo_delete）
 
 当 `.cliagent/config.json` 包含 `mcp`、`skill` 或 `subagent` 字段时，这些
@@ -79,10 +92,15 @@ CLI 便捷字段会在组装时复制到蓝图组件配置中：
 - **skill** — 通过 `load_skill` 加载本地技能指令
 - **subagent** — 将任务委托给基于文件配置的子 Agent
 
-## HITL（人工审批）
+## 权限
 
-CLI 通过 `/hitl [on|off]` 记录 HITL 状态，但当前默认 CLI 蓝图使用内置的
-`allow-all` 审批实现。在接入交互式审批实现前，工具调用不会被 HITL 开关阻塞。
+CLI 使用产品级权限策略。读/搜索工具默认允许，写入、编辑和 Shell 命令默认询问，
+显式拒绝规则始终生效。`/auto` 只会允许原本需要询问的请求，不会覆盖拒绝规则。
+
+## Shell
+
+以 `!` 开头的消息会通过 CLI shell service 在本地执行，并把输出记录到对话中。
+Windows 默认使用 PowerShell；配置可以切换到 Git Bash、WSL、cmd 或显式可执行文件。
 
 ## 上下文压缩
 
@@ -91,7 +109,7 @@ CLI 使用 `ContextCompressor`，默认配置：
 - `maxMessages`：60
 - `keepRecent`：15
 
-使用 `/compress` 手动触发压缩。
+压缩会作为已组装 Agent runtime 的一部分运行。
 
 ## 模型配置
 
@@ -106,5 +124,9 @@ CLI 使用 `ContextCompressor`，默认配置：
 | `providers[].models[].id` | 是 | `/model` 和 `defaultModel` 使用的选择器 ID |
 | `providers[].models[].name` | 是 | 发送给引擎的真实模型名 |
 | `defaultModel` | 否 | 模型 ID，如 `sonnet`；有歧义时使用 `provider/id` |
+| `defaultAgent` | 否 | `build` 或 `plan`，默认 `build` |
+| `permission` | 否 | 产品级 allow/ask/deny 权限策略 |
+| `shell` | 否 | 跨平台 Shell 设置 |
+| `tui` | 否 | TUI 展示偏好 |
 | `generation.temperature` | 否 | 默认 `0.7` |
 | `generation.thinking` | 否 | `none`、`low`、`medium`、`high` 或 `max` |
