@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { useInputHistory } from "../hooks/useInputHistory.js";
 
 interface InputBoxProps {
   onSubmit: (text: string) => void;
@@ -28,10 +29,14 @@ export function InputBox({
 }: InputBoxProps) {
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
+  const inputHistory = useInputHistory();
 
-  const updateValue = (nextValue: string, nextCursor: number) => {
+  const updateValue = (nextValue: string, nextCursor: number, resetHistory = true) => {
     setValue(nextValue);
     setCursor(nextCursor);
+    if (resetHistory) {
+      inputHistory.resetNavigation(nextValue);
+    }
     onChange?.(nextValue);
   };
 
@@ -48,8 +53,11 @@ export function InputBox({
         return;
       }
       const trimmed = value.trim();
-      if (trimmed) onSubmit(trimmed);
-      updateValue("", 0);
+      if (trimmed) {
+        inputHistory.remember(trimmed);
+        onSubmit(trimmed);
+      }
+      updateValue("", 0, false);
     } else if (key.leftArrow) {
       setCursor((prev) => Math.max(0, prev - 1));
     } else if (key.rightArrow) {
@@ -59,10 +67,20 @@ export function InputBox({
         onSuggestionPrev?.();
         return;
       }
+      const previousInput = inputHistory.previous(value);
+      if (previousInput !== null) {
+        updateValue(previousInput, previousInput.length, false);
+        return;
+      }
       setCursor(0);
     } else if (key.downArrow) {
       if (hasSuggestions) {
         onSuggestionNext?.();
+        return;
+      }
+      const nextInput = inputHistory.next();
+      if (nextInput !== null) {
+        updateValue(nextInput, nextInput.length, false);
         return;
       }
       setCursor(value.length);
