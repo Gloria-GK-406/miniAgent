@@ -56,6 +56,16 @@ export interface CLIActivityEntry {
   summary: string;
 }
 
+export type CLICommandHelpSource = "builtin" | "custom";
+
+export interface CLICommandHelpItem {
+  name: string;
+  aliases: string[];
+  description: string;
+  usage: string;
+  source: CLICommandHelpSource;
+}
+
 export interface CLIState {
   baseDir: string;
   config: CLIConfig;
@@ -63,6 +73,7 @@ export interface CLIState {
   modelName: string;
   modelPaths: string[];
   commandSuggestions: string[];
+  commandHelp: CLICommandHelpItem[];
   referencePaths: string[];
   inputHistory: string[];
   sessionId: string;

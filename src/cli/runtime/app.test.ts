@@ -52,6 +52,12 @@ describe("createCLIRuntime", () => {
     await runtime.submitInput("/help");
 
     expect(runtime.getState().panel).toEqual({ type: "help" });
+    expect(runtime.getState().commandHelp).toContainEqual(expect.objectContaining({
+      name: "export",
+      usage: "/export [json|markdown] [path]",
+      source: "builtin",
+    }));
+    expect(runtime.getState().commandHelp.some((command) => command.name === "panel-close")).toBe(false);
     expect(runtime.getState().referencePaths).toEqual([
       "README.md",
       "src/index.ts",
@@ -582,6 +588,12 @@ describe("createCLIRuntime", () => {
 
     const runtime = await createCLIRuntime(baseDir);
     expect(runtime.getState().commandSuggestions).toContain("/shortcut");
+    expect(runtime.getState().commandHelp).toContainEqual(expect.objectContaining({
+      name: "shortcut",
+      description: "Open help",
+      usage: "/shortcut [args]",
+      source: "custom",
+    }));
 
     await runtime.submitInput("/shortcut");
 

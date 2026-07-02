@@ -3,7 +3,12 @@ import { Box, Text, useInput, useStdout } from "ink";
 import type { Message } from "../../core/types.js";
 import { useRuntime } from "../hooks/useRuntime.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
-import type { CLIAppRuntime, CLIApprovalDecision, CLIViewPanel } from "../runtime/types.js";
+import type {
+  CLIAppRuntime,
+  CLIApprovalDecision,
+  CLICommandHelpItem,
+  CLIViewPanel,
+} from "../runtime/types.js";
 import { buildRenderableLines } from "./MessageList.js";
 import type { RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
@@ -153,16 +158,38 @@ function panelTitle(panel: Extract<CLIViewPanel, { type: "history" | "context" }
   return panel.type === "history" ? "History" : "Context";
 }
 
+function commandHelpLabel(command: CLICommandHelpItem): string {
+  const aliases = command.aliases.length > 0
+    ? ` (${command.aliases.map((alias) => `/${alias}`).join(", ")})`
+    : "";
+  const source = command.source === "custom" ? " [custom]" : "";
+  return `/${command.name}${aliases}${source}`;
+}
+
 function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
   const state = runtime.getState();
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Help</Text>
-      <Text>/help /history /context /tools /models /sessions /activity</Text>
-      <Text>/permissions /system /agent build|plan /auto /details</Text>
-      <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+      {state.commandHelp.length === 0 ? (
+        <>
+          <Text>/help /history /context /tools /models /sessions /activity</Text>
+          <Text>/permissions /system /agent build|plan /auto /details</Text>
+          <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+        </>
+      ) : (
+        state.commandHelp.map((command) => (
+          <Box key={`${command.source}:${command.name}`} flexDirection="column">
+            <Text>
+              <Text color="cyan">{commandHelpLabel(command)}</Text>
+              <Text> - {command.description}</Text>
+            </Text>
+            <Text dimColor>  {command.usage}</Text>
+          </Box>
+        ))
+      )}
       <Text dimColor>Tab build/plan · Ctrl+C stop/exit · PgUp/PgDn scroll</Text>
-      <Text dimColor>{state.commandSuggestions.join(" ")}</Text>
+      {state.commandHelp.length === 0 && <Text dimColor>{state.commandSuggestions.join(" ")}</Text>}
       <Text dimColor>{state.mode} mode</Text>
     </StaticPanelFrame>
   );

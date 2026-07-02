@@ -24,6 +24,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     modelName: "test/model",
     modelPaths: ["test/model"],
     commandSuggestions: [],
+    commandHelp: [],
     referencePaths: [],
     inputHistory: [],
     sessionId: "s1",
@@ -267,6 +268,36 @@ describe("App", () => {
     );
 
     expect(output).toContain("/shortcut");
+  });
+
+  it("renders command usage and descriptions in the help panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        commandHelp: [
+          {
+            name: "export",
+            aliases: [],
+            description: "Export current session",
+            usage: "/export [json|markdown] [path]",
+            source: "builtin",
+          },
+          {
+            name: "review",
+            aliases: ["rv"],
+            description: "Review staged changes",
+            usage: "/review [args]",
+            source: "custom",
+          },
+        ],
+        panel: { type: "help" },
+      })}
+      />,
+    );
+
+    expect(output).toContain("/export [json|markdown] [path]");
+    expect(output).toContain("Export current session");
+    expect(output).toContain("/review (/rv) [custom]");
+    expect(output).toContain("Review staged changes");
   });
 
   it("renders mode switch keybinding in the help panel", () => {

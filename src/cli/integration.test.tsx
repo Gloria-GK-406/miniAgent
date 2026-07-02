@@ -19,6 +19,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     modelName: "test/model",
     modelPaths: ["test/model"],
     commandSuggestions: [],
+    commandHelp: [],
     referencePaths: [],
     inputHistory: [],
     sessionId: "s1",

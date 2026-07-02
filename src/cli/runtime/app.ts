@@ -49,6 +49,8 @@ import type {
   CLIApprovalDecision,
   CLICommand,
   CLICommandContext,
+  CLICommandHelpItem,
+  CLICommandHelpSource,
   CLIEvent,
   CLIInputOverrides,
   CLIRuntimeSubscriber,
@@ -71,6 +73,21 @@ function getCommandSuggestions(commands: CLICommand[]): string[] {
       `/${command.name}`,
       ...(command.aliases ?? []).map((alias) => `/${alias}`),
     ]);
+}
+
+function getCommandHelpItems(
+  commands: CLICommand[],
+  source: CLICommandHelpSource,
+): CLICommandHelpItem[] {
+  return commands
+    .filter((command) => command.hidden !== true)
+    .map((command) => ({
+      name: command.name,
+      aliases: command.aliases ?? [],
+      description: command.description,
+      usage: command.usage,
+      source,
+    }));
 }
 
 interface RedoEntry {
@@ -191,6 +208,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     modelName: formatCurrentModel(built.agent),
     modelPaths: getResolvedModelPaths(built.agent),
     commandSuggestions: [],
+    commandHelp: [],
     referencePaths: await referenceService.listReferenceCandidates(),
     inputHistory: await inputHistoryService.list(),
     sessionId: session.id,
@@ -215,22 +233,31 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   const registry = createCommandRegistry();
   registerBuiltinCommands(registry);
-  const registeredCommandNames = new Set(registry.list().flatMap((command) => [
+  const builtinCommands = registry.list();
+  const registeredCommandNames = new Set(builtinCommands.flatMap((command) => [
     command.name,
     ...(command.aliases ?? []),
   ]));
+  const customCommands: CLICommand[] = [];
   for (const command of await loadCustomCommands(baseDir)) {
     if (registeredCommandNames.has(command.name)) {
       emit({ type: "notice", level: "warn", message: `Custom command /${command.name} conflicts with a built-in command` });
       continue;
     }
     registry.register(command);
+    customCommands.push(command);
     registeredCommandNames.add(command.name);
     for (const alias of command.aliases ?? []) {
       registeredCommandNames.add(alias);
     }
   }
-  updateState({ commandSuggestions: getCommandSuggestions(registry.list()) });
+  updateState({
+    commandSuggestions: getCommandSuggestions(registry.list()),
+    commandHelp: [
+      ...getCommandHelpItems(builtinCommands, "builtin"),
+      ...getCommandHelpItems(customCommands, "custom"),
+    ],
+  });
   const routerPermissionService = createModeAwarePermissionService({
     base: permissionService,
     getMode: () => state.mode,

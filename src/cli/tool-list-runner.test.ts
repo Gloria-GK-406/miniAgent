@@ -37,6 +37,7 @@ function state(overrides: Partial<CLIState> = {}): CLIState {
     modelName: "openai/fast",
     modelPaths: ["openai/fast"],
     commandSuggestions: [],
+    commandHelp: [],
     referencePaths: [],
     inputHistory: [],
     sessionId: "s1",
