@@ -76,6 +76,11 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/git l")).toEqual(["log"]);
   });
 
+  it("matches /diff flags", () => {
+    expect(matchSuggestions("/diff")).toEqual(["--staged"]);
+    expect(matchSuggestions("/diff --")).toEqual(["--staged"]);
+  });
+
   it("matches /export formats", () => {
     expect(matchSuggestions("/export")).toEqual(["json", "markdown"]);
     expect(matchSuggestions("/export m")).toEqual(["markdown"]);
@@ -304,6 +309,11 @@ describe("useSuggestion", () => {
 
   it("adds a trailing space for system command completion", () => {
     expect(applySuggestion("/sy", "/system")).toBe("/system ");
+  });
+
+  it("applies selected diff flag completion", () => {
+    expect(applySuggestion("/diff", "--staged")).toBe("/diff --staged ");
+    expect(applySuggestion("/diff --", "--staged")).toBe("/diff --staged ");
   });
 
   it("applies selected agent mode completion", () => {
