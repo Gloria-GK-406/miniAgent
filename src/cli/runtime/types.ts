@@ -15,7 +15,7 @@ import type { CLISubagentSummary } from "./subagent-service.js";
 
 export type CLIViewPanel =
   | { type: "none" }
-  | { type: "help" }
+  | { type: "help"; query?: string }
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
   | { type: "models" }

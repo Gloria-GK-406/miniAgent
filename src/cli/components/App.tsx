@@ -166,19 +166,38 @@ function commandHelpLabel(command: CLICommandHelpItem): string {
   return `/${command.name}${aliases}${source}`;
 }
 
+function commandMatchesHelpQuery(command: CLICommandHelpItem, query: string): boolean {
+  const normalized = query.toLowerCase();
+  return [
+    command.name,
+    ...command.aliases,
+    command.description,
+    command.usage,
+  ].some((value) => value.toLowerCase().includes(normalized));
+}
+
 function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
   const state = runtime.getState();
+  const panel = state.panel.type === "help" ? state.panel : { type: "help" as const };
+  const query = panel.query?.trim();
+  const visibleCommandHelp = query === undefined || query.length === 0
+    ? state.commandHelp
+    : state.commandHelp.filter((command) => commandMatchesHelpQuery(command, query));
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>
-      <Text bold color="cyan">Help</Text>
+      <Text bold color="cyan">
+        {query === undefined || query.length === 0 ? "Help" : `Help matching "${query}"`}
+      </Text>
       {state.commandHelp.length === 0 ? (
         <>
           <Text>/help /history /context /tools /models /sessions /activity</Text>
           <Text>/permissions /system /agent build|plan /auto /details</Text>
           <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
+      ) : visibleCommandHelp.length === 0 ? (
+        <Text dimColor>{`No commands match "${query}"`}</Text>
       ) : (
-        state.commandHelp.map((command) => (
+        visibleCommandHelp.map((command) => (
           <Box key={`${command.source}:${command.name}`} flexDirection="column">
             <Text>
               <Text color="cyan">{commandHelpLabel(command)}</Text>

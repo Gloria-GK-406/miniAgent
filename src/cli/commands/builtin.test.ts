@@ -94,6 +94,16 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.getState().panel).toEqual({ type: "help" });
   });
 
+  it("opens filtered help when /help receives a query", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/help diff");
+
+    expect(commandCtx.getState().panel).toEqual({ type: "help", query: "diff" });
+  });
+
   it("requests quit through the runtime without exiting directly", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);

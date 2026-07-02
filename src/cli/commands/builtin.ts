@@ -86,9 +86,14 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     name: "help",
     aliases: ["h"],
     description: "Show help",
-    usage: "/help",
-    execute: async (ctx) => {
-      ctx.updateState({ panel: { type: "help" } });
+    usage: "/help [query]",
+    execute: async (ctx, args) => {
+      const query = args.trim();
+      ctx.updateState({
+        panel: query.length === 0
+          ? { type: "help" }
+          : { type: "help", query },
+      });
     },
   });
   registry.register({

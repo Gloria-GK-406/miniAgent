@@ -300,6 +300,57 @@ describe("App", () => {
     expect(output).toContain("Review staged changes");
   });
 
+  it("filters command help by the active help query", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        commandHelp: [
+          {
+            name: "diff",
+            aliases: [],
+            description: "Show git diff",
+            usage: "/diff [--staged] [path]",
+            source: "builtin",
+          },
+          {
+            name: "review",
+            aliases: ["rv"],
+            description: "Review staged changes",
+            usage: "/review [args]",
+            source: "custom",
+          },
+        ],
+        panel: { type: "help", query: "staged" },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Help matching "staged"');
+    expect(output).toContain("/diff [--staged] [path]");
+    expect(output).toContain("/review (/rv) [custom]");
+  });
+
+  it("renders an empty command help state for unmatched queries", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        commandHelp: [
+          {
+            name: "diff",
+            aliases: [],
+            description: "Show git diff",
+            usage: "/diff [--staged] [path]",
+            source: "builtin",
+          },
+        ],
+        panel: { type: "help", query: "deploy" },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Help matching "deploy"');
+    expect(output).toContain('No commands match "deploy"');
+    expect(output).not.toContain("/diff [--staged] [path]");
+  });
+
   it("renders mode switch keybinding in the help panel", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({ panel: { type: "help" } })} />,
