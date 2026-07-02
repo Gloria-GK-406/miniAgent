@@ -51,6 +51,16 @@ export type CLIEntryAction =
     newSession?: string;
     output?: CLIEntryOutput;
   }
+  | {
+    type: "overview";
+    agent?: CLIEntryAgentMode;
+    autoApprove?: boolean;
+    cwd?: string;
+    model?: string;
+    sessionId?: string;
+    newSession?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "list-sessions"; cwd?: string; output?: CLIEntryOutput }
   | {
     type: "export-session";
@@ -202,6 +212,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let doctorMode = false;
   let diagnosticsMode = false;
   let statusMode = false;
+  let overviewMode = false;
   let listSessionsMode = false;
   let listModelsMode = false;
   let listCommandsMode = false;
@@ -273,6 +284,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--status") {
       statusMode = true;
+      continue;
+    }
+    if (arg === "--overview") {
+      overviewMode = true;
       continue;
     }
     if (arg === "--config-paths") {
@@ -646,11 +661,14 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (doctorMode && printMode) {
     return parseError("Cannot use --doctor with --print");
   }
-  if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
+  if (diagnosticsMode && (printMode || doctorMode || overviewMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
-  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || listSnapshotsMode || snapshotAction !== undefined || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || overviewMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || listSnapshotsMode || snapshotAction !== undefined || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --status with another headless mode");
+  }
+  if (overviewMode && (printMode || doctorMode || diagnosticsMode || statusMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || listSnapshotsMode || snapshotAction !== undefined || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+    return parseError("Cannot combine --overview with another headless mode");
   }
   if (
     completionShell !== undefined
@@ -659,6 +677,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || doctorMode
       || diagnosticsMode
       || statusMode
+      || overviewMode
       || configPathsMode
       || showConfigMode
       || initMode
@@ -694,6 +713,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || doctorMode
       || diagnosticsMode
       || statusMode
+      || overviewMode
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
@@ -726,6 +746,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || doctorMode
       || diagnosticsMode
       || statusMode
+      || overviewMode
       || configPathsMode
       || listSessionsMode
       || listModelsMode
@@ -759,6 +780,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || doctorMode
       || diagnosticsMode
       || statusMode
+      || overviewMode
       || configPathsMode
       || showConfigMode
       || initInstructionsMode
@@ -789,6 +811,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || doctorMode
       || diagnosticsMode
       || statusMode
+      || overviewMode
       || configPathsMode
       || showConfigMode
       || initMode
@@ -1036,6 +1059,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     return {
       type: "status",
+      ...(agent !== undefined && { agent }),
+      ...(autoApprove && { autoApprove: true }),
+      ...(cwd !== undefined && { cwd }),
+      ...(model !== undefined && { model }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(newSession !== undefined && { newSession }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (overviewMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --overview");
+    }
+    return {
+      type: "overview",
       ...(agent !== undefined && { agent }),
       ...(autoApprove && { autoApprove: true }),
       ...(cwd !== undefined && { cwd }),
@@ -1293,7 +1331,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --overview, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1326,6 +1364,7 @@ export function formatCLIHelp(): string {
     "  -s, --session   Resume a session by id",
     "  --new-session   Create and start in a named session",
     "  --status        Print runtime status headlessly",
+    "  --overview      Print workspace overview headlessly",
     "  --list-sessions List sessions headlessly",
     "  --list-models   List configured models headlessly",
     "  --list-commands List slash commands headlessly",

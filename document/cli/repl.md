@@ -93,6 +93,7 @@ also accept `--json`.
 | `--list-commands` | Yes | List built-in and project custom slash commands |
 | `--list-tools` | Yes | List runtime tools for the selected agent |
 | `--list-agents` | Yes | List primary mode and configured subagents |
+| `--overview` | Yes | Print workspace, session, git, todo, and activity summary |
 | `--preview-context` | Yes | Preview the assembled runtime context for the selected session and agent |
 | `--show-history` | Yes | Show current session messages |
 | `--list-references` | Yes | List files available to `@file` reference autocomplete |
@@ -129,6 +130,7 @@ miniagent --list-models --json
 miniagent --list-commands --json
 miniagent --list-tools --agent plan --json
 miniagent --list-agents --json
+miniagent --overview --json
 miniagent --preview-context --json
 miniagent --show-history --json
 miniagent --list-references --json

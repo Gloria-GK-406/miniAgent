@@ -9,6 +9,7 @@ type RuntimeBackedCLIEntryActionType =
   | "print"
   | "doctor"
   | "status"
+  | "overview"
   | "list-tools"
   | "list-agents"
   | "preview-context"

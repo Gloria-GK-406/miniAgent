@@ -18,6 +18,7 @@ import { runGitHeadless } from "./git-headless-runner.js";
 import { runHistory } from "./history-runner.js";
 import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
+import { runOverview } from "./overview-runner.js";
 import { runPermissionShow } from "./permission-show-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
 import { readPackageVersion } from "./package-info.js";
@@ -248,6 +249,21 @@ async function main(): Promise<void> {
       createRuntime: createCLIRuntime,
       streams,
       run: async (runtime) => await runRuntimeStatus(
+        runtime,
+        streams,
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      ),
+    });
+    return;
+  }
+  if (action.type === "overview") {
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runOverview(
         runtime,
         streams,
         {

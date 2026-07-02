@@ -6,6 +6,7 @@ describe("formatCompletionScript", () => {
     const longFlags = [
       "--list-models",
       "--status",
+      "--overview",
       "--config-paths",
       "--show-config",
       "--init",
@@ -40,6 +41,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--list-commands");
     expect(script).toContain("--list-tools");
     expect(script).toContain("--list-agents");
+    expect(script).toContain("--overview");
     expect(script).toContain("--preview-context");
     expect(script).toContain("--show-history");
     expect(script).toContain("--list-references");

@@ -14,6 +14,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--session", short: "-s", description: "Resume a session by id" },
   { long: "--new-session", description: "Create and start in a named session" },
   { long: "--status", description: "Print runtime status headlessly" },
+  { long: "--overview", description: "Print workspace overview headlessly" },
   { long: "--list-sessions", description: "List sessions headlessly" },
   { long: "--list-models", description: "List configured models headlessly" },
   { long: "--list-commands", description: "List slash commands headlessly" },
