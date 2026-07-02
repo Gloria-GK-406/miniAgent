@@ -1,5 +1,5 @@
 import type { ToolCallMessage, ToolResultMessage, MessageContent } from "../../core/types.js";
-import type { CLIActivityEntry } from "./types.js";
+import type { CLIActivityEntry, CLIApprovalAnswer, CLIApprovalDecision } from "./types.js";
 
 export function classifyActivityKind(toolName: string): CLIActivityEntry["kind"] {
   return toolName.toLowerCase().includes("subagent") ? "subagent" : "tool";
@@ -70,19 +70,36 @@ export function createApprovalActivityEntry(
   };
 }
 
+function normalizeApprovalDecision(decision: CLIApprovalAnswer): CLIApprovalDecision {
+  if (decision === true) return "allow";
+  if (decision === false) return "deny";
+  return decision;
+}
+
+function approvalDecisionStatus(decision: CLIApprovalDecision): CLIActivityEntry["status"] {
+  return decision === "allow" || decision === "allow-session" ? "done" : "error";
+}
+
+function approvalDecisionSummary(decision: CLIApprovalDecision, toolName: string): string {
+  if (decision === "allow-session") return `approved ${toolName} for session`;
+  if (decision === "deny-session") return `rejected ${toolName} for session`;
+  return `${decision === "allow" ? "approved" : "rejected"} ${toolName}`;
+}
+
 export function completeApprovalActivityEntry(
   entries: CLIActivityEntry[],
   id: string,
-  approved: boolean,
+  answer: CLIApprovalAnswer,
   endedAt: string,
 ): CLIActivityEntry[] {
+  const decision = normalizeApprovalDecision(answer);
   return entries.map((entry) => {
     if (entry.id !== id) return entry;
     return {
       ...entry,
-      status: approved ? "done" : "error",
+      status: approvalDecisionStatus(decision),
       endedAt,
-      summary: `${approved ? "approved" : "rejected"} ${entry.name}`,
+      summary: approvalDecisionSummary(decision, entry.name),
     };
   });
 }

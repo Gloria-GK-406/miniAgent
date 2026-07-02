@@ -37,9 +37,10 @@ describe("ApprovalPrompt", () => {
     expect(output).toContain("Approval required");
     expect(output).toContain("[y]es");
     expect(output).toContain("[n]o");
+    expect(output).toContain("[a]lways");
+    expect(output).toContain("[d]eny session");
     expect(output).toContain("Enter");
     expect(output).toContain("Esc");
-    expect(output).not.toContain("[a]lways");
   });
 
   it("truncates long args", () => {

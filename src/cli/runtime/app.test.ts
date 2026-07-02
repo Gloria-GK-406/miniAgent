@@ -277,6 +277,44 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("remembers session approval decisions for the same shell shortcut", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-session-approval-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "ask",
+        shell: "ask",
+      },
+      shell: {
+        windows: "powershell",
+        executable: process.execPath,
+        args: ["-e"],
+        timeoutMs: 120000,
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    const pending = runtime.submitInput("!console.log('session-ok')");
+    const approvalId = runtime.getState().approval?.id;
+    expect(approvalId).toEqual(expect.any(String));
+
+    runtime.answerApproval(approvalId!, "allow-session");
+    await pending;
+
+    expect(runtime.getState().activity).toContainEqual(expect.objectContaining({
+      id: approvalId,
+      kind: "approval",
+      name: "shell",
+      status: "done",
+      summary: "approved shell for session",
+    }));
+
+    await runtime.submitInput("!console.log('session-ok')");
+
+    expect(runtime.getState().approval).toBeNull();
+    expect(runtime.getState().messages).toHaveLength(6);
+    await runtime.destroy();
+  });
+
   it("requires approval for shell shortcuts in plan mode despite global allow", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-plan-shell-shortcut-"));
     await writeConfig(baseDir, {

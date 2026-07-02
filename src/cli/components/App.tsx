@@ -3,7 +3,7 @@ import { Box, Text, useInput, useStdout } from "ink";
 import type { Message } from "../../core/types.js";
 import { useRuntime } from "../hooks/useRuntime.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
-import type { CLIAppRuntime, CLIViewPanel } from "../runtime/types.js";
+import type { CLIAppRuntime, CLIApprovalDecision, CLIViewPanel } from "../runtime/types.js";
 import { buildRenderableLines } from "./MessageList.js";
 import type { RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
@@ -474,7 +474,7 @@ export function App({ runtime }: AppProps) {
     void runtime.runCommand("agent", nextAgentMode(state.mode));
   }, [runtime, state.mode]);
 
-  const handleApprovalDecision = useCallback((decision: boolean) => {
+  const handleApprovalDecision = useCallback((decision: CLIApprovalDecision) => {
     const approvalId = state.approval?.id;
     if (approvalId === undefined) {
       return;

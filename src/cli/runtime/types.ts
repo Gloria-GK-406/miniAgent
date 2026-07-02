@@ -38,6 +38,14 @@ export interface CLIApprovalRequest {
   decision: "pending";
 }
 
+export type CLIApprovalDecision =
+  | "allow"
+  | "deny"
+  | "allow-session"
+  | "deny-session";
+
+export type CLIApprovalAnswer = CLIApprovalDecision | boolean;
+
 export interface CLIActivityEntry {
   id: string;
   kind: "tool" | "subagent" | "approval";
@@ -124,7 +132,7 @@ export interface CLIAppRuntime {
   unsetPermissionRule(target: string): Promise<void>;
   setSystemPrompt(prompt: string): Promise<void>;
   unsetSystemPrompt(): Promise<void>;
-  answerApproval(id: string, decision: boolean): void;
+  answerApproval(id: string, decision: CLIApprovalAnswer): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;
   destroy(): Promise<void>;

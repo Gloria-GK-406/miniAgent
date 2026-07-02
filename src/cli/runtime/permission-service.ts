@@ -6,6 +6,13 @@ export interface PermissionService {
   updateConfig(config: CLIPermissionConfig): void;
 }
 
+export type SessionPermissionDecision = Extract<CLIPermissionDecision, "allow" | "deny">;
+
+export interface SessionPermissionService extends PermissionService {
+  rememberSessionDecision(request: CLIPermissionRequest, decision: SessionPermissionDecision): void;
+  clearSessionDecisions(): void;
+}
+
 export interface ModeAwarePermissionServiceOptions {
   base: PermissionService;
   getMode: () => CLIAgentMode;
@@ -29,6 +36,23 @@ function isDecision(value: unknown): value is CLIPermissionDecision {
 function getCommandText(args: Record<string, unknown>): string {
   const value = args["command"];
   return typeof value === "string" ? value : "";
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerialize(item)).join(",")}]`;
+  }
+  return `{${Object.entries(value)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`)
+    .join(",")}}`;
+}
+
+function sessionDecisionKey(request: CLIPermissionRequest): string {
+  return `${request.toolName}\0${stableSerialize(request.args)}`;
 }
 
 export function matchCommandPattern(pattern: string, command: string): boolean {
@@ -89,6 +113,32 @@ export function createPermissionService(config: CLIPermissionConfig): Permission
     },
     updateConfig: (nextConfig) => {
       permissionConfig = nextConfig;
+    },
+  };
+}
+
+export function createSessionPermissionService(base: PermissionService): SessionPermissionService {
+  const sessionDecisions = new Map<string, SessionPermissionDecision>();
+
+  return {
+    resolve: (request, autoApprove): CLIPermissionResult => {
+      const decision = sessionDecisions.get(sessionDecisionKey(request));
+      if (decision !== undefined) {
+        return {
+          decision,
+          reason: `session rule ${request.toolName}`,
+        };
+      }
+      return base.resolve(request, autoApprove);
+    },
+    updateConfig: (config) => {
+      base.updateConfig(config);
+    },
+    rememberSessionDecision: (request, decision) => {
+      sessionDecisions.set(sessionDecisionKey(request), decision);
+    },
+    clearSessionDecisions: () => {
+      sessionDecisions.clear();
     },
   };
 }

@@ -3,6 +3,7 @@ import { CLIConfigSchema, type CLIPermissionConfig } from "../config.js";
 import {
   createModeAwarePermissionService,
   createPermissionService,
+  createSessionPermissionService,
   matchCommandPattern,
 } from "./permission-service.js";
 
@@ -92,6 +93,60 @@ describe("PermissionService", () => {
     expect(service.resolve({ toolName: "write", args: {} }, true)).toEqual({
       decision: "deny",
       reason: "tool rule write",
+    });
+  });
+
+  it("applies session decisions to exact matching requests before config rules", () => {
+    const service = createSessionPermissionService(
+      createPermissionService({ "*": "ask", shell: "ask" }),
+    );
+    const request = { toolName: "shell", args: { command: "npm test" } };
+
+    service.rememberSessionDecision(request, "allow");
+
+    expect(service.resolve(request, false)).toEqual({
+      decision: "allow",
+      reason: "session rule shell",
+    });
+    expect(service.resolve({
+      toolName: "shell",
+      args: { command: "npm run lint" },
+    }, false)).toEqual({
+      decision: "ask",
+      reason: "tool rule shell",
+    });
+  });
+
+  it("matches session decisions with stable argument key order", () => {
+    const service = createSessionPermissionService(
+      createPermissionService({ "*": "ask" }),
+    );
+
+    service.rememberSessionDecision({
+      toolName: "write",
+      args: { path: "a.txt", content: "hello" },
+    }, "allow");
+
+    expect(service.resolve({
+      toolName: "write",
+      args: { content: "hello", path: "a.txt" },
+    }, false)).toEqual({
+      decision: "allow",
+      reason: "session rule write",
+    });
+  });
+
+  it("lets session denials override auto approval", () => {
+    const service = createSessionPermissionService(
+      createPermissionService({ "*": "ask" }),
+    );
+    const request = { toolName: "write", args: { path: "a.txt" } };
+
+    service.rememberSessionDecision(request, "deny");
+
+    expect(service.resolve(request, true)).toEqual({
+      decision: "deny",
+      reason: "session rule write",
     });
   });
 

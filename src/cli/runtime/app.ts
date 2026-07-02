@@ -29,7 +29,11 @@ import { createExportService } from "./export-service.js";
 import { createGitService } from "./git-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createInputHistoryService } from "./input-history-service.js";
-import { createModeAwarePermissionService, createPermissionService } from "./permission-service.js";
+import {
+  createModeAwarePermissionService,
+  createPermissionService,
+  createSessionPermissionService,
+} from "./permission-service.js";
 import { createPermissionConfigService } from "./permission-config-service.js";
 import { createProjectInstructionsService } from "./project-instructions-service.js";
 import { createReferenceService } from "./reference-service.js";
@@ -41,6 +45,8 @@ import { createSubagentService } from "./subagent-service.js";
 import { createSystemPromptConfigService } from "./system-prompt-config-service.js";
 import type {
   CLIAppRuntime,
+  CLIApprovalAnswer,
+  CLIApprovalDecision,
   CLICommand,
   CLICommandContext,
   CLIEvent,
@@ -73,6 +79,30 @@ interface RedoEntry {
   messages: Message[];
 }
 
+interface ApprovalResolver {
+  toolName: string;
+  args: Record<string, unknown>;
+  resolve: (approved: boolean) => void;
+}
+
+function normalizeApprovalAnswer(answer: CLIApprovalAnswer): CLIApprovalDecision {
+  if (answer === true) return "allow";
+  if (answer === false) return "deny";
+  return answer;
+}
+
+function approvalAnswerAllows(answer: CLIApprovalAnswer): boolean {
+  const decision = normalizeApprovalAnswer(answer);
+  return decision === "allow" || decision === "allow-session";
+}
+
+function sessionPermissionDecision(answer: CLIApprovalAnswer): "allow" | "deny" | null {
+  const decision = normalizeApprovalAnswer(answer);
+  if (decision === "allow-session") return "allow";
+  if (decision === "deny-session") return "deny";
+  return null;
+}
+
 export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> {
   let config = await loadConfig(baseDir);
   const sessionService = await createCLISessionService(baseDir);
@@ -87,9 +117,11 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const inputHistoryService = createInputHistoryService(baseDir);
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
-  const approvalResolvers = new Map<string, (decision: boolean) => void>();
+  const approvalResolvers = new Map<string, ApprovalResolver>();
   const redoStack: RedoEntry[] = [];
-  const permissionService = createPermissionService(config.permission);
+  const permissionService = createSessionPermissionService(
+    createPermissionService(config.permission),
+  );
   const shellService = createShellService(config.shell);
   const diagnosticsService = createDiagnosticsService({
     baseDir,
@@ -117,7 +149,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   function requestApproval(toolName: string, args: Record<string, unknown>): Promise<boolean> {
     return new Promise((resolve) => {
       const id = crypto.randomUUID();
-      approvalResolvers.set(id, resolve);
+      approvalResolvers.set(id, { toolName, args, resolve });
       updateState({
         approval: { id, toolName, args, decision: "pending" },
         activity: [
@@ -669,7 +701,17 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       await updateSystemPrompt(() => systemPromptConfigService.unsetSystemPrompt());
     },
     answerApproval: (id, decision) => {
-      approvalResolvers.get(id)?.(decision);
+      const pending = approvalResolvers.get(id);
+      const sessionDecision = sessionPermissionDecision(decision);
+      if (pending !== undefined) {
+        if (sessionDecision !== null) {
+          permissionService.rememberSessionDecision({
+            toolName: pending.toolName,
+            args: pending.args,
+          }, sessionDecision);
+        }
+        pending.resolve(approvalAnswerAllows(decision));
+      }
       approvalResolvers.delete(id);
       updateState({
         approval: null,
@@ -688,8 +730,8 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       await rebuildCurrentAgent();
     },
     destroy: async () => {
-      for (const resolve of approvalResolvers.values()) {
-        resolve(false);
+      for (const pending of approvalResolvers.values()) {
+        pending.resolve(false);
       }
       approvalResolvers.clear();
       await built.agent.destroy();
