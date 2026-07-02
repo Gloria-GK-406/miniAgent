@@ -3,9 +3,10 @@ import { z } from "zod";
 import { OpenAIEngine } from "../../../src/engine/openai/index.js";
 import { MessageType } from "../../../src/core/types.js";
 import type { Message, Tool } from "../../../src/core/types.js";
-import type { ModelConfig } from "../../../src/core/config.js";
+import { ThinkingLevel, type ModelProviderConfig } from "../../../src/core/config.js";
 import {
   getProviderConfig,
+  getProviderModel,
   isProviderConfigured,
   invokeEngine,
   isAssistResponse,
@@ -14,19 +15,22 @@ import {
 import { getTestImageBase64 } from "../image.js";
 
 const PROVIDER = "OPENAI" as const;
+const engine = new OpenAIEngine();
 
 describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI Engine", () => {
-  let config: ModelConfig;
+  let providerConfig: ModelProviderConfig;
+  let providerModel: string;
 
   beforeAll(() => {
-    config = getProviderConfig(PROVIDER, "openai");
+    providerConfig = getProviderConfig(PROVIDER, "openai");
+    providerModel = getProviderModel(PROVIDER);
   });
 
   it("text: sends a text message and receives a response", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "Reply with exactly: pong" },
     ];
-    const result = await invokeEngine(OpenAIEngine, config, messages, []);
+    const result = await invokeEngine(engine, providerConfig, providerModel, messages, []);
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
       expect(result.message.content).toBeTruthy();
@@ -51,7 +55,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI Engine", () => {
         content: "Describe this image in one short sentence.",
       },
     ];
-    const result = await invokeEngine(OpenAIEngine, config, messages, []);
+    const result = await invokeEngine(engine, providerConfig, providerModel, messages, []);
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
       expect(result.message.content).toBeTruthy();
@@ -70,7 +74,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is the weather in Beijing?" },
     ];
-    const result = await invokeEngine(OpenAIEngine, config, messages, [tool]);
+    const result = await invokeEngine(engine, providerConfig, providerModel, messages, [tool]);
     expect(isToolCallResponse(result)).toBe(true);
     if (isToolCallResponse(result)) {
       expect(result.message).toHaveLength(1);
@@ -83,20 +87,22 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("OpenAI Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 2+2? Reply with just the number." },
     ];
-    const thinkConfig = { ...config, thinking: true };
-    const result = await invokeEngine(OpenAIEngine, thinkConfig, messages, []);
+    const result = await invokeEngine(engine, providerConfig, providerModel, messages, [], {
+      generation: { thinking: ThinkingLevel.Medium },
+    });
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
       expect(result.message.content).toBeTruthy();
     }
   });
 
-  it("thinking: sends request with thinking disabled (default)", async () => {
+  it("thinking: sends request with thinking disabled", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 3+3? Reply with just the number." },
     ];
-    const noThinkConfig = { ...config, thinking: false };
-    const result = await invokeEngine(OpenAIEngine, noThinkConfig, messages, []);
+    const result = await invokeEngine(engine, providerConfig, providerModel, messages, [], {
+      generation: { thinking: ThinkingLevel.None },
+    });
     expect(isAssistResponse(result)).toBe(true);
     if (isAssistResponse(result)) {
       expect(result.message.content).toBeTruthy();

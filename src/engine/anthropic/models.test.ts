@@ -6,12 +6,15 @@ describe("Anthropic model presets", () => {
   it("includes conservative Claude chat models", () => {
     expect(ANTHROPIC_MODEL_PRESETS.length).toBeGreaterThan(0);
     expect(
-      ANTHROPIC_MODEL_PRESETS.some((model) => model.model.includes("claude")),
+      ANTHROPIC_MODEL_PRESETS.some((model) => model.name.includes("claude")),
     ).toBe(true);
     expect(
       ANTHROPIC_MODEL_PRESETS.every((model) =>
         model.thinkingLevels.includes(ThinkingLevel.None),
       ),
+    ).toBe(true);
+    expect(
+      ANTHROPIC_MODEL_PRESETS.every((model) => model.id === model.name),
     ).toBe(true);
   });
 });

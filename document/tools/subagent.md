@@ -78,7 +78,7 @@ Frontmatter fields:
 | `id` | Yes | Unique subagent identifier |
 | `name` | No | Display name (defaults to `id`) |
 | `description` | No | Short description shown in tool listing |
-| `model` | No | Model to use in `provider/model` format |
+| `model` | No | Model to use as `id` or `provider/id` |
 | `capabilities` | No | `AgentCapabilityRule` for filtering available tools |
 
 ### run_subagent Tool

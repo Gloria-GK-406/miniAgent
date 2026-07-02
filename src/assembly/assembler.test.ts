@@ -4,54 +4,46 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import { AgentAssembler, AgentBlueprintRegistry } from "./assembler.js";
-import { MessageType } from "../core/types.js";
-import type { AgentConfig } from "../core/config.js";
-import type { LLMRequest, LLMResponse, LLMStreamHandle, Message } from "../core/types.js";
+import { LLMStreamChunkType, MessageType, type LLMRequest, type Message, type MessageChunk } from "../core/types.js";
+import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest, type ResolvedModel } from "../core/config.js";
 import { isCapabilityEnabled } from "./capability.js";
 import type { AgentCapabilitySelector } from "./capability.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {
-        model: {
+        providers: [{
             provider: "test",
-            model: "test-model",
-            apiKey: "test-key",
-        },
-        models: new Map(),
+            key: "test-key",
+            models: [{ id: "test-model", name: "test-model" }],
+        }],
         plugins: new Map(),
         paths: { sessiondir: basepersistdir },
     };
 }
 
-function createResolvedHandle<T>(value: T): LLMStreamHandle<T> {
+function resolvedModel(): ResolvedModel {
     return {
-        onChunk: () => () => void 0,
-        then<TResult1 = T, TResult2 = never>(
-            onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
-            onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-        ): PromiseLike<TResult1 | TResult2> {
-            return Promise.resolve(value).then(onfulfilled, onrejected);
-        },
+        id: "test-model",
+        provider: "test",
+        name: "test-model",
+        thinkingLevels: [ThinkingLevel.None],
+    };
+}
+
+function textChunk(text: string): MessageChunk {
+    return {
+        type: LLMStreamChunkType.TextDelta,
+        text,
     };
 }
 
 function createLLM(): LLMRequest {
-    const response: LLMResponse = {
-        message: {
-            id: "assist-1",
-            type: MessageType.Assist,
-            content: "done",
-        },
-        tokenCount: {
-            input: 0,
-            output: 0,
-            total: 0,
-        },
-    };
-
     return {
-        streamInvoke(_messages: Message[]): LLMStreamHandle<LLMResponse> {
-            return createResolvedHandle(response);
+        getEngineModels(engineName: string): ResolvedModel[] {
+            return engineName === "test" ? [resolvedModel()] : [];
+        },
+        async *streamInvoke(_request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
+            yield textChunk("done");
         },
     };
 }

@@ -2,17 +2,20 @@ import { ThinkingLevel, type ModelPreset } from "../../core/config.js";
 
 export const OPENAI_MODEL_PRESETS: ModelPreset[] = [
   {
-    model: "gpt-4o",
+    id: "gpt-4o",
+    name: "gpt-4o",
     displayName: "GPT-4o",
     thinkingLevels: [ThinkingLevel.None],
   },
   {
-    model: "gpt-4.1",
+    id: "gpt-4.1",
+    name: "gpt-4.1",
     displayName: "GPT-4.1",
     thinkingLevels: [ThinkingLevel.None],
   },
   {
-    model: "o3",
+    id: "o3",
+    name: "o3",
     displayName: "o3",
     thinkingLevels: [
       ThinkingLevel.None,
@@ -22,7 +25,8 @@ export const OPENAI_MODEL_PRESETS: ModelPreset[] = [
     ],
   },
   {
-    model: "o4-mini",
+    id: "o4-mini",
+    name: "o4-mini",
     displayName: "o4 Mini",
     thinkingLevels: [
       ThinkingLevel.None,

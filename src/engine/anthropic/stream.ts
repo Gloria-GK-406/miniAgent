@@ -11,6 +11,7 @@ interface AnthropicToolUseBuffer {
   name: string;
   input: unknown;
   inputJson: string;
+  startEmitted: boolean;
 }
 
 export interface ConsumeAnthropicStreamOptions {
@@ -26,6 +27,68 @@ function toToolArguments(toolUse: AnthropicToolUseBuffer): Record<string, unknow
     return toolUse.input as Record<string, unknown>;
   }
   return {};
+}
+
+export async function* streamAnthropicChunks(
+  stream: AsyncIterable<RawMessageStreamEvent>,
+): AsyncGenerator<LLMStreamChunk> {
+  const toolUses = new Map<number, AnthropicToolUseBuffer>();
+
+  for await (const event of stream) {
+    if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
+      const toolUse = event.content_block as ToolUseBlock;
+      toolUses.set(event.index, {
+        id: toolUse.id,
+        name: toolUse.name,
+        input: toolUse.input,
+        inputJson: "",
+        startEmitted: true,
+      });
+      yield {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: event.index,
+        argsText: "",
+        toolCallId: toolUse.id,
+        toolName: toolUse.name,
+      };
+      continue;
+    }
+
+    if (event.type !== "content_block_delta") {
+      continue;
+    }
+
+    if (event.delta.type === "text_delta") {
+      yield {
+        type: LLMStreamChunkType.TextDelta,
+        text: event.delta.text,
+      };
+      continue;
+    }
+
+    if (event.delta.type === "thinking_delta") {
+      yield {
+        type: LLMStreamChunkType.ReasoningDelta,
+        text: event.delta.thinking,
+      };
+      continue;
+    }
+
+    if (event.delta.type === "input_json_delta") {
+      const toolUse = toolUses.get(event.index);
+      if (!toolUse) {
+        throw new Error(`Anthropic input_json_delta received before tool_use start at index ${event.index}`);
+      }
+      toolUse.inputJson += event.delta.partial_json;
+      yield {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: event.index,
+        argsText: event.delta.partial_json,
+        toolCallId: toolUse.id,
+        toolName: toolUse.name,
+      };
+    }
+  }
 }
 
 export async function consumeAnthropicStream(
@@ -69,6 +132,7 @@ export async function consumeAnthropicStream(
         name: toolUse.name,
         input: toolUse.input,
         inputJson: "",
+        startEmitted: true,
       });
       continue;
     }

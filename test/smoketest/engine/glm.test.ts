@@ -3,9 +3,10 @@ import { z } from "zod";
 import { GLMEngine } from "../../../src/engine/glm/index.js";
 import { MessageType } from "../../../src/core/types.js";
 import type { Message, Tool } from "../../../src/core/types.js";
-import type { ModelConfig } from "../../../src/core/config.js";
+import { ThinkingLevel, type ModelProviderConfig } from "../../../src/core/config.js";
 import {
   getProviderConfig,
+  getProviderModel,
   isProviderConfigured,
   invokeEngineForSmoke,
   isAssistResponse,
@@ -14,19 +15,22 @@ import {
 import { getTestImageBase64 } from "../image.js";
 
 const PROVIDER = "GLM" as const;
+const engine = new GLMEngine();
 
 describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
-  let config: ModelConfig;
+  let providerConfig: ModelProviderConfig;
+  let providerModel: string;
 
   beforeAll(() => {
-    config = getProviderConfig(PROVIDER, "glm");
+    providerConfig = getProviderConfig(PROVIDER, "glm");
+    providerModel = getProviderModel(PROVIDER);
   });
 
   it("text: sends a text message and receives a response", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "Reply with exactly: pong" },
     ];
-    const result = await invokeEngineForSmoke(GLMEngine, config, messages, []);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, []);
     if (result === null) {
       return;
     }
@@ -54,7 +58,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
         content: "Describe this image in one short sentence.",
       },
     ];
-    const result = await invokeEngineForSmoke(GLMEngine, config, messages, []);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, []);
     if (result === null) {
       return;
     }
@@ -76,7 +80,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is the weather in Beijing?" },
     ];
-    const result = await invokeEngineForSmoke(GLMEngine, config, messages, [tool]);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, [tool]);
     if (result === null) {
       return;
     }
@@ -92,8 +96,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 2+2? Reply with just the number." },
     ];
-    const thinkConfig = { ...config, thinking: true };
-    const result = await invokeEngineForSmoke(GLMEngine, thinkConfig, messages, []);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, [], {
+      generation: { thinking: ThinkingLevel.Medium },
+    });
     if (result === null) {
       return;
     }
@@ -103,12 +108,13 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("GLM Engine", () => {
     }
   }, 20000);
 
-  it("thinking: sends request with thinking disabled (default)", async () => {
+  it("thinking: sends request with thinking disabled", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 3+3? Reply with just the number." },
     ];
-    const noThinkConfig = { ...config, thinking: false };
-    const result = await invokeEngineForSmoke(GLMEngine, noThinkConfig, messages, []);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, [], {
+      generation: { thinking: ThinkingLevel.None },
+    });
     if (result === null) {
       return;
     }

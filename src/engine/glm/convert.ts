@@ -4,7 +4,6 @@ import type {
   AssistMessage,
   ToolCallMessage,
   ToolResultMessage,
-  Tool,
   ImageContent,
   LLMMessageResponse,
   LLMResponse,
@@ -12,7 +11,6 @@ import type {
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-  type ModelConfig,
 } from "../../core/config.js";
 import type {
   ChatCompletionMessageParam,
@@ -124,31 +122,6 @@ function convertToolResultMessage(
   } as GLMMessageParam;
 }
 
-export function buildCreateParams(
-  messages: Message[],
-  config: ModelConfig,
-  tools: Tool[],
-) {
-  return {
-    model: config.model,
-    messages: convertMessages(messages),
-    tools: convertTools(tools),
-    ...(config.thinking !== undefined && {
-      thinking: {
-        type: config.thinking ? ("enabled" as const) : ("disabled" as const),
-      },
-    }),
-    ...(config.maxTokens !== undefined && { max_tokens: config.maxTokens }),
-    ...(config.maxOutputTokens !== undefined && {
-      max_completion_tokens: config.maxOutputTokens,
-    }),
-    ...(config.temperature !== undefined && {
-      temperature: config.temperature,
-    }),
-    ...(config.topP !== undefined && { top_p: config.topP }),
-  };
-}
-
 type GLMReasoningEffort = "low" | "medium" | "high" | "max";
 
 const ORDERED_THINKING_LEVELS = [
@@ -176,20 +149,10 @@ function selectSupportedThinkingLevel(
   }
 
   const requestedIndex = ORDERED_THINKING_LEVELS.indexOf(requested);
-  let nearest = supportedNonNone[0]!;
-  let nearestDistance = Math.abs(
-    ORDERED_THINKING_LEVELS.indexOf(nearest) - requestedIndex,
+  const lowerOrEqual = supportedNonNone.filter(
+    (level) => ORDERED_THINKING_LEVELS.indexOf(level) <= requestedIndex,
   );
-  for (const level of supportedNonNone.slice(1)) {
-    const distance = Math.abs(
-      ORDERED_THINKING_LEVELS.indexOf(level) - requestedIndex,
-    );
-    if (distance < nearestDistance) {
-      nearest = level;
-      nearestDistance = distance;
-    }
-  }
-  return nearest;
+  return lowerOrEqual.at(-1);
 }
 
 function supportsReasoningEffort(model: string): boolean {
@@ -204,9 +167,9 @@ function supportsReasoningEffort(model: string): boolean {
 
 function mapGLMReasoningEffort(
   level: ThinkingLevel,
-  engine: string,
+  provider: string,
 ): GLMReasoningEffort {
-  if (engine === "glm-codeplan") {
+  if (provider === "glm-codeplan") {
     return level === ThinkingLevel.Max ? "max" : "high";
   }
   switch (level) {
@@ -231,32 +194,32 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
   const supportsThinking = request.model.thinkingLevels.some(
     (level) => level !== ThinkingLevel.None,
   );
-  const config: ModelConfig = {
-    provider: request.model.engine,
-    model: request.model.model,
-    apiKey: request.provider.apiKey,
-    ...(request.provider.baseUrl !== undefined && {
-      baseUrl: request.provider.baseUrl,
-    }),
-    ...(supportsThinking && {
-      thinking: effectiveThinking !== undefined
-        && effectiveThinking !== ThinkingLevel.None,
-    }),
-    ...(request.generation.maxOutputTokens !== undefined && {
-      maxOutputTokens: request.generation.maxOutputTokens,
-    }),
-    temperature: request.generation.temperature,
-    ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
-  };
 
   return {
-    ...buildCreateParams(request.messages, config, request.tools),
+    model: request.model.name,
+    messages: convertMessages(request.messages),
+    tools: convertTools(request.tools),
+    ...(supportsThinking
+      && effectiveThinking !== undefined && {
+        thinking: {
+          type: effectiveThinking === ThinkingLevel.None
+            ? ("disabled" as const)
+            : ("enabled" as const),
+        },
+      }),
+    ...(request.generation.maxOutputTokens !== undefined && {
+      max_completion_tokens: request.generation.maxOutputTokens,
+    }),
+    temperature: request.generation.temperature,
+    ...(request.generation.topP !== undefined && {
+      top_p: request.generation.topP,
+    }),
     ...(effectiveThinking !== undefined
       && effectiveThinking !== ThinkingLevel.None
-      && supportsReasoningEffort(request.model.model) && {
+      && supportsReasoningEffort(request.model.name) && {
         reasoning_effort: mapGLMReasoningEffort(
           effectiveThinking,
-          request.model.engine,
+          request.model.provider,
         ),
       }),
   };

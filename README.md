@@ -15,36 +15,37 @@ import {
   MiniAgent,
   LLMEngineManager,
   MessageType,
-  ThinkingLevel,
 } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
+import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
 import { z } from "zod";
 
 // 1. Set up the LLM engine
-const engines = new LLMEngineManager();
-engines.register(new AnthropicEngine());
+const llm = new LLMEngineManager();
+llm.register(new OpenAIEngine());
 
 // 2. Create the agent
-const agent = new MiniAgent(engines, {
-  providers: [
-    {
-      name: "anthropic-main",
-      engine: "anthropic",
-      apiKey: process.env.ANTHROPIC_API_KEY!,
+const agent = new MiniAgent({
+  llm,
+  config: {
+    providers: [
+      {
+        provider: "openai",
+        key: process.env.OPENAI_API_KEY!,
+        models: [{ id: "fast", name: "gpt-4o-mini" }],
+      },
+    ],
+    defaultModel: { id: "fast", provider: "openai" },
+    generation: {
+      temperature: 0.7,
+      thinking: "medium",
     },
-  ],
-  defaultModel: { id: "anthropic-main/claude-sonnet-4-5" },
-  generation: {
-    temperature: 0.7,
-    thinking: ThinkingLevel.Medium,
+    plugins: new Map(),
+    paths: { sessiondir: "./sessions" },
   },
-  models: new Map(),
-  plugins: new Map(),
-  paths: { sessiondir: "./sessions" },
 });
 
 console.log(agent.getModels().map((model) => model.id));
-agent.setGenerationConfig({ temperature: 0.2, thinking: ThinkingLevel.None });
+agent.setGenerationConfig({ temperature: 0.2, thinking: "none" });
 
 // 3. Print streaming output
 agent.on("llm:chunk", ({ chunk }) => {
@@ -202,12 +203,11 @@ const processor = {
 
 MiniAgent separates LLM interaction into two layers:
 
-In provider mode, `MiniAgent` sends a resolved provider, resolved model, tools, messages, and `GenerationConfig` to a registered engine instance. The legacy `ModelConfig` call path still exists for migration.
+In provider mode, `MiniAgent` sends messages, tools, a resolved provider, a resolved model, and `GenerationConfig` to a registered engine instance.
 
-- **`LLMRequest`** — The interface the agent calls. It supports request-mode generation and the legacy `streamInvoke(messages, modelConfig, tools)` form.
-- **`ModelCatalogLLMEngine`** — The request-mode engine interface. Engines expose `name`, `getModels()`, and `streamGenerate(request)`.
-- **`LLMEngine`** — The legacy engine interface with constructor-bound `ModelConfig`.
-- **`LLMEngineManager`** — The default `LLMRequest` implementation. It registers engine instances for model catalogs and still supports constructor-based legacy registration during migration.
+- **`LLMRequest`** — The interface the agent calls: `streamInvoke(request)`.
+- **`LLMEngine`** — The engine interface. Engines expose `name`, `getModels()`, and `streamGenerate(request)`.
+- **`LLMEngineManager`** — The default `LLMRequest` implementation. It registers engine instances and routes resolved model requests.
 
 ```
   MiniAgent ──calls──► LLMRequest (interface)
@@ -237,17 +237,15 @@ engines.register(new GLMEngine());
 engines.register(new GLMCodePlanEngine());
 ```
 
-Provider-mode engines expose a model catalog and receive a per-request provider/model/generation object:
+Provider-mode engines expose a model catalog and receive a per-request provider, resolved model, and generation object:
 
 ```typescript
-interface ModelCatalogLLMEngine {
+interface LLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
-  streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
+  streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 ```
-
-The older `engines.register("anthropic", AnthropicEngine)` constructor form remains available for legacy `ModelConfig` callers.
 
 ## Blueprint and Assembly
 
@@ -356,33 +354,22 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 {
   "providers": [
     {
-      "name": "anthropic-main",
       "engine": "anthropic",
-      "apiKey": "sk-ant-..."
+      "key": "sk-ant-...",
+      "models": [{ "id": "sonnet", "name": "claude-sonnet-4-5" }]
     },
     {
-      "name": "local-qwen",
       "engine": "openai-compatible",
-      "apiKey": "local",
-      "baseUrl": "http://localhost:8000/v1",
-      "models": {
-        "add": [
-          {
-            "model": "qwen3-coder",
-            "contextSize": 128000,
-            "maxOutputTokens": 32768,
-            "thinkingLevels": ["none", "medium"]
-          }
-        ]
-      }
+      "key": "local",
+      "baseURL": "http://localhost:11434/v1",
+      "models": [{ "id": "local", "name": "qwen2.5-coder" }]
     }
   ],
-  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "defaultModel": "sonnet",
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
-  },
-  "systemPrompt": "You are a helpful assistant."
+  }
 }
 ```
 
@@ -390,8 +377,8 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 | Command | Description |
 |---------|-------------|
-| `/models` | List resolved provider/model ids |
-| `/model <provider/model>` | Switch active model by resolved id |
+| `/models` | List resolved model ids |
+| `/model <id\|provider/id>` | Switch active model by resolved id |
 | `/tools` | List registered tools |
 | `/history [page]` | View conversation history |
 | `/context` | Preview context sent to LLM |
@@ -440,13 +427,11 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 | `getToolList()` | Get all currently available tools. |
 | `previewContext()` | Preview the context that will be sent to the LLM. |
 | `setDiscardBefore(id)` | Set a watermark to discard messages before the given ID. |
-| `getModels()` / `getResolvedModels()` | Get resolved provider/model catalog entries. |
+| `getModels()` / `getResolvedModels()` | Get resolved provider-qualified model catalog entries. |
 | `getCurrentResolvedModel()` | Get the active resolved model. |
 | `setResolvedModel(selector)` | Switch active model by `{ id }` or `{ provider, model }`. |
 | `getGenerationConfig()` | Get generation preferences such as temperature and thinking level. |
 | `setGenerationConfig(update)` | Update generation preferences without changing the active model. |
-| `setModel(config)` | Legacy: switch using a full `ModelConfig`. |
-| `setModelByPath(path)` | Legacy: switch model by `provider/model` path string. |
 | `setAutoApprovedTools(names)` | Set tools that bypass HITL approval. |
 | `getConfig()` | Get the current agent configuration. |
 | `getContextCount()` | Get cumulative token usage statistics. |

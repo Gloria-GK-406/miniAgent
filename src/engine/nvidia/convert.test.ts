@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest";
 import { MessageType } from "../../core/types.js";
 import {
   convertMessages,
-  buildCreateParams,
+  buildCreateParamsFromRequest,
   convertResponse,
 } from "../openai-compatible/convert.js";
 import type { Message, Tool } from "../../core/types.js";
-import type { ModelConfig } from "../../core/config.js";
+import {
+  ThinkingLevel,
+  type LLMGenerateRequest,
+} from "../../core/config.js";
 import { z } from "zod";
 
 function sysMsg(content: string): Message {
@@ -50,12 +53,47 @@ function toolResultMsg(
   };
 }
 
-const baseConfig: ModelConfig = {
-  provider: "nvidia",
-  model: "meta/llama-3.3-70b-instruct",
-  apiKey: "nvapi-test-key",
-  baseUrl: "",
-};
+function makeTool(): Tool {
+  return {
+    name: "get_weather",
+    description: "Get weather for a city",
+    parameters: z.object({ city: z.string().describe("City name") }),
+    execute: async () => "sunny",
+  };
+}
+
+function request(
+  overrides: Partial<{
+    thinking: ThinkingLevel;
+    thinkingLevels: ThinkingLevel[];
+    tools: Tool[];
+    maxOutputTokens: number;
+    topP: number;
+  }> = {},
+): LLMGenerateRequest {
+  return {
+    messages: [userMsg("hi")],
+    tools: overrides.tools ?? [],
+    provider: {
+      provider: "nvidia",
+      key: "nvapi-test-key",
+    },
+    model: {
+      id: "nvidia/meta-llama-3-3-70b-instruct",
+      provider: "nvidia",
+      name: "meta/llama-3.3-70b-instruct",
+      thinkingLevels: overrides.thinkingLevels ?? [ThinkingLevel.None],
+    },
+    generation: {
+      temperature: 0.7,
+      ...(overrides.topP !== undefined && { topP: overrides.topP }),
+      ...(overrides.maxOutputTokens !== undefined && {
+        maxOutputTokens: overrides.maxOutputTokens,
+      }),
+      thinking: overrides.thinking ?? ThinkingLevel.None,
+    },
+  };
+}
 
 describe("NVIDIA convertMessages", () => {
   it("converts system message", () => {
@@ -111,48 +149,26 @@ describe("NVIDIA convertMessages", () => {
   });
 });
 
-describe("NVIDIA buildCreateParams", () => {
-  it("builds basic params with model and messages", () => {
-    const params = buildCreateParams([userMsg("hi")], baseConfig, []);
+describe("NVIDIA buildCreateParamsFromRequest", () => {
+  it("builds request-mode params with generation fields", () => {
+    const params = buildCreateParamsFromRequest(request({
+      maxOutputTokens: 4096,
+      topP: 0.9,
+    }));
+
     expect(params).toMatchObject({
       model: "meta/llama-3.3-70b-instruct",
+      max_completion_tokens: 4096,
+      temperature: 0.7,
+      top_p: 0.9,
     });
     expect(params.messages).toHaveLength(1);
   });
 
-  it("includes max_tokens when configured", () => {
-    const config: ModelConfig = { ...baseConfig, maxTokens: 4096 };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params).toMatchObject({ max_tokens: 4096 });
-  });
-
-  it("includes temperature when configured", () => {
-    const config: ModelConfig = { ...baseConfig, temperature: 0.7 };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params).toMatchObject({ temperature: 0.7 });
-  });
-
-  it("includes topP when configured", () => {
-    const config: ModelConfig = { ...baseConfig, topP: 0.9 };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params).toMatchObject({ top_p: 0.9 });
-  });
-
-  it("omits optional params when not configured", () => {
-    const params = buildCreateParams([userMsg("hi")], baseConfig, []);
-    expect(params).not.toHaveProperty("max_tokens");
-    expect(params).not.toHaveProperty("temperature");
-    expect(params).not.toHaveProperty("top_p");
-  });
-
   it("converts tools correctly", () => {
-    const tool: Tool = {
-      name: "get_weather",
-      description: "Get weather for a city",
-      parameters: z.object({ city: z.string().describe("City name") }),
-      execute: async () => "sunny",
-    };
-    const params = buildCreateParams([userMsg("hi")], baseConfig, [tool]);
+    const params = buildCreateParamsFromRequest(request({
+      tools: [makeTool()],
+    }));
     expect(params.tools).toHaveLength(1);
     expect(params.tools![0]).toMatchObject({
       type: "function",
@@ -161,6 +177,16 @@ describe("NVIDIA buildCreateParams", () => {
         description: "Get weather for a city",
       },
     });
+  });
+
+  it("silently omits thinking params for NVIDIA", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
+    }));
+
+    expect(params).not.toHaveProperty("reasoning_effort");
+    expect(params).not.toHaveProperty("thinking");
   });
 });
 

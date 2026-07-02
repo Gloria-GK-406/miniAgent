@@ -1,33 +1,22 @@
 import type {
-  Message,
-  Tool,
   LLMRequest,
-  ModelAwareLLMRequest,
-  LLMResponse,
+  MessageChunk,
   TokenCount,
   LLMStreamChunk,
   LLMStreamHandle,
 } from "./types.js";
 import type {
   LLMGenerateRequest,
-  ModelConfig,
   ModelPreset,
+  ResolvedModel,
 } from "./config.js";
-import { LRUCache } from "lru-cache";
+import { ThinkingLevel } from "./config.js";
 
 export interface LLMEngine {
-  streamGenerate(messages: Message[], tools: Tool[]): LLMStreamHandle<LLMResponse>;
-}
-
-export type LegacyLLMEngine = LLMEngine;
-
-export interface ModelCatalogLLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
-  streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
+  streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
-
-export type LLMEngineCtor = new (config: ModelConfig) => LegacyLLMEngine;
 
 class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
   private listeners = new Set<(chunk: LLMStreamChunk) => void>();
@@ -108,75 +97,71 @@ export function createLLMStreamHandle<T>(): LLMStreamController<T> {
   };
 }
 
-export class LLMEngineManager implements LLMRequest, ModelAwareLLMRequest {
-  private engines = new Map<string, ModelCatalogLLMEngine>();
-  private legacyCtors = new Map<string, LLMEngineCtor>();
-  private legacyCache = new LRUCache<ModelConfig, LegacyLLMEngine>({ max: 20 });
-
-  register(engine: ModelCatalogLLMEngine): void;
-  register(provider: string, ctor: LLMEngineCtor): void;
-  register(providerOrEngine: string | ModelCatalogLLMEngine, ctor?: LLMEngineCtor): void {
-    if (typeof providerOrEngine === "string") {
-      if (!ctor) {
-        throw new Error(`No LLM engine constructor provided for provider: ${providerOrEngine}`);
-      }
-      this.legacyCtors.set(providerOrEngine, ctor);
-      return;
-    }
-    this.engines.set(providerOrEngine.name, providerOrEngine);
+function assertLLMEngine(engine: unknown): asserts engine is LLMEngine {
+  if (typeof engine !== "object" || engine === null) {
+    throw new Error("Expected an LLM engine instance");
   }
 
-  get(config: ModelConfig): LegacyLLMEngine {
-    const cached = this.legacyCache.get(config);
-    if (cached) {
-      return cached;
+  const candidate = engine as {
+    name?: unknown;
+    getModels?: unknown;
+    streamGenerate?: unknown;
+  };
+
+  if (typeof candidate.name !== "string" || candidate.name.trim() === "") {
+    throw new Error("Expected an LLM engine instance with a non-empty name");
+  }
+  if (typeof candidate.getModels !== "function") {
+    throw new Error("Expected an LLM engine instance with getModels()");
+  }
+  if (typeof candidate.streamGenerate !== "function") {
+    throw new Error("Expected an LLM engine instance with streamGenerate()");
+  }
+}
+
+function resolveModel(engineName: string, model: ModelPreset): ResolvedModel {
+  return {
+    id: model.id,
+    provider: engineName,
+    name: model.name,
+    ...(model.displayName !== undefined && { displayName: model.displayName }),
+    ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
+    ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
+    thinkingLevels: [...(model.thinkingLevels ?? [ThinkingLevel.None])],
+    ...(model.capabilities !== undefined && { capabilities: structuredClone(model.capabilities) }),
+    ...(model.metadata !== undefined && { metadata: structuredClone(model.metadata) }),
+  };
+}
+
+export class LLMEngineManager implements LLMRequest {
+  private engines = new Map<string, LLMEngine>();
+
+  register(engine: LLMEngine): void {
+    assertLLMEngine(engine);
+    if (this.engines.has(engine.name)) {
+      throw new Error(`LLM engine already registered: ${engine.name}`);
     }
-    const Ctor = this.legacyCtors.get(config.provider);
-    if (!Ctor) {
-      throw new Error(`No LLM engine registered for provider: ${config.provider}`);
-    }
-    const engine = new Ctor(config);
-    this.legacyCache.set(config, engine);
-    return engine;
+    this.engines.set(engine.name, engine);
   }
 
-  getEngineModels(engineName: string): ModelPreset[] {
+  getEngineModels(engineName: string): ResolvedModel[] {
     const engine = this.engines.get(engineName);
     if (!engine) {
       return [];
     }
-    return engine.getModels().map((model) => ({
-      ...model,
-      thinkingLevels: [...model.thinkingLevels],
-    }));
+    return engine.getModels().map((model) => resolveModel(engine.name, model));
   }
 
-  streamInvoke(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
-  streamInvoke(
-    messages: Message[],
-    config: ModelConfig,
-    tools: Tool[],
-  ): LLMStreamHandle<LLMResponse>;
-  streamInvoke(
-    requestOrMessages: LLMGenerateRequest | Message[],
-    config?: ModelConfig,
-    tools?: Tool[],
-  ): LLMStreamHandle<LLMResponse> {
-    if (Array.isArray(requestOrMessages)) {
-      if (!config || !tools) {
-        throw new Error("Legacy streamInvoke requires config and tools");
-      }
-      const engine = this.get(config);
-      return engine.streamGenerate(requestOrMessages, tools);
-    }
-
-    const engine = this.engines.get(requestOrMessages.model.engine);
+  streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
+    const engine = this.engines.get(request.model.provider);
     if (!engine) {
-      throw new Error(`No LLM engine registered for engine: ${requestOrMessages.model.engine}`);
+      throw new Error(`No LLM engine registered for provider: ${request.model.provider}`);
     }
-    return engine.streamGenerate(requestOrMessages);
+    return engine.streamGenerate(request);
   }
 }
+
+export class DefaultLLMEngineRegister extends LLMEngineManager {}
 
 export function emptyTokenCount(): TokenCount {
   return {

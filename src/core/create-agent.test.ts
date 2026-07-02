@@ -5,54 +5,48 @@ import { tmpdir } from "node:os";
 import { z } from "zod";
 import { createMiniAgent } from "./create-agent.js";
 import { defineAgentModule } from "./module.js";
-import { MessageType } from "./types.js";
-import type { AgentConfig } from "./config.js";
-import type { LLMMessageResponse, LLMRequest, LLMResponse, LLMStreamHandle, Message } from "./types.js";
+import { LLMStreamChunkType, MessageType, type LLMRequest, type Message, type MessageChunk } from "./types.js";
+import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest, type ResolvedModel } from "./config.js";
 import type { Store } from "../store/store.js";
 import type { MessageSource } from "../store/message-source.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {
-        model: {
+        providers: [{
             provider: "test",
-            model: "test-model",
-            apiKey: "test-key",
+            key: "test-key",
             baseUrl: "http://localhost",
-        },
-        models: new Map(),
+            models: [{ id: "test-model", name: "test-model" }],
+        }],
         plugins: new Map(),
         paths: { sessiondir: basepersistdir },
     };
 }
 
-function createResolvedHandle<T>(value: T): LLMStreamHandle<T> {
+function resolvedModel(): ResolvedModel {
     return {
-        onChunk: () => () => void 0,
-        then<TResult1 = T, TResult2 = never>(
-            onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
-            onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-        ): PromiseLike<TResult1 | TResult2> {
-            return Promise.resolve(value).then(onfulfilled, onrejected);
-        },
+        id: "test-model",
+        provider: "test",
+        name: "test-model",
+        thinkingLevels: [ThinkingLevel.None],
     };
 }
 
-function wrapResponse(message: LLMMessageResponse): LLMResponse {
+function textChunk(text: string): MessageChunk {
     return {
-        message,
-        tokenCount: {
-            input: 0,
-            output: 0,
-            total: 0,
-        },
+        type: LLMStreamChunkType.TextDelta,
+        text,
     };
 }
 
-function createLLM(response: LLMResponse, onInvoke?: (messages: Message[]) => void): LLMRequest {
+function createLLM(text = "done", onInvoke?: (messages: Message[]) => void): LLMRequest {
     return {
-        streamInvoke(messages: Message[]): LLMStreamHandle<LLMResponse> {
-            onInvoke?.(messages);
-            return createResolvedHandle(response);
+        getEngineModels(engineName: string): ResolvedModel[] {
+            return engineName === "test" ? [resolvedModel()] : [];
+        },
+        async *streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
+            onInvoke?.(request.messages);
+            yield textChunk(text);
         },
     };
 }
@@ -72,12 +66,8 @@ describe("createMiniAgent", () => {
         const installed = vi.fn();
         const seenContexts: Message[][] = [];
         const llm = createLLM(
-            wrapResponse({
-                id: "assist-1",
-                type: MessageType.Assist,
-                content: "done",
-            }),
-            (messages) => {
+            "done",
+            (messages: Message[]) => {
                 seenContexts.push(messages);
             },
         );
@@ -121,11 +111,7 @@ describe("createMiniAgent", () => {
     });
 
     it("supports multi-role modules through defineAgentModule", async () => {
-        const llm = createLLM(wrapResponse({
-            id: "assist-1",
-            type: MessageType.Assist,
-            content: "done",
-        }));
+        const llm = createLLM();
 
         const agent = createMiniAgent({
             llm,
@@ -177,11 +163,7 @@ describe("createMiniAgent", () => {
             getAll: async (): Promise<Message[]> => [...persisted],
         };
         const receivedStores: Store[] = [];
-        const llm = createLLM(wrapResponse({
-            id: "assist-1",
-            type: MessageType.Assist,
-            content: "done",
-        }));
+        const llm = createLLM();
 
         const agent = createMiniAgent({
             llm,
@@ -204,6 +186,10 @@ describe("createMiniAgent", () => {
         });
 
         expect(receivedStores).toEqual([customStore]);
-        expect((await agent.getMessages()).map((message) => message.id)).toEqual(["user-1", "assist-1"]);
+        expect((await agent.getMessages()).map((message) => message.type)).toEqual([
+            MessageType.User,
+            MessageType.Assist,
+        ]);
+        expect((await agent.getMessages()).map((message) => message.content)).toEqual(["hello", "done"]);
     });
 });

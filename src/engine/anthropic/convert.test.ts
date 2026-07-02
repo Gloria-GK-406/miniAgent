@@ -4,7 +4,6 @@ import { MessageType } from "../../core/types.js";
 import {
   convertMessages,
   convertTools,
-  buildCreateParams,
   buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
@@ -12,7 +11,6 @@ import type { Message, Tool, ImageContent } from "../../core/types.js";
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-  type ModelConfig,
 } from "../../core/config.js";
 
 function sysMsg(content: string): Message {
@@ -73,32 +71,28 @@ function toolResultMsg(
   };
 }
 
-const baseConfig: ModelConfig = {
-  provider: "anthropic",
-  model: "claude-sonnet-4-5-20250929",
-  apiKey: "test-key",
-  baseUrl: "",
-};
-
 function request(
   overrides: Partial<{
     thinking: ThinkingLevel;
     thinkingLevels: ThinkingLevel[];
+    messages: Message[];
+    tools: Tool[];
+    maxOutputTokens: number;
+    topP: number;
   }> = {},
 ): LLMGenerateRequest {
   return {
-    messages: [userMsg("hi")],
-    tools: [],
+    messages: overrides.messages ?? [userMsg("hi")],
+    tools: overrides.tools ?? [],
     provider: {
-      name: "anthropic-main",
-      engine: "anthropic",
-      apiKey: "test-key",
+      provider: "anthropic",
+      key: "test-key",
+      baseUrl: "https://example.invalid",
     },
     model: {
-      id: "anthropic-main/claude-sonnet-4-5",
-      provider: "anthropic-main",
-      engine: "anthropic",
-      model: "claude-sonnet-4-5",
+      id: "anthropic/claude-sonnet-4-5",
+      provider: "anthropic",
+      name: "claude-sonnet-4-5",
       thinkingLevels: overrides.thinkingLevels ?? [
         ThinkingLevel.None,
         ThinkingLevel.Low,
@@ -107,6 +101,10 @@ function request(
     },
     generation: {
       temperature: 0.7,
+      ...(overrides.topP !== undefined && { topP: overrides.topP }),
+      ...(overrides.maxOutputTokens !== undefined && {
+        maxOutputTokens: overrides.maxOutputTokens,
+      }),
       thinking: overrides.thinking ?? ThinkingLevel.Low,
     },
   };
@@ -260,49 +258,35 @@ describe("convertTools", () => {
   });
 });
 
-describe("buildCreateParams", () => {
-  it("builds params with defaults", () => {
-    const params = buildCreateParams([userMsg("hi")], baseConfig, []);
-    expect(params.model).toBe("claude-sonnet-4-5-20250929");
+describe("buildCreateParamsFromRequest", () => {
+  it("builds params from request with default max tokens", () => {
+    const params = buildCreateParamsFromRequest(request());
+    expect(params.model).toBe("claude-sonnet-4-5");
     expect(params.max_tokens).toBe(4096);
     expect(params.messages).toEqual([{ role: "user", content: "hi" }]);
   });
 
-  it("prefers maxTokens over maxOutputTokens", () => {
-    const config: ModelConfig = {
-      ...baseConfig,
-      maxTokens: 100,
+  it("uses request maxOutputTokens and optional generation fields", () => {
+    const params = buildCreateParamsFromRequest(request({
       maxOutputTokens: 200,
-    };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params.max_tokens).toBe(100);
-  });
-
-  it("uses maxOutputTokens when maxTokens is absent", () => {
-    const config: ModelConfig = { ...baseConfig, maxOutputTokens: 200 };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params.max_tokens).toBe(200);
-  });
-
-  it("sets system when SystemMessage present", () => {
-    const params = buildCreateParams(
-      [sysMsg("Be helpful"), userMsg("hi")],
-      baseConfig,
-      [],
-    );
-    expect(params.system).toBe("Be helpful");
-  });
-
-  it("includes tools and optional fields", () => {
-    const config: ModelConfig = {
-      ...baseConfig,
-      temperature: 0.5,
       topP: 0.8,
-    };
-    const params = buildCreateParams([userMsg("hi")], config, [makeTool()]);
-    expect(params.tools).toHaveLength(1);
-    expect(params.temperature).toBe(0.5);
+      thinking: ThinkingLevel.None,
+    }));
+
+    expect(params.max_tokens).toBe(200);
+    expect(params.temperature).toBe(0.7);
     expect(params.top_p).toBe(0.8);
+  });
+
+  it("sets system and tools from request", () => {
+    const params = buildCreateParamsFromRequest(request({
+      messages: [sysMsg("Be helpful"), userMsg("hi")],
+      tools: [makeTool()],
+      thinking: ThinkingLevel.None,
+    }));
+
+    expect(params.system).toBe("Be helpful");
+    expect(params.tools).toHaveLength(1);
   });
 
   it("uses supported partial thinking effort in request mode", () => {
@@ -317,7 +301,7 @@ describe("buildCreateParams", () => {
     expect(params).not.toHaveProperty("thinking");
   });
 
-  it("downgrades unsupported high effort to nearest supported effort", () => {
+  it("downgrades unsupported high effort to nearest supported lower effort", () => {
     const params = buildCreateParamsFromRequest(request({
       thinking: ThinkingLevel.High,
       thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Low, ThinkingLevel.Medium],
@@ -328,7 +312,17 @@ describe("buildCreateParams", () => {
     });
   });
 
-  it("downgrades unsupported max effort to nearest supported effort", () => {
+  it("omits thinking instead of upgrading low to medium", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Low,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    }));
+
+    expect(params).not.toHaveProperty("thinking");
+    expect(params).not.toHaveProperty("output_config");
+  });
+
+  it("downgrades unsupported max effort to nearest supported lower effort", () => {
     const params = buildCreateParamsFromRequest(request({
       thinking: ThinkingLevel.Max,
       thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],

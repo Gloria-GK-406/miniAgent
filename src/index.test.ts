@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import * as publicApi from "./index.js";
 import {
     GenerationConfigSchema,
     LLMGenerateRequestSchema,
-    ModelAwareLLMRequestSchema,
+    LLMRequestSchema,
+    LLMStreamChunkType,
     ModelPresetSchema,
     ModelProviderConfigSchema,
     ModelSelectorSchema,
@@ -14,7 +16,7 @@ import {
     type GenerationConfig,
     type GenerationConfigInput,
     type LLMGenerateRequest,
-    type ModelAwareLLMRequest,
+    type LLMRequest,
     type ModelPreset,
     type ModelProviderConfig,
     type ModelSelector,
@@ -25,27 +27,27 @@ import {
 describe("root exports", () => {
     it("exports model preset and generate request public API", () => {
         const preset: ModelPreset = ModelPresetSchema.parse({
-            model: "test-model",
+            id: "test-model",
+            name: "public-model-name",
             thinkingLevels: [ThinkingLevel.None],
         });
         const overrides: ProviderModelOverrides = ProviderModelOverridesSchema.parse({
             add: [preset],
         });
         const provider: ModelProviderConfig = ModelProviderConfigSchema.parse({
-            name: "test-provider",
-            engine: "test-engine",
-            apiKey: "key",
-            models: overrides,
+            provider: "test-provider",
+            key: "key",
+            models: [preset],
         });
         const resolvedModel: ResolvedModel = ResolvedModelSchema.parse({
-            id: "test-provider/test-model",
+            id: "test-model",
             provider: "test-provider",
-            engine: "test-engine",
-            model: "test-model",
+            name: "public-model-name",
             thinkingLevels: [ThinkingLevel.None],
         });
         const selector: ModelSelector = ModelSelectorSchema.parse({
-            id: "test-provider/test-model",
+            id: "test-model",
+            provider: "test-provider",
         });
         const generationInput: GenerationConfigInput = {
             thinking: ThinkingLevel.Medium,
@@ -58,17 +60,30 @@ describe("root exports", () => {
             model: resolvedModel,
             generation,
         });
-        const requestInvoker: ModelAwareLLMRequest = ModelAwareLLMRequestSchema.parse({
-            getEngineModels: () => [preset],
-            streamInvoke: () => {
-                throw new Error("not used");
+        const requestInvoker: LLMRequest = LLMRequestSchema.parse({
+            getEngineModels: () => [resolvedModel],
+            streamInvoke: async function* () {
+                yield { type: LLMStreamChunkType.TextDelta, text: "not used" };
             },
         });
 
         expect(ThinkingLevelSchema.parse("none")).toBe(ThinkingLevel.None);
         expect(GenerationConfigSchema.parse({}).temperature).toBe(0.7);
-        expect(selector).toEqual({ id: "test-provider/test-model" });
-        expect(request.model.model).toBe("test-model");
-        expect(requestInvoker.getEngineModels("test-engine")).toEqual([preset]);
+        expect(overrides.add).toEqual([preset]);
+        expect(selector).toEqual({ id: "test-model", provider: "test-provider" });
+        expect(request.model.name).toBe("public-model-name");
+        expect(requestInvoker.getEngineModels("test-provider")).toEqual([resolvedModel]);
+    });
+
+    it("does not export retired model config runtime schemas", () => {
+        const retiredExports = [
+            "Model" + "ConfigSchema",
+            "Model" + "GroupSchema",
+            "Model" + "AwareLLMRequestSchema",
+        ];
+
+        for (const name of retiredExports) {
+            expect(publicApi).not.toHaveProperty(name);
+        }
     });
 });

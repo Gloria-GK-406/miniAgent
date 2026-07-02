@@ -3,7 +3,7 @@ import type {
   ChatCompletionChunk,
 } from "openai/resources/chat/completions/completions.js";
 import { LLMStreamChunkType, MessageType } from "../../core/types.js";
-import { consumeOpenAIStream } from "./stream.js";
+import { consumeOpenAIStream, streamOpenAIChunks } from "./stream.js";
 
 async function* toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
@@ -28,6 +28,103 @@ function chunk(
     ],
   } as ChatCompletionChunk;
 }
+
+async function collectStreamChunks(
+  stream: AsyncGenerator<unknown>,
+): Promise<unknown[]> {
+  const chunks: unknown[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return chunks;
+}
+
+describe("streamOpenAIChunks", () => {
+  it("emits one empty tool-call delta when id/name arrive without arguments", async () => {
+    await expect(
+      collectStreamChunks(
+        streamOpenAIChunks(toAsyncIterable([
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_empty",
+                function: { name: "get_weather" },
+              },
+            ],
+          }),
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_empty",
+                function: { name: "_duplicate" },
+              },
+            ],
+          }),
+        ])),
+      ),
+    ).resolves.toEqual([
+      {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: 0,
+        argsText: "",
+        toolCallId: "call_empty",
+        toolName: "get_weather",
+      },
+    ]);
+  });
+
+  it("does not duplicate repeated tool-call metadata before arguments arrive", async () => {
+    await expect(
+      collectStreamChunks(
+        streamOpenAIChunks(toAsyncIterable([
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_1",
+                function: { name: "get_weather" },
+              },
+            ],
+          }),
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_1",
+                function: { name: "get_weather" },
+              },
+            ],
+          }),
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                function: { arguments: "{\"city\":\"Beijing\"}" },
+              },
+            ],
+          }),
+        ])),
+      ),
+    ).resolves.toEqual([
+      {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: 0,
+        argsText: "",
+        toolCallId: "call_1",
+        toolName: "get_weather",
+      },
+      {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: 0,
+        argsText: "{\"city\":\"Beijing\"}",
+        toolCallId: "call_1",
+        toolName: "get_weather",
+      },
+    ]);
+  });
+});
 
 describe("consumeOpenAIStream", () => {
   it("emits text chunks and returns a final AssistMessage", async () => {

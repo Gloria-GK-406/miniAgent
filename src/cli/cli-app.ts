@@ -2,43 +2,57 @@ import { join } from "node:path";
 
 import { AgentAssembler, AgentBlueprintRegistry } from "../assembly/assembler.js";
 import type { AgentBlueprint } from "../assembly/blueprint.js";
-import { defineAgentModule } from "../core/module.js";
+import { ContextCompressor } from "../context/compressor.js";
+import type { MiniAgent } from "../core/agent.js";
+import {
+    AgentConfigSchema,
+    type AgentConfig,
+    type GenerationConfig,
+    type JsonValue,
+    type ModelProviderConfig,
+    type NormalizedAgentConfig,
+    type PathConfig,
+    type ResolvedModel,
+} from "../core/config.js";
 import { LLMEngineManager } from "../core/llm.js";
-import type { ModelCatalogLLMEngine } from "../core/llm.js";
+import type { LLMEngine } from "../core/llm.js";
+import { defineAgentModule } from "../core/module.js";
 import { MessageType } from "../core/types.js";
 import type { Message } from "../core/types.js";
-import type { MiniAgent } from "../core/agent.js";
-import { ThinkingLevel, type AgentConfig, type GenerationConfigInput, type ModelConfig, type ModelGroup } from "../core/config.js";
-import type { JsonValue } from "../core/config.js";
+import {
+    AnthropicEngine,
+    GLMCodePlanEngine,
+    GLMEngine,
+    NVIDIAEngine,
+    OpenAICompatibleEngine,
+    OpenAIEngine,
+} from "../engine/index.js";
 import { SessionManager } from "../core/session.js";
 import type { SessionMeta } from "../core/session.js";
-import { ContextCompressor } from "../context/compressor.js";
 import {
-    AnthropicEngine, OpenAIEngine, OpenAICompatibleEngine,
-    GLMEngine, GLMCodePlanEngine, NVIDIAEngine,
-} from "../engine/index.js";
-import {
-    readTool, writeTool, editTool, globTool, grepTool, bashTool,
-    TodoManager, SubagentPlugin, AgentContextProvider,
-    McpPlugin, SkillPlugin,
+    AgentContextProvider,
+    McpPlugin,
+    SkillPlugin,
+    SubagentPlugin,
+    TodoManager,
+    bashTool,
+    editTool,
+    globTool,
+    grepTool,
+    readTool,
+    writeTool,
 } from "../tool/index.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../tool/subagent.js";
 import {
     CLIAGENT_DIR,
-    findModel,
-    findLegacyModel,
-    findProviderByEngineOrName,
     loadConfig,
     parseDefaultModel,
-    parseModelSelector,
-    resolveProvider,
     toAgentGenerationConfig,
     toAgentProviders,
-    toModelConfig,
 } from "./config.js";
-import type { CLIConfig, CLIModel } from "./config.js";
+import type { CLIConfig } from "./config.js";
 
-const ENGINE_FACTORIES: Record<string, () => ModelCatalogLLMEngine> = {
+const ENGINE_FACTORIES: Record<string, () => LLMEngine> = {
     anthropic: () => new AnthropicEngine(),
     openai: () => new OpenAIEngine(),
     "openai-compatible": () => new OpenAICompatibleEngine(),
@@ -68,7 +82,6 @@ const SHARED_BLUEPRINT: AgentBlueprint = {
 export interface CLIAppResult {
     agent: MiniAgent;
     config: CLIConfig;
-    activeModel: CLIModel | undefined;
     sessionManager: SessionManager;
     session: SessionMeta;
     baseDir: string;
@@ -80,54 +93,102 @@ export interface CLIAppResult {
     setHITL: (enabled: boolean) => void;
     setSystemPrompt: (prompt: string) => void;
     rebuildAgent: (sessionId: string) => Promise<MiniAgent>;
-    buildModelsMap: () => Map<string, ModelGroup>;
-    resolveModelConfig: (path: string) => ModelConfig;
+}
+
+interface ModelListAgent {
+    getModels(): ResolvedModel[];
+}
+
+interface ModelSwitchAgent extends ModelListAgent {
+    setResolvedModel(selector: { id: string; provider: string }): void;
+}
+
+export function formatResolvedModelPath(model: ResolvedModel): string {
+    return `${model.provider}/${model.id}`;
+}
+
+export function getResolvedModelPaths(agent: ModelListAgent): string[] {
+    return agent.getModels().map(formatResolvedModelPath);
+}
+
+function availableModelPaths(models: ResolvedModel[]): string {
+    return models.map(formatResolvedModelPath).join(", ") || "(none)";
+}
+
+function findResolvedModelForCLI(models: ResolvedModel[], selector: string): ResolvedModel {
+    const trimmed = selector.trim();
+    if (trimmed.length === 0) {
+        throw new Error("Model selector is empty.");
+    }
+
+    const sep = trimmed.indexOf("/");
+    if (sep !== -1) {
+        const provider = trimmed.slice(0, sep);
+        const id = trimmed.slice(sep + 1);
+        const found = models.find((model) => model.provider === provider && model.id === id);
+        if (found) {
+            return found;
+        }
+        throw new Error(`Model not found: ${trimmed}. Available models: ${availableModelPaths(models)}`);
+    }
+
+    const matches = models.filter((model) => model.id === trimmed);
+    if (matches.length === 1) {
+        return matches[0]!;
+    }
+    if (matches.length > 1) {
+        throw new Error(`Model selector is ambiguous: ${trimmed}. Available models: ${availableModelPaths(matches)}`);
+    }
+    throw new Error(`Model not found: ${trimmed}. Available models: ${availableModelPaths(models)}`);
+}
+
+export function selectResolvedModelForCLI(
+    agent: ModelSwitchAgent,
+    selector: string,
+): ResolvedModel {
+    const selected = findResolvedModelForCLI(agent.getModels(), selector);
+    agent.setResolvedModel({ id: selected.id, provider: selected.provider });
+    return selected;
+}
+
+export interface BuildSubagentAgentConfigOptions {
+    providers: ModelProviderConfig[];
+    currentModel: ResolvedModel | undefined;
+    generation: GenerationConfig;
+    plugins: Map<string, JsonValue>;
+    paths: PathConfig;
+}
+
+export function buildSubagentAgentConfig(
+    options: BuildSubagentAgentConfigOptions,
+): NormalizedAgentConfig {
+    return AgentConfigSchema.parse({
+        providers: options.providers,
+        ...(options.currentModel !== undefined && {
+            defaultModel: {
+                id: options.currentModel.id,
+                provider: options.currentModel.provider,
+            },
+        }),
+        generation: options.generation,
+        plugins: options.plugins,
+        paths: options.paths,
+    });
 }
 
 export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     const config = await loadConfig(baseDir);
-
     const persistDir = join(baseDir, CLIAGENT_DIR);
     const manager = new LLMEngineManager();
 
     let hitlEnabled = true;
     let userSystemPrompt = config.systemPrompt ?? "You are a helpful assistant.";
-
-    function buildModelsMap(): Map<string, ModelGroup> {
-        const map = new Map<string, ModelGroup>();
-        for (const m of config.models) {
-            const p = resolveProvider(config, m.provider);
-            const group = map.get(p.engine);
-            if (group) {
-                group.models.push(toModelConfig(m, p));
-            } else {
-                map.set(p.engine, { models: [toModelConfig(m, p)] });
-            }
-        }
-        return map;
-    }
-
-    function resolveModelConfig(path: string): ModelConfig {
-        const sep = path.indexOf("/");
-        if (sep === -1) {
-            throw new Error(`Invalid model path: "${path}". Expected format: provider/model`);
-        }
-        const providerOrEngine = path.slice(0, sep);
-        const model = path.slice(sep + 1);
-        const provider = findProviderByEngineOrName(config, providerOrEngine);
-        const engine = provider?.engine ?? providerOrEngine;
-        const group = buildModelsMap().get(engine);
-        if (!group) {
-            throw new Error(`No models found for provider: "${providerOrEngine}"`);
-        }
-        const found = group.models.find((entry) => entry.model === model);
-        if (!found) {
-            throw new Error(`Model "${model}" not found for provider: "${providerOrEngine}"`);
-        }
-        return found;
-    }
+    let currentParentAgent: MiniAgent | undefined;
 
     registerEngines(manager, config);
+
+    const sessionManager = new SessionManager(persistDir);
+    await sessionManager.load();
 
     const blueprintRegistry = createBlueprintRegistry(
         baseDir,
@@ -137,16 +198,10 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
             manager,
             config,
             baseDir,
-            buildModelsMap,
-            resolveModelConfig,
+            () => currentParentAgent,
         ),
     );
     const assembler = new AgentAssembler(blueprintRegistry);
-
-    const activeModel = findModel(config);
-
-    const sessionManager = new SessionManager(persistDir);
-    await sessionManager.load();
 
     const sessions = sessionManager.list();
     let session: SessionMeta;
@@ -165,7 +220,6 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
     const agent = await buildAgentInner(
         session.id,
         baseDir,
-        activeModel,
         config,
         manager,
         assembler,
@@ -173,11 +227,11 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
         userSystemPrompt,
         () => hitlEnabled,
     );
+    currentParentAgent = agent;
 
     return {
         agent,
         config,
-        activeModel,
         sessionManager,
         session,
         baseDir,
@@ -189,10 +243,9 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
         setHITL: (enabled: boolean) => { hitlEnabled = enabled; },
         setSystemPrompt: (prompt: string) => { userSystemPrompt = prompt; },
         rebuildAgent: async (sessionId: string) => {
-            return buildAgentInner(
+            const rebuilt = await buildAgentInner(
                 sessionId,
                 baseDir,
-                activeModel,
                 config,
                 manager,
                 assembler,
@@ -200,66 +253,27 @@ export async function createCLIApp(baseDir: string): Promise<CLIAppResult> {
                 userSystemPrompt,
                 () => hitlEnabled,
             );
+            currentParentAgent = rebuilt;
+            return rebuilt;
         },
-        buildModelsMap,
-        resolveModelConfig,
     };
 }
 
 function registerEngines(manager: LLMEngineManager, config: CLIConfig): void {
     const seen = new Set<string>();
     for (const p of config.providers) {
-        if (seen.has(p.engine)) continue;
+        if (seen.has(p.engine)) {
+            continue;
+        }
         const createEngine = ENGINE_FACTORIES[p.engine];
         if (!createEngine) {
             throw new Error(
-                `Unsupported engine "${p.engine}" for provider "${p.name}". `
-                + `Known engines: ${Object.keys(ENGINE_FACTORIES).join(", ")}`,
+                `Unsupported engine "${p.engine}". Known engines: ${Object.keys(ENGINE_FACTORIES).join(", ")}`,
             );
         }
         manager.register(createEngine());
         seen.add(p.engine);
     }
-}
-
-export function applyLegacyGenerationForModel(
-    agent: MiniAgent,
-    config: CLIConfig,
-    selector: string,
-): void {
-    if (config.generation !== undefined) {
-        return;
-    }
-
-    const generation = toSwitchGenerationConfig(config, selector);
-    if (generation !== undefined) {
-        agent.setGenerationConfig(generation);
-    }
-}
-
-type ResettableGenerationConfigInput = GenerationConfigInput & {
-    topP?: number | undefined;
-    maxOutputTokens?: number | undefined;
-};
-
-function toSwitchGenerationConfig(
-    config: CLIConfig,
-    selector: string,
-): GenerationConfigInput | undefined {
-    const legacyModel = findLegacyModel(config, selector);
-    if (!legacyModel) {
-        return undefined;
-    }
-
-    const generation: ResettableGenerationConfigInput = {
-        temperature: legacyModel.temperature ?? 0.7,
-        topP: legacyModel.topP,
-        maxOutputTokens: legacyModel.maxOutputTokens ?? legacyModel.maxTokens,
-        thinking: legacyModel.thinking === undefined
-            ? ThinkingLevel.Medium
-            : legacyModel.thinking ? ThinkingLevel.Medium : ThinkingLevel.None,
-    };
-    return generation;
 }
 
 function createCLIApprover(getHitlEnabled: () => boolean) {
@@ -299,47 +313,48 @@ function createBlueprintRegistry(
     return registry;
 }
 
+function clonePluginConfig(config: CLIConfig): Map<string, JsonValue> {
+    const plugins = new Map<string, JsonValue>();
+    if (config.mcp) {
+        plugins.set("mcp", JSON.parse(JSON.stringify(config.mcp)) as JsonValue);
+    }
+    if (config.skill) {
+        plugins.set("skill", JSON.parse(JSON.stringify(config.skill)) as JsonValue);
+    }
+    if (config.subagent) {
+        plugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
+    }
+    return plugins;
+}
+
 function createConfiguredSubagentFactory(
     sessionManager: SessionManager,
     assembler: AgentAssembler,
     manager: LLMEngineManager,
     config: CLIConfig,
     baseDir: string,
-    buildModelsMap: () => Map<string, ModelGroup>,
-    resolveModelConfig: (path: string) => ModelConfig,
+    getParentAgent: () => MiniAgent | undefined,
 ): ConfiguredSubagentFactory {
     return async (request: SubagentInvocation): Promise<MiniAgent> => {
+        const parentAgent = getParentAgent();
+        if (!parentAgent) {
+            throw new Error("Parent agent is not initialized for subagent creation.");
+        }
+
         const active = sessionManager.getActive();
         const sessionId = active?.id ?? "temp";
         const persistDir = sessionManager.getSessionPersistDir(sessionId);
-
-        const subPlugins = new Map<string, JsonValue>();
-        if (config.mcp) {
-            subPlugins.set("mcp", JSON.parse(JSON.stringify(config.mcp)) as JsonValue);
-        }
-        if (config.skill) {
-            subPlugins.set("skill", JSON.parse(JSON.stringify(config.skill)) as JsonValue);
-        }
-        if (config.subagent) {
-            subPlugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
-        }
-
-        const modelSelector = request.entry.model !== undefined
-            ? parseModelSelector(config, request.entry.model)
-            : parseDefaultModel(config);
-        const generation = toAgentGenerationConfig(config, request.entry.model);
-        const legacyModel = request.entry.model !== undefined
-            ? tryResolveModelConfig(resolveModelConfig, request.entry.model)
-            : undefined;
-        const agentConfig: AgentConfig = {
-            ...(legacyModel !== undefined && { model: legacyModel }),
-            models: new Map(),
+        const plugins = clonePluginConfig(config);
+        const currentModel = request.entry.model !== undefined
+            ? findResolvedModelForCLI(parentAgent.getModels(), request.entry.model)
+            : parentAgent.getCurrentResolvedModel();
+        const agentConfig = buildSubagentAgentConfig({
             providers: toAgentProviders(config),
-            ...(modelSelector !== undefined && { defaultModel: modelSelector }),
-            ...(generation !== undefined && { generation }),
-            plugins: subPlugins,
+            currentModel,
+            generation: parentAgent.getGenerationConfig(),
+            plugins,
             paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
-        };
+        });
         const assembleOpts: Parameters<typeof assembler.assemble>[0] = {
             llm: manager,
             config: agentConfig,
@@ -369,21 +384,9 @@ function createConfiguredSubagentFactory(
     };
 }
 
-function tryResolveModelConfig(
-    resolveModelConfig: (path: string) => ModelConfig,
-    path: string,
-): ModelConfig | undefined {
-    try {
-        return resolveModelConfig(path);
-    } catch {
-        return undefined;
-    }
-}
-
 async function buildAgentInner(
     sessionId: string,
     baseDir: string,
-    _activeModel: CLIModel | undefined,
     config: CLIConfig,
     manager: LLMEngineManager,
     assembler: AgentAssembler,
@@ -392,20 +395,10 @@ async function buildAgentInner(
     getHitlEnabled: () => boolean,
 ): Promise<MiniAgent> {
     const persistDir = new SessionManager(join(baseDir, CLIAGENT_DIR)).getSessionPersistDir(sessionId);
-    const plugins = new Map<string, JsonValue>();
-    if (config.mcp) {
-        plugins.set("mcp", JSON.parse(JSON.stringify(config.mcp)) as JsonValue);
-    }
-    if (config.skill) {
-        plugins.set("skill", JSON.parse(JSON.stringify(config.skill)) as JsonValue);
-    }
-    if (config.subagent) {
-        plugins.set("subagent", JSON.parse(JSON.stringify(config.subagent)) as JsonValue);
-    }
+    const plugins = clonePluginConfig(config);
     const defaultModel = parseDefaultModel(config);
     const generation = toAgentGenerationConfig(config);
     const agentConfig: AgentConfig = {
-        models: new Map(),
         providers: toAgentProviders(config),
         ...(defaultModel !== undefined && { defaultModel }),
         ...(generation !== undefined && { generation }),
@@ -413,7 +406,7 @@ async function buildAgentInner(
         paths: { sessiondir: persistDir },
     };
 
-    const agent = await assembler.assemble({
+    return assembler.assemble({
         llm: manager,
         config: agentConfig,
         blueprint: SHARED_BLUEPRINT,
@@ -434,7 +427,6 @@ async function buildAgentInner(
             },
         ],
     });
-    return agent;
 }
 
 function buildSystemPrompt(baseDir: string, userSystemPrompt: string): string {

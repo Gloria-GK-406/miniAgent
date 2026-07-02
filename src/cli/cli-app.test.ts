@@ -1,16 +1,37 @@
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { ThinkingLevel } from "../core/config.js";
+import type {
+  GenerationConfig,
+  JsonValue,
+  ModelProviderConfig,
+  ResolvedModel,
+} from "../core/config.js";
 import {
-  applyLegacyGenerationForModel,
+  buildSubagentAgentConfig,
   createCLIApp,
+  formatResolvedModelPath,
+  getResolvedModelPaths,
+  selectResolvedModelForCLI,
 } from "./cli-app.js";
-import { CLIConfigSchema } from "./config.js";
+
+function resolvedModel(
+  id: string,
+  provider = "openai",
+  name = id,
+): ResolvedModel {
+  return {
+    id,
+    provider,
+    name,
+    thinkingLevels: [ThinkingLevel.None],
+  };
+}
 
 describe("createCLIApp", () => {
-  it("boots from provider-only config and engine catalog default model", async () => {
+  it("boots from provider-only config and uses resolved model APIs", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
     const configDir = join(baseDir, ".cliagent");
     await mkdir(configDir, { recursive: true });
@@ -19,12 +40,18 @@ describe("createCLIApp", () => {
       JSON.stringify({
         providers: [
           {
-            name: "anthropic-main",
-            engine: "anthropic",
-            apiKey: "sk-test",
+            engine: "openai",
+            key: "sk-test",
+            models: [
+              {
+                id: "fast",
+                name: "gpt-4o-mini",
+                thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+              },
+            ],
           },
         ],
-        defaultModel: "anthropic-main/claude-sonnet-4-5",
+        defaultModel: "fast",
         generation: {
           temperature: 0.1,
           thinking: ThinkingLevel.Low,
@@ -34,190 +61,117 @@ describe("createCLIApp", () => {
     );
 
     const app = await createCLIApp(baseDir);
+    const current = app.agent.getCurrentResolvedModel();
 
-    expect(app.agent.getCurrentResolvedModel().id).toBe("anthropic-main/claude-sonnet-4-5");
+    expect(current).toMatchObject({
+      id: "fast",
+      provider: "openai",
+      name: "gpt-4o-mini",
+    });
     expect(app.agent.getGenerationConfig()).toMatchObject({
       temperature: 0.1,
       thinking: ThinkingLevel.Low,
     });
-    expect(app.agent.getResolvedModels().map((model) => model.id)).toContain(
-      "anthropic-main/claude-sonnet-4-5",
-    );
+    expect(app.agent.getModels().map(formatResolvedModelPath)).toEqual(["openai/fast"]);
+    expect(app.agent.getConfig()).not.toHaveProperty("model");
+    expect(app.agent.getConfig()).not.toHaveProperty("models");
   });
 
-  it("preserves legacy top-level model generation fields", async () => {
-    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
-    const configDir = join(baseDir, ".cliagent");
-    await mkdir(configDir, { recursive: true });
-    await writeFile(
-      join(configDir, "config.json"),
-      JSON.stringify({
-        providers: [
-          {
-            name: "main",
-            provider: "openai-compatible",
-            apiKey: "sk-test",
-            baseUrl: "https://example.test/v1",
-          },
-        ],
-        models: [
-          {
-            name: "fast",
-            provider: "main",
-            model: "custom-fast",
-            temperature: 0.3,
-            topP: 0.8,
-            maxOutputTokens: 2048,
-            thinking: false,
-          },
-        ],
-        defaultModel: "fast",
-      }),
-      "utf-8",
-    );
+  it("formats resolved models for CLI display", () => {
+    const agent = {
+      getModels: vi.fn(() => [
+        resolvedModel("fast", "openai"),
+        resolvedModel("deep", "anthropic"),
+      ]),
+    };
 
-    const app = await createCLIApp(baseDir);
+    expect(getResolvedModelPaths(agent)).toEqual(["openai/fast", "anthropic/deep"]);
+  });
 
-    expect(app.agent.getCurrentResolvedModel().id).toBe("main/custom-fast");
-    expect(app.agent.getGenerationConfig()).toEqual({
-      temperature: 0.3,
-      topP: 0.8,
-      maxOutputTokens: 2048,
-      thinking: ThinkingLevel.None,
+  it("switches models with setResolvedModel using id and provider", () => {
+    const agent = {
+      getModels: vi.fn(() => [
+        resolvedModel("fast", "openai"),
+        resolvedModel("deep", "anthropic"),
+      ]),
+      setResolvedModel: vi.fn(),
+      setGenerationConfig: vi.fn(),
+    };
+
+    const selected = selectResolvedModelForCLI(agent, "anthropic/deep");
+
+    expect(selected).toMatchObject({ id: "deep", provider: "anthropic" });
+    expect(agent.setResolvedModel).toHaveBeenCalledWith({
+      id: "deep",
+      provider: "anthropic",
     });
+    expect(agent.setGenerationConfig).not.toHaveBeenCalled();
   });
 
-  it("updates legacy generation after resolved model switches", async () => {
-    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
-    const configDir = join(baseDir, ".cliagent");
-    await mkdir(configDir, { recursive: true });
-    await writeFile(
-      join(configDir, "config.json"),
-      JSON.stringify({
-        providers: [
-          {
-            name: "main",
-            provider: "openai-compatible",
-            apiKey: "sk-test",
-            baseUrl: "https://example.test/v1",
-          },
-        ],
-        models: [
-          {
-            name: "fast",
-            provider: "main",
-            model: "custom-fast",
-            temperature: 0.2,
-            maxTokens: 1024,
-          },
-          {
-            name: "deep",
-            provider: "main",
-            model: "custom-deep",
-            temperature: 0.6,
-            maxOutputTokens: 4096,
-            thinking: true,
-          },
-        ],
-        defaultModel: "fast",
-      }),
-      "utf-8",
-    );
-    const app = await createCLIApp(baseDir);
+  it("selects a unique model by id without applying model-level generation", () => {
+    const agent = {
+      getModels: vi.fn(() => [resolvedModel("fast", "openai")]),
+      setResolvedModel: vi.fn(),
+      setGenerationConfig: vi.fn(),
+    };
 
-    app.agent.setResolvedModel({ id: "main/custom-deep" });
-    applyLegacyGenerationForModel(app.agent, app.config, "main/custom-deep");
+    selectResolvedModelForCLI(agent, "fast");
 
-    expect(app.agent.getGenerationConfig()).toMatchObject({
-      temperature: 0.6,
-      maxOutputTokens: 4096,
-      thinking: ThinkingLevel.Medium,
+    expect(agent.setResolvedModel).toHaveBeenCalledWith({
+      id: "fast",
+      provider: "openai",
     });
+    expect(agent.setGenerationConfig).not.toHaveBeenCalled();
   });
 
-  it("clears stale optional generation fields after legacy model switches", async () => {
-    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
-    const configDir = join(baseDir, ".cliagent");
-    await mkdir(configDir, { recursive: true });
-    await writeFile(
-      join(configDir, "config.json"),
-      JSON.stringify({
-        providers: [
-          {
-            name: "main",
-            provider: "openai-compatible",
-            apiKey: "sk-test",
-            baseUrl: "https://example.test/v1",
-          },
-        ],
-        models: [
-          {
-            name: "rich",
-            provider: "main",
-            model: "custom-rich",
-            temperature: 0.4,
-            topP: 0.8,
-            maxTokens: 2048,
-          },
-          {
-            name: "plain",
-            provider: "main",
-            model: "custom-plain",
-            temperature: 0.6,
-          },
-        ],
-        defaultModel: "rich",
-      }),
-      "utf-8",
+  it("rejects ambiguous bare model ids with provider-qualified choices", () => {
+    const agent = {
+      getModels: vi.fn(() => [
+        resolvedModel("fast", "openai"),
+        resolvedModel("fast", "anthropic"),
+      ]),
+      setResolvedModel: vi.fn(),
+    };
+
+    expect(() => selectResolvedModelForCLI(agent, "fast")).toThrow(
+      /Model selector is ambiguous: fast.*openai\/fast.*anthropic\/fast/,
     );
-    const app = await createCLIApp(baseDir);
-
-    app.agent.setResolvedModel({ id: "main/custom-plain" });
-    applyLegacyGenerationForModel(app.agent, app.config, "main/custom-plain");
-
-    expect(app.agent.getGenerationConfig()).toMatchObject({
-      temperature: 0.6,
-      thinking: ThinkingLevel.Medium,
-    });
-    expect(app.agent.getGenerationConfig().topP).toBeUndefined();
-    expect(app.agent.getGenerationConfig().maxOutputTokens).toBeUndefined();
+    expect(agent.setResolvedModel).not.toHaveBeenCalled();
   });
 
-  it("does not override explicit top-level generation on model switches", async () => {
-    const config = CLIConfigSchema.parse({
-      providers: [
-        {
-          name: "main",
-          provider: "openai-compatible",
-          apiKey: "sk-test",
-        },
-      ],
-      models: [
-        {
-          name: "fast",
-          provider: "main",
-          model: "custom-fast",
-          temperature: 0.2,
-        },
-      ],
-      defaultModel: "fast",
-      generation: {
-        temperature: 0.9,
-        thinking: ThinkingLevel.High,
+  it("builds provider-only subagent config from the parent resolved model", () => {
+    const providers: ModelProviderConfig[] = [
+      {
+        provider: "openai",
+        key: "test-key",
+        models: [{ id: "fast", name: "gpt-4o-mini" }],
       },
-    });
-    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-cli-"));
-    const configDir = join(baseDir, ".cliagent");
-    await mkdir(configDir, { recursive: true });
-    await writeFile(join(configDir, "config.json"), JSON.stringify(config), "utf-8");
-    const app = await createCLIApp(baseDir);
+    ];
+    const generation: GenerationConfig = {
+      temperature: 0.6,
+      thinking: ThinkingLevel.Medium,
+    };
+    const plugins = new Map<string, JsonValue>([
+      ["skill", { directories: ["/tmp/skills"] }],
+    ]);
 
-    applyLegacyGenerationForModel(app.agent, app.config, "main/custom-fast");
-
-    expect(app.agent.getGenerationConfig()).toMatchObject({
-      temperature: 0.9,
-      thinking: ThinkingLevel.High,
+    const config = buildSubagentAgentConfig({
+      providers,
+      currentModel: resolvedModel("fast", "openai", "gpt-4o-mini"),
+      generation,
+      plugins,
+      paths: { sessiondir: "/tmp/subagent-session" },
     });
+
+    expect(config).toEqual({
+      providers,
+      defaultModel: { id: "fast", provider: "openai" },
+      generation,
+      plugins,
+      paths: { sessiondir: "/tmp/subagent-session" },
+    });
+    expect(config).not.toHaveProperty("model");
+    expect(config).not.toHaveProperty("models");
   });
 
   it("rejects unknown provider engines at startup", async () => {
@@ -229,21 +183,18 @@ describe("createCLIApp", () => {
       JSON.stringify({
         providers: [
           {
-            name: "mystery",
             engine: "not-real",
-            apiKey: "sk-test",
-            models: {
-              add: [{ model: "custom-model" }],
-            },
+            key: "sk-test",
+            models: [{ id: "custom", name: "custom-model" }],
           },
         ],
-        defaultModel: "mystery/custom-model",
+        defaultModel: "custom",
       }),
       "utf-8",
     );
 
     await expect(createCLIApp(baseDir)).rejects.toThrow(
-      'Unsupported engine "not-real" for provider "mystery"',
+      'Unsupported engine "not-real"',
     );
   });
 });

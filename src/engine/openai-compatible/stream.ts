@@ -9,12 +9,17 @@ interface OpenAIToolCallBuffer {
   id?: string;
   name: string;
   argumentsText: string;
+  startEmitted: boolean;
 }
 
 export interface ConsumeOpenAIStreamOptions {
   emitChunk: (chunk: LLMStreamChunk) => void;
   extractReasoningDelta?: (chunk: ChatCompletionChunk) => string | undefined;
   shouldBreak?: () => boolean;
+}
+
+export interface StreamOpenAIChunksOptions {
+  extractReasoningDelta?: (chunk: ChatCompletionChunk) => string | undefined;
 }
 
 function getToolCallBuffer(
@@ -28,9 +33,102 @@ function getToolCallBuffer(
   const created: OpenAIToolCallBuffer = {
     name: "",
     argumentsText: "",
+    startEmitted: false,
   };
   buffers[index] = created;
   return created;
+}
+
+function appendToolCallName(currentName: string, namePart: string): string {
+  if (currentName === "" || namePart.startsWith(currentName)) {
+    return namePart;
+  }
+  if (
+    currentName === namePart
+    || currentName.endsWith(namePart)
+    || currentName.includes(namePart)
+  ) {
+    return currentName;
+  }
+
+  const maxOverlap = Math.min(currentName.length, namePart.length);
+  for (let overlap = maxOverlap; overlap > 0; overlap--) {
+    if (currentName.endsWith(namePart.slice(0, overlap))) {
+      return currentName + namePart.slice(overlap);
+    }
+  }
+  return currentName + namePart;
+}
+
+function toolCallStartChunk(
+  index: number,
+  toolCall: OpenAIToolCallBuffer,
+): LLMStreamChunk {
+  return {
+    type: LLMStreamChunkType.ToolCallArgumentsDelta,
+    index,
+    argsText: "",
+    ...(toolCall.id !== undefined && { toolCallId: toolCall.id }),
+    ...(toolCall.name !== "" && { toolName: toolCall.name }),
+  };
+}
+
+export async function* streamOpenAIChunks(
+  stream: AsyncIterable<ChatCompletionChunk>,
+  options: StreamOpenAIChunksOptions = {},
+): AsyncGenerator<LLMStreamChunk> {
+  const toolCalls: OpenAIToolCallBuffer[] = [];
+
+  for await (const chunk of stream) {
+    const choice = chunk.choices[0];
+    if (!choice) {
+      continue;
+    }
+
+    const reasoningDelta = options.extractReasoningDelta?.(chunk);
+    if (reasoningDelta) {
+      yield {
+        type: LLMStreamChunkType.ReasoningDelta,
+        text: reasoningDelta,
+      };
+    }
+
+    const delta = choice.delta;
+    if (delta.content) {
+      yield {
+        type: LLMStreamChunkType.TextDelta,
+        text: delta.content,
+      };
+    }
+
+    for (const toolCallDelta of delta.tool_calls ?? []) {
+      const current = getToolCallBuffer(toolCalls, toolCallDelta.index);
+      if (toolCallDelta.id) {
+        current.id = toolCallDelta.id;
+      }
+      if (toolCallDelta.function?.name) {
+        current.name = appendToolCallName(
+          current.name,
+          toolCallDelta.function.name,
+        );
+      }
+      const argumentsDelta = toolCallDelta.function?.arguments;
+      if (argumentsDelta !== undefined) {
+        current.argumentsText += argumentsDelta;
+        current.startEmitted = true;
+        yield {
+          type: LLMStreamChunkType.ToolCallArgumentsDelta,
+          index: toolCallDelta.index,
+          argsText: argumentsDelta,
+          ...(current.id !== undefined && { toolCallId: current.id }),
+          ...(current.name !== "" && { toolName: current.name }),
+        };
+      } else if (!current.startEmitted && current.id !== undefined && current.name !== "") {
+        current.startEmitted = true;
+        yield toolCallStartChunk(toolCallDelta.index, current);
+      }
+    }
+  }
 }
 
 export async function consumeOpenAIStream(
@@ -80,10 +178,14 @@ export async function consumeOpenAIStream(
         current.id = toolCallDelta.id;
       }
       if (toolCallDelta.function?.name) {
-        current.name += toolCallDelta.function.name;
+        current.name = appendToolCallName(
+          current.name,
+          toolCallDelta.function.name,
+        );
       }
       if (toolCallDelta.function?.arguments) {
         current.argumentsText += toolCallDelta.function.arguments;
+        current.startEmitted = true;
         options.emitChunk({
           type: LLMStreamChunkType.ToolCallArgumentsDelta,
           index: toolCallDelta.index,

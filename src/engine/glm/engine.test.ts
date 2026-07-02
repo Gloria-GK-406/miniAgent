@@ -6,7 +6,7 @@ import {
   type Message,
   type MessageChunk,
 } from "../../core/types.js";
-import { OpenAICompatibleEngine } from "./engine.js";
+import { GLMEngine } from "./engine.js";
 
 const openAIMocks = vi.hoisted(() => ({
   constructor: vi.fn(),
@@ -30,7 +30,10 @@ async function* completionStream() {
   yield {
     choices: [
       {
-        delta: { content: "ok" },
+        delta: {
+          content: "answer",
+          reasoning_content: "think",
+        },
         finish_reason: null,
         index: 0,
       },
@@ -55,56 +58,53 @@ function request(): LLMGenerateRequest {
     messages,
     tools: [],
     provider: {
-      provider: "openai-compatible",
-      key: "request-key",
-      baseUrl: "http://localhost:9000/v1",
+      provider: "glm",
+      key: "glm-key",
     },
     model: {
-      id: "openai-compatible/custom-model",
-      provider: "openai-compatible",
-      name: "custom-model",
-      maxOutputTokens: 1234,
-      thinkingLevels: [ThinkingLevel.None],
+      id: "glm/glm-5.2",
+      provider: "glm",
+      name: "glm-5.2",
+      thinkingLevels: [
+        ThinkingLevel.None,
+        ThinkingLevel.Low,
+        ThinkingLevel.Medium,
+      ],
     },
     generation: {
-      temperature: 0.2,
-      topP: 0.8,
-      maxOutputTokens: 777,
-      thinking: ThinkingLevel.None,
+      temperature: 0.4,
+      topP: 0.6,
+      thinking: ThinkingLevel.Medium,
     },
   };
 }
 
-describe("OpenAICompatibleEngine request mode", () => {
+describe("GLMEngine request mode", () => {
   beforeEach(() => {
     openAIMocks.constructor.mockClear();
     openAIMocks.create.mockReset();
     openAIMocks.create.mockResolvedValue(completionStream());
   });
 
-  it("uses request provider credentials and generation params", async () => {
-    const engine = new OpenAICompatibleEngine();
+  it("uses the GLM default base URL and yields reasoning/text chunks", async () => {
+    const engine = new GLMEngine();
 
-    const stream = engine.streamGenerate(request());
-    expect(stream[Symbol.asyncIterator]).toBeTypeOf("function");
-    await expect(collect(stream)).resolves.toEqual([
-      { type: LLMStreamChunkType.TextDelta, text: "ok" },
+    await expect(collect(engine.streamGenerate(request()))).resolves.toEqual([
+      { type: LLMStreamChunkType.ReasoningDelta, text: "think" },
+      { type: LLMStreamChunkType.TextDelta, text: "answer" },
     ]);
 
     expect(openAIMocks.constructor).toHaveBeenCalledWith({
-      apiKey: "request-key",
-      baseURL: "http://localhost:9000/v1",
+      apiKey: "glm-key",
+      baseURL: "https://open.bigmodel.cn/api/paas/v4",
     });
     expect(openAIMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "custom-model",
-        temperature: 0.2,
-        top_p: 0.8,
-        max_completion_tokens: 777,
+        model: "glm-5.2",
+        top_p: 0.6,
+        thinking: { type: "enabled" },
+        reasoning_effort: "medium",
         stream: true,
-        stream_options: {
-          include_usage: true,
-        },
       }),
     );
   });

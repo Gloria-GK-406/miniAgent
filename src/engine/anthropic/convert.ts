@@ -11,7 +11,6 @@ import type {
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-  type ModelConfig,
 } from "../../core/config.js";
 import type {
   MessageParam,
@@ -26,6 +25,13 @@ interface ConvertedInput {
   system?: string;
   messages: MessageParam[];
 }
+
+type AnthropicEffort = "low" | "medium" | "high" | "max";
+type AnthropicCreateParams = Anthropic.MessageCreateParamsNonStreaming & {
+  output_config?: {
+    effort: AnthropicEffort;
+  };
+};
 
 function extractText(content: Message["content"]): string {
   if (typeof content === "string") return content;
@@ -168,28 +174,6 @@ export function convertTools(tools: Tool[]): AnthropicTool[] {
   });
 }
 
-export function buildCreateParams(
-  messages: Message[],
-  config: ModelConfig,
-  tools: Tool[],
-): Anthropic.MessageCreateParamsNonStreaming {
-  const { system, messages: convertedMessages } = convertMessages(messages);
-
-  return {
-    model: config.model,
-    max_tokens: config.maxTokens ?? config.maxOutputTokens ?? 4096,
-    ...(system !== undefined && { system }),
-    messages: convertedMessages,
-    ...(convertTools(tools).length > 0 && { tools: convertTools(tools) }),
-    ...(config.temperature !== undefined && {
-      temperature: config.temperature,
-    }),
-    ...(config.topP !== undefined && { top_p: config.topP }),
-  };
-}
-
-type AnthropicEffort = "low" | "medium" | "high" | "max";
-
 const ORDERED_THINKING_LEVELS = [
   ThinkingLevel.Low,
   ThinkingLevel.Medium,
@@ -215,20 +199,10 @@ function selectSupportedThinkingLevel(
   }
 
   const requestedIndex = ORDERED_THINKING_LEVELS.indexOf(requested);
-  let nearest = supportedNonNone[0]!;
-  let nearestDistance = Math.abs(
-    ORDERED_THINKING_LEVELS.indexOf(nearest) - requestedIndex,
+  const lowerOrEqual = supportedNonNone.filter(
+    (level) => ORDERED_THINKING_LEVELS.indexOf(level) <= requestedIndex,
   );
-  for (const level of supportedNonNone.slice(1)) {
-    const distance = Math.abs(
-      ORDERED_THINKING_LEVELS.indexOf(level) - requestedIndex,
-    );
-    if (distance < nearestDistance) {
-      nearest = level;
-      nearestDistance = distance;
-    }
-  }
-  return nearest;
+  return lowerOrEqual.at(-1);
 }
 
 function mapAnthropicEffort(level: ThinkingLevel): AnthropicEffort {
@@ -248,31 +222,29 @@ function mapAnthropicEffort(level: ThinkingLevel): AnthropicEffort {
 
 export function buildCreateParamsFromRequest(
   request: LLMGenerateRequest,
-): Anthropic.MessageCreateParamsNonStreaming {
-  const config: ModelConfig = {
-    provider: request.model.engine,
-    model: request.model.model,
-    apiKey: request.provider.apiKey,
-    ...(request.generation.maxOutputTokens !== undefined && {
-      maxOutputTokens: request.generation.maxOutputTokens,
-    }),
-    temperature: request.generation.temperature,
-    ...(request.generation.topP !== undefined && { topP: request.generation.topP }),
-  };
-  const params = buildCreateParams(request.messages, config, request.tools);
+): AnthropicCreateParams {
+  const { system, messages } = convertMessages(request.messages);
+  const tools = convertTools(request.tools);
   const effectiveThinking = selectSupportedThinkingLevel(
     request.generation.thinking,
     request.model.thinkingLevels,
   );
 
-  if (effectiveThinking === undefined) {
-    return params;
-  }
   return {
-    ...params,
-    output_config: {
-      effort: mapAnthropicEffort(effectiveThinking),
-    },
+    model: request.model.name,
+    max_tokens: request.generation.maxOutputTokens ?? 4096,
+    ...(system !== undefined && { system }),
+    messages,
+    ...(tools.length > 0 && { tools }),
+    temperature: request.generation.temperature,
+    ...(request.generation.topP !== undefined && {
+      top_p: request.generation.topP,
+    }),
+    ...(effectiveThinking !== undefined && {
+      output_config: {
+        effort: mapAnthropicEffort(effectiveThinking),
+      },
+    }),
   };
 }
 

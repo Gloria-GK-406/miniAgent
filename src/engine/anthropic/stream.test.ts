@@ -3,13 +3,53 @@ import type {
   RawMessageStreamEvent,
 } from "@anthropic-ai/sdk/resources/messages/messages.js";
 import { LLMStreamChunkType, MessageType } from "../../core/types.js";
-import { consumeAnthropicStream } from "./stream.js";
+import { consumeAnthropicStream, streamAnthropicChunks } from "./stream.js";
 
 async function* toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
     yield item;
   }
 }
+
+async function collectStreamChunks(
+  stream: AsyncGenerator<unknown>,
+): Promise<unknown[]> {
+  const chunks: unknown[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return chunks;
+}
+
+describe("streamAnthropicChunks", () => {
+  it("emits an empty tool-call delta when a tool_use block has no argument delta", async () => {
+    const events: RawMessageStreamEvent[] = [
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_empty",
+          name: "get_weather",
+          input: {},
+          caller: { type: "direct" },
+        },
+      },
+    ] as RawMessageStreamEvent[];
+
+    await expect(
+      collectStreamChunks(streamAnthropicChunks(toAsyncIterable(events))),
+    ).resolves.toEqual([
+      {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: 0,
+        argsText: "",
+        toolCallId: "toolu_empty",
+        toolName: "get_weather",
+      },
+    ]);
+  });
+});
 
 describe("consumeAnthropicStream", () => {
   it("emits text and reasoning chunks and returns AssistMessage", async () => {

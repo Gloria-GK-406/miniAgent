@@ -1,5 +1,5 @@
 import type { Tool } from "../types.js";
-import type { AgentConfig } from "../../core/config.js";
+import type { NormalizedAgentConfig } from "../../core/config.js";
 import { McpClient } from "./client.js";
 import { convertMcpTool, prefixToolName } from "./convert.js";
 import { getCapabilityNamespace, isCapabilityEnabled } from "../../assembly/capability.js";
@@ -30,7 +30,7 @@ export class McpPlugin {
         return true;
     }
 
-    async setConfig(agentConfig: AgentConfig): Promise<void> {
+    async setConfig(agentConfig: NormalizedAgentConfig): Promise<void> {
         const pluginConfig = agentConfig.plugins.get("mcp");
         if (pluginConfig === undefined || pluginConfig === null) {
             await this.disconnectAll();

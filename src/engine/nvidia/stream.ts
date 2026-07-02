@@ -12,6 +12,7 @@ interface OpenAIToolCallBuffer {
   id?: string;
   name: string;
   argumentsText: string;
+  startEmitted: boolean;
 }
 
 function getToolCallBuffer(
@@ -25,9 +26,44 @@ function getToolCallBuffer(
   const created: OpenAIToolCallBuffer = {
     name: "",
     argumentsText: "",
+    startEmitted: false,
   };
   buffers[index] = created;
   return created;
+}
+
+function appendToolCallName(currentName: string, namePart: string): string {
+  if (currentName === "" || namePart.startsWith(currentName)) {
+    return namePart;
+  }
+  if (
+    currentName === namePart
+    || currentName.endsWith(namePart)
+    || currentName.includes(namePart)
+  ) {
+    return currentName;
+  }
+
+  const maxOverlap = Math.min(currentName.length, namePart.length);
+  for (let overlap = maxOverlap; overlap > 0; overlap--) {
+    if (currentName.endsWith(namePart.slice(0, overlap))) {
+      return currentName + namePart.slice(overlap);
+    }
+  }
+  return currentName + namePart;
+}
+
+function toolCallStartChunk(
+  index: number,
+  toolCall: OpenAIToolCallBuffer,
+): LLMStreamChunk {
+  return {
+    type: LLMStreamChunkType.ToolCallArgumentsDelta,
+    index,
+    argsText: "",
+    ...(toolCall.id !== undefined && { toolCallId: toolCall.id }),
+    ...(toolCall.name !== "" && { toolName: toolCall.name }),
+  };
 }
 
 enum ParseState {
@@ -38,6 +74,134 @@ enum ParseState {
 export interface ConsumeNVIDIAStreamOptions {
   emitChunk: (chunk: LLMStreamChunk) => void;
   shouldBreak?: () => boolean;
+}
+
+export async function* streamNVIDIAChunks(
+  stream: AsyncIterable<ChatCompletionChunk>,
+): AsyncGenerator<LLMStreamChunk> {
+  let state = ParseState.Content;
+  let buffer = "";
+  const toolCalls: OpenAIToolCallBuffer[] = [];
+
+  function* emitReasoning(text: string): Generator<LLMStreamChunk> {
+    yield {
+      type: LLMStreamChunkType.ReasoningDelta,
+      text,
+    };
+  }
+
+  function* emitText(text: string): Generator<LLMStreamChunk> {
+    yield {
+      type: LLMStreamChunkType.TextDelta,
+      text,
+    };
+  }
+
+  function* processText(text: string): Generator<LLMStreamChunk> {
+    buffer += text;
+
+    while (buffer.length > 0) {
+      if (state === ParseState.Content) {
+        const markerIdx = buffer.indexOf("<");
+        if (markerIdx === -1) {
+          yield* emitText(buffer);
+          buffer = "";
+          return;
+        }
+
+        if (markerIdx > 0) {
+          yield* emitText(buffer.slice(0, markerIdx));
+          buffer = buffer.slice(markerIdx);
+        }
+
+        if (buffer.startsWith(THINKING_OPEN)) {
+          state = ParseState.Thinking;
+          buffer = buffer.slice(THINKING_OPEN.length);
+          continue;
+        }
+        if (THINKING_OPEN.startsWith(buffer)) {
+          return;
+        }
+
+        yield* emitText(buffer[0]!);
+        buffer = buffer.slice(1);
+        continue;
+      }
+
+      const markerIdx = buffer.indexOf("<");
+      if (markerIdx === -1) {
+        yield* emitReasoning(buffer);
+        buffer = "";
+        return;
+      }
+
+      if (markerIdx > 0) {
+        yield* emitReasoning(buffer.slice(0, markerIdx));
+        buffer = buffer.slice(markerIdx);
+      }
+
+      if (buffer.startsWith(THINKING_CLOSE)) {
+        state = ParseState.Content;
+        buffer = buffer.slice(THINKING_CLOSE.length);
+        continue;
+      }
+      if (THINKING_CLOSE.startsWith(buffer)) {
+        return;
+      }
+
+      yield* emitReasoning(buffer[0]!);
+      buffer = buffer.slice(1);
+    }
+  }
+
+  for await (const chunk of stream) {
+    const choice = chunk.choices[0];
+    if (!choice) {
+      continue;
+    }
+
+    const delta = choice.delta;
+
+    if (delta.content) {
+      yield* processText(delta.content);
+    }
+
+    for (const toolCallDelta of delta.tool_calls ?? []) {
+      const current = getToolCallBuffer(toolCalls, toolCallDelta.index);
+      if (toolCallDelta.id) {
+        current.id = toolCallDelta.id;
+      }
+      if (toolCallDelta.function?.name) {
+        current.name = appendToolCallName(
+          current.name,
+          toolCallDelta.function.name,
+        );
+      }
+      const argumentsDelta = toolCallDelta.function?.arguments;
+      if (argumentsDelta !== undefined) {
+        current.argumentsText += argumentsDelta;
+        current.startEmitted = true;
+        yield {
+          type: LLMStreamChunkType.ToolCallArgumentsDelta,
+          index: toolCallDelta.index,
+          argsText: argumentsDelta,
+          ...(current.id !== undefined && { toolCallId: current.id }),
+          ...(current.name !== "" && { toolName: current.name }),
+        };
+      } else if (!current.startEmitted && current.id !== undefined && current.name !== "") {
+        current.startEmitted = true;
+        yield toolCallStartChunk(toolCallDelta.index, current);
+      }
+    }
+  }
+
+  if (buffer.length > 0) {
+    if (state === ParseState.Content) {
+      yield* emitText(buffer);
+    } else {
+      yield* emitReasoning(buffer);
+    }
+  }
 }
 
 export async function consumeNVIDIAStream(
@@ -150,10 +314,14 @@ export async function consumeNVIDIAStream(
         current.id = toolCallDelta.id;
       }
       if (toolCallDelta.function?.name) {
-        current.name += toolCallDelta.function.name;
+        current.name = appendToolCallName(
+          current.name,
+          toolCallDelta.function.name,
+        );
       }
       if (toolCallDelta.function?.arguments) {
         current.argumentsText += toolCallDelta.function.arguments;
+        current.startEmitted = true;
         options.emitChunk({
           type: LLMStreamChunkType.ToolCallArgumentsDelta,
           index: toolCallDelta.index,

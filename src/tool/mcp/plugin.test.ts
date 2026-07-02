@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { McpPlugin } from "./plugin.js";
-import type { AgentConfig, JsonValue } from "../../core/config.js";
+import { AgentConfigSchema, type JsonValue, type NormalizedAgentConfig } from "../../core/config.js";
 
 interface MockClient {
     serverName: string;
@@ -39,17 +39,16 @@ vi.mock("./client.js", () => ({
     },
 }));
 
-function makeConfig(servers: Record<string, object>): AgentConfig {
-    return {
-        model: {
-            provider: "test",
-            model: "test-model",
-            apiKey: "key",
-        },
-        models: new Map(),
-        plugins: new Map([["mcp", { servers } as unknown as JsonValue]]),
+function makeAgentConfig(plugins = new Map<string, JsonValue>()): NormalizedAgentConfig {
+    return AgentConfigSchema.parse({
+        providers: [{ provider: "test", key: "key" }],
+        plugins,
         paths: { sessiondir: "/tmp" },
-    };
+    });
+}
+
+function makeConfig(servers: Record<string, object>): NormalizedAgentConfig {
+    return makeAgentConfig(new Map([["mcp", { servers } as unknown as JsonValue]]));
 }
 
 describe("McpPlugin", () => {
@@ -68,24 +67,14 @@ describe("McpPlugin", () => {
     });
 
     it("returns empty tools when no config", async () => {
-        const config: AgentConfig = {
-            model: { provider: "test", model: "m", apiKey: "k" },
-            models: new Map(),
-            plugins: new Map(),
-            paths: { sessiondir: "/tmp" },
-        };
+        const config = makeAgentConfig();
         await plugin.setConfig(config);
         const tools = await plugin.getTools();
         expect(tools).toEqual([]);
     });
 
     it("returns empty tools when config is null", async () => {
-        const config: AgentConfig = {
-            model: { provider: "test", model: "m", apiKey: "k" },
-            models: new Map(),
-            plugins: new Map([["mcp", null]]),
-            paths: { sessiondir: "/tmp" },
-        };
+        const config = makeAgentConfig(new Map([["mcp", null]]));
         await plugin.setConfig(config);
         const tools = await plugin.getTools();
         expect(tools).toEqual([]);
@@ -183,12 +172,7 @@ describe("McpPlugin", () => {
         await plugin.setConfig(config);
         expect(await plugin.getTools()).toHaveLength(1);
 
-        const noConfig: AgentConfig = {
-            model: { provider: "test", model: "m", apiKey: "k" },
-            models: new Map(),
-            plugins: new Map(),
-            paths: { sessiondir: "/tmp" },
-        };
+        const noConfig = makeAgentConfig();
         await plugin.setConfig(noConfig);
 
         const tools = await plugin.getTools();

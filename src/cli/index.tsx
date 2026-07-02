@@ -1,5 +1,10 @@
 import { render } from "ink";
-import { applyLegacyGenerationForModel, createCLIApp } from "./cli-app.js";
+import {
+    createCLIApp,
+    formatResolvedModelPath,
+    getResolvedModelPaths,
+    selectResolvedModelForCLI,
+} from "./cli-app.js";
 import { App } from "./components/App.js";
 
 const A = {
@@ -17,7 +22,7 @@ function printHelp(): void {
     const lines = [
         `${A.bold}Commands:${A.reset}`,
         `  ${A.cyan}/models${A.reset}                List configured models`,
-        `  ${A.cyan}/model <provider/model>${A.reset} Switch active model`,
+        `  ${A.cyan}/model <id|provider/id>${A.reset} Switch active model`,
         `  ${A.cyan}/tools${A.reset}                 List registered tools`,
         `  ${A.cyan}/history${A.reset}               View conversation history`,
         `  ${A.cyan}/context${A.reset}               Preview context sent to LLM`,
@@ -56,24 +61,16 @@ async function main(): Promise<void> {
         const inkHolder: { current: ReturnType<typeof render> | undefined } = { current: undefined };
 
         function getModelName(): string {
-            return currentAgent.getCurrentResolvedModel().id;
+            const current = currentAgent.getCurrentResolvedModel();
+            return current ? formatResolvedModelPath(current) : "(none)";
         }
 
         function getModelPaths(): string[] {
-            const resolvedModels = currentAgent.getResolvedModels();
-            if (resolvedModels.length > 0) {
-                return resolvedModels.map((model) => model.id);
-            }
-            return currentAgent.getModelDisplayList();
+            return getResolvedModelPaths(currentAgent);
         }
 
         async function handleSelectModelAsync(path: string): Promise<void> {
-            try {
-                currentAgent.setResolvedModel({ id: path });
-            } catch {
-                currentAgent.setModelByPath(path);
-            }
-            applyLegacyGenerationForModel(currentAgent, ctx.config, path);
+            selectResolvedModelForCLI(currentAgent, path);
             rerenderApp();
         }
 
@@ -129,12 +126,7 @@ async function main(): Promise<void> {
                         break;
                     }
                     try {
-                        try {
-                            currentAgent.setResolvedModel({ id: arg });
-                        } catch {
-                            currentAgent.setModelByPath(arg);
-                        }
-                        applyLegacyGenerationForModel(currentAgent, ctx.config, arg);
+                        selectResolvedModelForCLI(currentAgent, arg);
                         console.log(
                             `Switched to ${A.bold}${getModelName()}${A.reset}`,
                         );

@@ -4,14 +4,14 @@ import { GLM_MODEL_PRESETS } from "./models.js";
 
 describe("GLM model presets", () => {
   it("includes source-backed GLM chat models", () => {
-    expect(GLM_MODEL_PRESETS.some((model) => model.model === "glm-5.2")).toBe(true);
-    expect(GLM_MODEL_PRESETS.some((model) => model.model === "glm-4.5-air")).toBe(true);
+    expect(GLM_MODEL_PRESETS.some((model) => model.name === "glm-5.2")).toBe(true);
+    expect(GLM_MODEL_PRESETS.some((model) => model.name === "glm-4.5-air")).toBe(true);
     expect(
-      GLM_MODEL_PRESETS.find((model) => model.model === "glm-5.2")
+      GLM_MODEL_PRESETS.find((model) => model.name === "glm-5.2")
         ?.maxOutputTokens,
     ).toBe(131072);
     expect(
-      GLM_MODEL_PRESETS.find((model) => model.model === "glm-4.5-air")
+      GLM_MODEL_PRESETS.find((model) => model.name === "glm-4.5-air")
         ?.maxOutputTokens,
     ).toBe(98304);
     expect(
@@ -19,5 +19,6 @@ describe("GLM model presets", () => {
         model.thinkingLevels.includes(ThinkingLevel.None),
       ),
     ).toBe(true);
+    expect(GLM_MODEL_PRESETS.every((model) => model.id === model.name)).toBe(true);
   });
 });

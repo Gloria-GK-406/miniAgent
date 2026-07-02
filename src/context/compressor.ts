@@ -1,7 +1,21 @@
-import type { Message, ContextProvider, LLMRequest, LLMResponse, ConfigNotifier, LLMRequire } from "../core/types.js";
-import { MessageType } from "../core/types.js";
-import type { ModelConfig, AgentConfig } from "../core/config.js";
-import type { Tool } from "../tool/types.js";
+import type { Message, ContextProvider, LLMRequest, ConfigNotifier, LLMRequire } from "../core/types.js";
+import { LLMStreamChunkType, MessageType } from "../core/types.js";
+import {
+    AgentConfigSchema,
+    ThinkingLevel,
+    normalizeGenerationConfig,
+} from "../core/config.js";
+import type {
+    AgentConfig,
+    GenerationConfig,
+    JsonValue,
+    LLMGenerateRequest,
+    ModelPreset,
+    ModelProviderConfig,
+    NormalizedAgentConfig,
+    ResolvedModel,
+} from "../core/config.js";
+import { resolveModelsFromProviders, selectResolvedModel } from "../core/model-resolution.js";
 
 const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the following conversation into a concise summary that preserves:
 1. Key decisions made
@@ -12,10 +26,55 @@ const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the follo
 
 Be concise but complete. Write in third person.`;
 
+const DEFAULT_GENERATION_CONFIG = {
+    temperature: 0.7,
+    thinking: ThinkingLevel.Medium,
+} satisfies GenerationConfig;
+
 function extractText(content: Message["content"]): string {
     if (typeof content === "string") return content;
     if (content.type === "text") return content.text;
     return "";
+}
+
+function cloneJsonRecord<T extends Record<string, JsonValue>>(value: T): T {
+    return structuredClone(value) as T;
+}
+
+function cloneModelPreset(model: ModelPreset): ModelPreset {
+    return {
+        id: model.id,
+        name: model.name,
+        ...(model.displayName !== undefined && { displayName: model.displayName }),
+        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
+        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
+        ...(model.thinkingLevels !== undefined && {
+            thinkingLevels: [...model.thinkingLevels],
+        }),
+        ...(model.capabilities !== undefined && {
+            capabilities: cloneJsonRecord(model.capabilities),
+        }),
+        ...(model.metadata !== undefined && {
+            metadata: cloneJsonRecord(model.metadata),
+        }),
+    };
+}
+
+function cloneProviderConfig(provider: ModelProviderConfig): ModelProviderConfig {
+    return {
+        provider: provider.provider,
+        key: provider.key,
+        ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
+        models: (provider.models ?? []).map(cloneModelPreset),
+    };
+}
+
+function buildFallbackSummary(messages: Message[]): string {
+    return messages
+        .map((m) => {
+            return `[${m.type}]: ${extractText(m.content).slice(0, 200)}`;
+        })
+        .join("\n");
 }
 
 export interface CompressionConfig {
@@ -26,7 +85,8 @@ export interface CompressionConfig {
 export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNotifier {
     priority = -1000;
     private llm: LLMRequest | null = null;
-    private modelConfig: ModelConfig | null = null;
+    private agentConfig: NormalizedAgentConfig | null = null;
+    private generationConfig: GenerationConfig = { ...DEFAULT_GENERATION_CONFIG };
     private config: CompressionConfig;
     private messages: Message[] = [];
     private summary: string | null = null;
@@ -44,7 +104,10 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
     }
 
     async setConfig(config: AgentConfig): Promise<void> {
-        this.modelConfig = config.model ?? null;
+        this.agentConfig = AgentConfigSchema.parse(config);
+        this.generationConfig = normalizeGenerationConfig(
+            this.agentConfig.generation ?? DEFAULT_GENERATION_CONFIG,
+        );
     }
 
     getCompressedCount(): number {
@@ -70,7 +133,13 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
     }
 
     private async compress(messages: Message[]): Promise<void> {
-        if (!this.llm || !this.modelConfig) return;
+        if (!this.llm || !this.agentConfig) return;
+
+        const selectedModel = this.selectSummaryModel();
+        if (!selectedModel) return;
+
+        const provider = this.getProviderConfigForModel(selectedModel);
+        if (!provider) return;
 
         const conversationText = messages
             .map((m) => {
@@ -85,26 +154,42 @@ export class ContextCompressor implements ContextProvider, LLMRequire, ConfigNot
         };
 
         try {
-            const stream = this.llm.streamInvoke(
-                [{ id: "compress-system", type: MessageType.System, content: SUMMARIZE_PROMPT }, summarizeRequest],
-                this.modelConfig,
-                [] as Tool[],
-            );
-            const response: LLMResponse = await stream;
-            const content = response.message;
-            if (!Array.isArray(content) && content.type === MessageType.Assist) {
-                this.summary = extractText(content.content);
-                this.compressedCount += messages.length;
+            const request: LLMGenerateRequest = {
+                provider,
+                model: selectedModel,
+                messages: [
+                    { id: "compress-system", type: MessageType.System, content: SUMMARIZE_PROMPT },
+                    summarizeRequest,
+                ],
+                tools: [],
+                generation: { ...this.generationConfig },
+            };
+            let summary = "";
+            for await (const chunk of this.llm.streamInvoke(request)) {
+                if (chunk.type === LLMStreamChunkType.TextDelta) {
+                    summary += chunk.text;
+                }
             }
+            if (summary.trim() === "") {
+                summary = buildFallbackSummary(messages);
+            }
+            this.summary = summary;
+            this.compressedCount += messages.length;
         } catch {
-            const text = messages
-                .map((m) => {
-                    return `[${m.type}]: ${extractText(m.content).slice(0, 200)}`;
-                })
-                .join("\n");
-            this.summary = text;
+            this.summary = buildFallbackSummary(messages);
             this.compressedCount += messages.length;
         }
+    }
+
+    private selectSummaryModel(): ResolvedModel | undefined {
+        if (!this.llm || !this.agentConfig) return undefined;
+        const resolvedModels = resolveModelsFromProviders(this.agentConfig.providers, this.llm);
+        return selectResolvedModel(resolvedModels, this.agentConfig.defaultModel);
+    }
+
+    private getProviderConfigForModel(model: ResolvedModel): ModelProviderConfig | undefined {
+        const provider = this.agentConfig?.providers.find((entry) => entry.provider === model.provider);
+        return provider ? cloneProviderConfig(provider) : undefined;
     }
 
     async collect(): Promise<Message[]> {

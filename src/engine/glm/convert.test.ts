@@ -2,16 +2,15 @@ import { describe, it, expect } from "vitest";
 import { MessageType } from "../../core/types.js";
 import {
   convertMessages,
-  buildCreateParams,
   buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
-import type { Message } from "../../core/types.js";
+import type { Message, Tool } from "../../core/types.js";
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-  type ModelConfig,
 } from "../../core/config.js";
+import { z } from "zod";
 
 function sysMsg(content: string): Message {
   return { id: "sys-1", type: MessageType.System, content };
@@ -63,36 +62,41 @@ function toolResultMsg(
   };
 }
 
-const baseConfig: ModelConfig = {
-  provider: "glm",
-  model: "glm-5",
-  apiKey: "test-key",
-  baseUrl: "",
-};
+function makeTool(): Tool {
+  return {
+    name: "get_weather",
+    description: "Get weather for a city",
+    parameters: z.object({
+      city: z.string(),
+    }),
+    execute: async () => "sunny",
+  };
+}
 
 function request(
   overrides: Partial<{
-    engine: string;
+    provider: string;
     model: string;
     thinking: ThinkingLevel;
     thinkingLevels: ThinkingLevel[];
+    tools: Tool[];
+    maxOutputTokens: number;
+    topP: number;
   }> = {},
 ): LLMGenerateRequest {
-  const engine = overrides.engine ?? "glm";
+  const provider = overrides.provider ?? "glm";
   const model = overrides.model ?? "glm-5.2";
   return {
     messages: [userMsg("hi")],
-    tools: [],
+    tools: overrides.tools ?? [],
     provider: {
-      name: "provider",
-      engine,
-      apiKey: "test-key",
+      provider,
+      key: "test-key",
     },
     model: {
-      id: `provider/${model}`,
-      provider: "provider",
-      engine,
-      model,
+      id: `${provider}/${model}`,
+      provider,
+      name: model,
       thinkingLevels: overrides.thinkingLevels ?? [
         ThinkingLevel.None,
         ThinkingLevel.Low,
@@ -103,6 +107,10 @@ function request(
     },
     generation: {
       temperature: 0.7,
+      ...(overrides.topP !== undefined && { topP: overrides.topP }),
+      ...(overrides.maxOutputTokens !== undefined && {
+        maxOutputTokens: overrides.maxOutputTokens,
+      }),
       thinking: overrides.thinking ?? ThinkingLevel.Low,
     },
   };
@@ -160,26 +168,24 @@ describe("GLM convertMessages", () => {
   });
 });
 
-describe("GLM buildCreateParams", () => {
-  it("includes thinking enabled when config.thinking is true", () => {
-    const config: ModelConfig = { ...baseConfig, thinking: true };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params).toMatchObject({
-      thinking: { type: "enabled" },
-    });
-  });
+describe("GLM buildCreateParamsFromRequest", () => {
+  it("maps request fields to provider params", () => {
+    const params = buildCreateParamsFromRequest(request({
+      maxOutputTokens: 4096,
+      topP: 0.9,
+      tools: [makeTool()],
+      thinking: ThinkingLevel.None,
+    }));
 
-  it("includes thinking disabled when config.thinking is false", () => {
-    const config: ModelConfig = { ...baseConfig, thinking: false };
-    const params = buildCreateParams([userMsg("hi")], config, []);
     expect(params).toMatchObject({
+      model: "glm-5.2",
+      messages: [{ role: "user", content: "hi" }],
+      max_completion_tokens: 4096,
+      temperature: 0.7,
+      top_p: 0.9,
       thinking: { type: "disabled" },
     });
-  });
-
-  it("omits thinking when config.thinking is undefined", () => {
-    const params = buildCreateParams([userMsg("hi")], baseConfig, []);
-    expect(params).not.toHaveProperty("thinking");
+    expect(params.tools).toHaveLength(1);
   });
 
   it("includes level-aware reasoning effort for GLM-5.2 request mode", () => {
@@ -193,9 +199,35 @@ describe("GLM buildCreateParams", () => {
     });
   });
 
+  it("downgrades unsupported GLM effort to nearest supported lower effort", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Max,
+      thinkingLevels: [
+        ThinkingLevel.None,
+        ThinkingLevel.Low,
+        ThinkingLevel.Medium,
+      ],
+    }));
+
+    expect(params).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "medium",
+    });
+  });
+
+  it("omits thinking instead of upgrading low to medium", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Low,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    }));
+
+    expect(params).not.toHaveProperty("thinking");
+    expect(params).not.toHaveProperty("reasoning_effort");
+  });
+
   it("maps CodePlan low/medium/high efforts to high", () => {
     const params = buildCreateParamsFromRequest(request({
-      engine: "glm-codeplan",
+      provider: "glm-codeplan",
       thinking: ThinkingLevel.Medium,
     }));
 
@@ -207,7 +239,7 @@ describe("GLM buildCreateParams", () => {
 
   it("maps CodePlan max effort to max", () => {
     const params = buildCreateParamsFromRequest(request({
-      engine: "glm-codeplan",
+      provider: "glm-codeplan",
       thinking: ThinkingLevel.Max,
     }));
 
@@ -219,7 +251,7 @@ describe("GLM buildCreateParams", () => {
 
   it("omits reasoning_effort for boolean-only GLM thinking models", () => {
     const params = buildCreateParamsFromRequest(request({
-      engine: "glm-codeplan",
+      provider: "glm-codeplan",
       model: "glm-4.7",
       thinking: ThinkingLevel.High,
       thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],

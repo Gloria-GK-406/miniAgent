@@ -3,11 +3,12 @@ export type { MiniAgentOptions } from "./core/agent.js";
 export { createMiniAgent } from "./core/create-agent.js";
 export { defineAgentModule } from "./core/module.js";
 export { AgentAssembler, AgentBlueprintRegistry } from "./assembly/assembler.js";
-export { LLMEngineManager } from "./core/llm.js";
-export type { LLMEngine, LegacyLLMEngine, LLMEngineCtor, ModelCatalogLLMEngine } from "./core/llm.js";
+export { DefaultLLMEngineRegister, LLMEngineManager } from "./core/llm.js";
+export type { LLMEngine } from "./core/llm.js";
 export { createLLMStreamHandle } from "./core/llm.js";
 export type { LLMStreamController } from "./core/llm.js";
 export { emptyTokenCount, createTokenCount, addTokenCount } from "./core/llm.js";
+export { resolveModelsFromProviders, selectResolvedModel } from "./core/model-resolution.js";
 export type {
     CreateMiniAgentOptions,
     AgentInstaller,
@@ -30,7 +31,7 @@ export type {
 } from "./assembly/capability.js";
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
-export { ModelAwareLLMRequestSchema } from "./core/types.js";
+export { LLMRequestSchema } from "./core/types.js";
 export type {
     Message,
     MessageContent,
@@ -42,12 +43,12 @@ export type {
     ToolCallMessage,
     ToolResultMessage,
     LLMResponse,
+    MessageChunk,
     LLMStreamChunk,
     TextDeltaChunk,
     ReasoningDeltaChunk,
     ToolCallArgumentsDeltaChunk,
     LLMRequest,
-    ModelAwareLLMRequest,
     LLMStreamHandle,
     ContextProvider,
     ContextProcessor,
@@ -68,7 +69,6 @@ export type {
 export {
     ThinkingLevel,
     JsonValueSchema,
-    ModelConfigSchema,
     ThinkingLevelSchema,
     ModelPresetSchema,
     ProviderModelOverridesSchema,
@@ -77,7 +77,6 @@ export {
     ModelSelectorSchema,
     GenerationConfigSchema,
     LLMGenerateRequestSchema,
-    ModelGroupSchema,
     PathConfigSchema,
     PersistConfigFileSchema,
     PersistConfigSchema,
@@ -87,7 +86,6 @@ export {
 } from "./core/config.js";
 export type {
     JsonValue,
-    ModelConfig,
     ModelPreset,
     ProviderModelOverrides,
     ModelProviderConfig,
@@ -96,12 +94,12 @@ export type {
     GenerationConfig,
     GenerationConfigInput,
     LLMGenerateRequest,
-    ModelGroup,
     PathConfig,
     PersistConfigFile,
     PersistConfig,
     RuntimeConfig,
     AgentConfig,
+    NormalizedAgentConfig,
 } from "./core/config.js";
 
 export type { MessageSource } from "./store/message-source.js";

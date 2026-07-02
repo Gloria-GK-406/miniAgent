@@ -2,7 +2,8 @@ import { ThinkingLevel, type ModelPreset } from "../../core/config.js";
 
 export const GLM_CODEPLAN_MODEL_PRESETS: ModelPreset[] = [
   {
-    model: "glm-5.2",
+    id: "glm-5.2",
+    name: "glm-5.2",
     displayName: "GLM 5.2",
     contextSize: 1000000,
     maxOutputTokens: 131072,
@@ -15,7 +16,8 @@ export const GLM_CODEPLAN_MODEL_PRESETS: ModelPreset[] = [
     ],
   },
   {
-    model: "glm-5.2[1m]",
+    id: "glm-5.2[1m]",
+    name: "glm-5.2[1m]",
     displayName: "GLM 5.2 1M",
     contextSize: 1000000,
     maxOutputTokens: 131072,
@@ -28,7 +30,8 @@ export const GLM_CODEPLAN_MODEL_PRESETS: ModelPreset[] = [
     ],
   },
   {
-    model: "glm-4.7",
+    id: "glm-4.7",
+    name: "glm-4.7",
     displayName: "GLM 4.7",
     contextSize: 200000,
     maxOutputTokens: 131072,

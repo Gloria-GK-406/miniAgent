@@ -2,7 +2,8 @@ import { ThinkingLevel, type ModelPreset } from "../../core/config.js";
 
 export const ANTHROPIC_MODEL_PRESETS: ModelPreset[] = [
   {
-    model: "claude-sonnet-4-5",
+    id: "claude-sonnet-4-5",
+    name: "claude-sonnet-4-5",
     displayName: "Claude Sonnet 4.5",
     thinkingLevels: [
       ThinkingLevel.None,
@@ -13,7 +14,8 @@ export const ANTHROPIC_MODEL_PRESETS: ModelPreset[] = [
     ],
   },
   {
-    model: "claude-opus-4-1",
+    id: "claude-opus-4-1",
+    name: "claude-opus-4-1",
     displayName: "Claude Opus 4.1",
     thinkingLevels: [
       ThinkingLevel.None,
@@ -24,7 +26,8 @@ export const ANTHROPIC_MODEL_PRESETS: ModelPreset[] = [
     ],
   },
   {
-    model: "claude-3-haiku-20240307",
+    id: "claude-3-haiku-20240307",
+    name: "claude-3-haiku-20240307",
     displayName: "Claude 3 Haiku",
     thinkingLevels: [ThinkingLevel.None],
   },

@@ -78,7 +78,7 @@ Frontmatter 字段：
 | `id` | 是 | 唯一的子 Agent 标识符 |
 | `name` | 否 | 显示名称（默认为 `id`） |
 | `description` | 否 | 在工具列表中显示的简短描述 |
-| `model` | 否 | 使用的模型，`provider/model` 格式 |
+| `model` | 否 | 使用的模型，格式为 `id` 或 `provider/id` |
 | `capabilities` | 否 | 用于过滤可用工具的 `AgentCapabilityRule` |
 
 ### run_subagent 工具

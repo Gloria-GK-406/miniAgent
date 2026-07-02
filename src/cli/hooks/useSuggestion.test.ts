@@ -54,7 +54,7 @@ describe("matchSuggestions", () => {
   });
 
   it("returns all matching model suggestions", () => {
-    const paths = Array.from({ length: 10 }, (_, i) => `provider/model-${i}`);
+    const paths = Array.from({ length: 10 }, (_, i) => `provider/id-${i}`);
     const result = matchSuggestions("/model ", paths);
     expect(result).toHaveLength(10);
   });

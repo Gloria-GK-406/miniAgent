@@ -3,16 +3,19 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SkillPlugin } from "./plugin.js";
-import type { AgentConfig } from "../../core/config.js";
+import { AgentConfigSchema, type JsonValue, type NormalizedAgentConfig } from "../../core/config.js";
 import { MessageType } from "../../core/types.js";
 
-function makeConfig(directories: string[]): AgentConfig {
-    return {
-        model: { provider: "test", model: "m", apiKey: "k" },
-        models: new Map(),
-        plugins: new Map([["skill", { directories }]]),
+function makeAgentConfig(plugins = new Map<string, JsonValue>()): NormalizedAgentConfig {
+    return AgentConfigSchema.parse({
+        providers: [{ provider: "test", key: "key" }],
+        plugins,
         paths: { sessiondir: "/tmp" },
-    };
+    });
+}
+
+function makeConfig(directories: string[]): NormalizedAgentConfig {
+    return makeAgentConfig(new Map([["skill", { directories }]]));
 }
 
 function makeSkillManifest(id: string, name?: string, description?: string, content?: string): string {
@@ -40,36 +43,21 @@ describe("SkillPlugin", () => {
 
     describe("setConfig", () => {
         it("clears skills when no config", async () => {
-            const config: AgentConfig = {
-                model: { provider: "test", model: "m", apiKey: "k" },
-                models: new Map(),
-                plugins: new Map(),
-                paths: { sessiondir: "/tmp" },
-            };
+            const config = makeAgentConfig();
             await plugin.setConfig(config);
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);
         });
 
         it("clears skills when config is null", async () => {
-            const config: AgentConfig = {
-                model: { provider: "test", model: "m", apiKey: "k" },
-                models: new Map(),
-                plugins: new Map([["skill", null]]),
-                paths: { sessiondir: "/tmp" },
-            };
+            const config = makeAgentConfig(new Map([["skill", null]]));
             await plugin.setConfig(config);
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);
         });
 
         it("throws on invalid config", async () => {
-            const config: AgentConfig = {
-                model: { provider: "test", model: "m", apiKey: "k" },
-                models: new Map(),
-                plugins: new Map([["skill", { directories: 123 }]]),
-                paths: { sessiondir: "/tmp" },
-            };
+            const config = makeAgentConfig(new Map([["skill", { directories: 123 }]]));
             await expect(plugin.setConfig(config)).rejects.toThrow("Invalid skill plugin config");
         });
 
@@ -94,12 +82,7 @@ describe("SkillPlugin", () => {
 
     describe("collect", () => {
         it("returns empty array when no skills loaded", async () => {
-            const config: AgentConfig = {
-                model: { provider: "test", model: "m", apiKey: "k" },
-                models: new Map(),
-                plugins: new Map(),
-                paths: { sessiondir: "/tmp" },
-            };
+            const config = makeAgentConfig();
             await plugin.setConfig(config);
             const messages = await plugin.collect();
             expect(messages).toEqual([]);
@@ -122,12 +105,7 @@ describe("SkillPlugin", () => {
 
     describe("getTools", () => {
         it("returns empty array when no skills", async () => {
-            const config: AgentConfig = {
-                model: { provider: "test", model: "m", apiKey: "k" },
-                models: new Map(),
-                plugins: new Map(),
-                paths: { sessiondir: "/tmp" },
-            };
+            const config = makeAgentConfig();
             await plugin.setConfig(config);
             const tools = await plugin.getTools();
             expect(tools).toEqual([]);

@@ -1,157 +1,135 @@
 import { describe, expect, it } from "vitest";
-import type { Tool } from "../tool/types.js";
-import {
-  LLMEngineManager,
-  createLLMStreamHandle,
-  type LLMEngine,
-  type ModelCatalogLLMEngine,
-} from "./llm.js";
-import {
-  LLMRequestSchema,
-  ModelAwareLLMRequestSchema,
-  MessageType,
-  type LLMRequest,
-  type LLMResponse,
-  type Message,
-  type ModelAwareLLMRequest,
-} from "./types.js";
+import { LLMEngineManager } from "./llm.js";
+import { LLMRequestSchema, LLMStreamChunkType, type MessageChunk } from "./types.js";
 import { ThinkingLevel, type LLMGenerateRequest, type ModelPreset } from "./config.js";
+import type { LLMEngine } from "./llm.js";
 
-function resolvedResponse(text: string) {
-  const response: LLMResponse = {
-    message: {
-      id: "assist-1",
-      type: MessageType.Assist,
-      content: text,
-    },
-    tokenCount: { input: 0, output: 0, total: 0 },
-  };
-  const controller = createLLMStreamHandle<LLMResponse>();
-  controller.resolve(response);
-  return controller.handle;
+async function* chunkStream(text: string): AsyncGenerator<MessageChunk> {
+  yield { type: LLMStreamChunkType.TextDelta, text };
 }
 
-function generateRequest(engine: string, model: string): LLMGenerateRequest {
+function fakeEngine(name: string, models: ModelPreset[]) {
   return {
-    messages: [{ id: "u", type: MessageType.User, content: "hi" }] as Message[],
-    tools: [] as Tool[],
-    provider: { name: "p", engine, apiKey: "k" },
+    name,
+    getModels: () => models,
+    streamGenerate: (request: LLMGenerateRequest) => chunkStream(request.model.name),
+  } satisfies LLMEngine;
+}
+
+function requestFor(engineName: string, modelId: string, modelName: string) {
+  return {
+    messages: [],
+    tools: [],
+    provider: {
+      provider: engineName,
+      key: "test-key",
+      models: [],
+    },
     model: {
-      id: `p/${model}`,
-      provider: "p",
-      engine,
-      model,
+      id: modelId,
+      provider: engineName,
+      name: modelName,
       thinkingLevels: [ThinkingLevel.None],
     },
-    generation: { temperature: 0.7, thinking: ThinkingLevel.Medium },
-  };
+    generation: {
+      temperature: 0.7,
+      thinking: ThinkingLevel.Medium,
+    },
+  } satisfies LLMGenerateRequest;
 }
 
 describe("LLMEngineManager", () => {
-  it("keeps LLMEngine compatible with legacy engines", async () => {
-    const engine: LLMEngine = {
-      streamGenerate(messages: Message[], tools: Tool[]) {
-        return resolvedResponse(`${messages.length}:${tools.length}`);
-      },
-    };
-
-    const response = await engine.streamGenerate(
-      [{ id: "u", type: MessageType.User, content: "hi" }],
-      [],
-    );
-    expect(response.message).toMatchObject({ content: "1:0" });
-  });
-
-  it("registers engine instances by their name", async () => {
-    const seen: LLMGenerateRequest[] = [];
+  it("registers engine instances by engine.name", () => {
     const manager = new LLMEngineManager();
-    const engine: ModelCatalogLLMEngine = {
-      name: "test-engine",
-      getModels(): ModelPreset[] {
-        return [{ model: "m", thinkingLevels: [ThinkingLevel.None] }];
-      },
-      streamGenerate(request: LLMGenerateRequest) {
-        seen.push(request);
-        return resolvedResponse(request.model.model);
-      },
-    };
-    manager.register(engine);
+    manager.register(fakeEngine("openai", [
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
 
-    const request = generateRequest("test-engine", "m");
-
-    const response = await manager.streamInvoke(request);
-    expect(response.message).toMatchObject({ content: "m" });
-    expect(seen).toHaveLength(1);
-  });
-
-  it("accepts model catalog engine adapters for instance registration", async () => {
-    const manager = new LLMEngineManager();
-    const engine: ModelCatalogLLMEngine = {
-      name: "public-engine",
-      getModels(): ModelPreset[] {
-        return [{ model: "public-model", thinkingLevels: [ThinkingLevel.None] }];
-      },
-      streamGenerate(request: LLMGenerateRequest) {
-        return resolvedResponse(request.model.model);
-      },
-    };
-
-    manager.register(engine);
-
-    const response = await manager.streamInvoke(generateRequest("public-engine", "public-model"));
-    expect(response.message).toMatchObject({ content: "public-model" });
-  });
-
-  it("keeps LLMRequest compatible with legacy request implementations", async () => {
-    const llmRequest: LLMRequest = {
-      streamInvoke(messages: Message[], config, tools: Tool[]) {
-        return resolvedResponse(`${config.model}:${messages.length}:${tools.length}`);
-      },
-    };
-    const parsedRequest = LLMRequestSchema.parse(llmRequest);
-
-    const response = await parsedRequest.streamInvoke(
-      [{ id: "u", type: MessageType.User, content: "hi" }],
+    expect(manager.getEngineModels("openai")).toEqual([
       {
-        provider: "legacy-provider",
-        model: "legacy-model",
-        apiKey: "key",
+        id: "fast",
+        provider: "openai",
+        name: "gpt-4o-mini",
+        thinkingLevels: [ThinkingLevel.None],
       },
-      [],
-    );
-    expect(response.message).toMatchObject({ content: "legacy-model:1:0" });
+    ]);
   });
 
-  it("implements ModelAwareLLMRequest with request-object streamInvoke support", async () => {
+  it("returns cloned resolved model arrays from engine catalogs", () => {
     const manager = new LLMEngineManager();
-    manager.register({
-      name: "request-engine",
-      getModels: () => [{ model: "request-model", thinkingLevels: [ThinkingLevel.None] }],
-      streamGenerate: (request: LLMGenerateRequest) => resolvedResponse(request.model.model),
-    });
-    const llmRequest: ModelAwareLLMRequest = manager;
-    const parsedRequest = ModelAwareLLMRequestSchema.parse(llmRequest);
+    manager.register(fakeEngine("openai", [
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
 
-    const response = await parsedRequest.streamInvoke(generateRequest("request-engine", "request-model"));
-    expect(response.message).toMatchObject({ content: "request-model" });
-  });
-
-  it("exposes cloned models from a registered engine", () => {
-    const presets: ModelPreset[] = [
-      { model: "a", thinkingLevels: [ThinkingLevel.None] },
-    ];
-    const manager = new LLMEngineManager();
-    manager.register({
-      name: "catalog",
-      getModels: () => presets,
-      streamGenerate: () => resolvedResponse("ok"),
-    });
-
-    const models = manager.getEngineModels("catalog");
+    const models = manager.getEngineModels("openai");
     models[0]!.thinkingLevels.push(ThinkingLevel.Medium);
 
-    expect(manager.getEngineModels("catalog")).toEqual([
-      { model: "a", thinkingLevels: [ThinkingLevel.None] },
+    expect(manager.getEngineModels("openai")).toEqual([
+      {
+        id: "fast",
+        provider: "openai",
+        name: "gpt-4o-mini",
+        thinkingLevels: [ThinkingLevel.None],
+      },
+    ]);
+  });
+
+  it("streams a single LLMGenerateRequest to the selected engine", async () => {
+    const calls: LLMGenerateRequest[] = [];
+    const manager = new LLMEngineManager();
+    manager.register({
+      name: "openai",
+      getModels: () => [
+        { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+      ],
+      streamGenerate(request) {
+        calls.push(request);
+        return chunkStream(request.model.name);
+      },
+    });
+
+    const request = requestFor("openai", "fast", "gpt-4o-mini");
+
+    const chunks = [];
+    for await (const chunk of manager.streamInvoke(request)) {
+      chunks.push(chunk);
+    }
+
+    expect(calls).toEqual([request]);
+    expect(chunks).toEqual([
+      { type: LLMStreamChunkType.TextDelta, text: "gpt-4o-mini" },
+    ]);
+  });
+
+  it("rejects legacy constructor registration at runtime", () => {
+    const manager = new LLMEngineManager();
+
+    expect(() => manager.register("openai" as never)).toThrow(
+      /engine instance/i,
+    );
+  });
+
+  it("parses request-mode LLMRequest implementations", async () => {
+    const request = requestFor("openai", "fast", "gpt-4o-mini");
+    const llmRequest = LLMRequestSchema.parse({
+      getEngineModels: () => [
+        {
+          id: "fast",
+          provider: "openai",
+          name: "gpt-4o-mini",
+          thinkingLevels: [ThinkingLevel.None],
+        },
+      ],
+      streamInvoke: (received: LLMGenerateRequest) => chunkStream(received.model.name),
+    });
+
+    const chunks = [];
+    for await (const chunk of llmRequest.streamInvoke(request)) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: LLMStreamChunkType.TextDelta, text: "gpt-4o-mini" },
     ]);
   });
 });

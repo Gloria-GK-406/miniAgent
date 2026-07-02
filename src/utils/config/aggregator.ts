@@ -1,9 +1,21 @@
 import { PersistConfigSchema } from "../../core/config.js";
-import type { ModelGroup, PersistConfig, PersistConfigFile } from "../../core/config.js";
+import type { ModelProviderConfig, PersistConfig, PersistConfigFile } from "../../core/config.js";
 
-function cloneGroup(group: ModelGroup): ModelGroup {
+function cloneProvider(provider: ModelProviderConfig): ModelProviderConfig {
     return {
-        models: group.models.map((model) => ({ ...model })),
+        ...provider,
+        models: (provider.models ?? []).map((model) => ({
+            ...model,
+            ...(model.thinkingLevels !== undefined && {
+                thinkingLevels: [...model.thinkingLevels],
+            }),
+            ...(model.capabilities !== undefined && {
+                capabilities: structuredClone(model.capabilities),
+            }),
+            ...(model.metadata !== undefined && {
+                metadata: structuredClone(model.metadata),
+            }),
+        })),
     };
 }
 
@@ -17,23 +29,24 @@ export class PersistentConfigAggregator {
     }
 
     static merge(base: PersistConfig, override: PersistConfigFile): PersistConfig {
-        const models: Record<string, ModelGroup> = {
-            ...Object.fromEntries(
-                Object.entries(base.models).map(([name, group]) => [name, cloneGroup(group)]),
-            ),
-        };
-        for (const [name, group] of Object.entries(override.models)) {
-            models[name] = cloneGroup(group);
+        const providers = new Map(
+            base.providers.map((provider) => [provider.provider, cloneProvider(provider)]),
+        );
+        for (const provider of override.providers) {
+            providers.set(provider.provider, cloneProvider(provider));
         }
+
+        const generation = {
+            ...(base.generation ?? {}),
+            ...(override.generation ?? {}),
+        };
 
         return PersistConfigSchema.parse({
             ...(base.defaultModel !== undefined && { defaultModel: base.defaultModel }),
             ...(override.defaultModel !== undefined && { defaultModel: override.defaultModel }),
-            models,
-            plugins: {
-                ...base.plugins,
-                ...override.plugins,
-            },
+            providers: [...providers.values()],
+            ...(Object.keys(generation).length > 0 && { generation }),
+            plugins: new Map([...base.plugins, ...override.plugins]),
         });
     }
 }

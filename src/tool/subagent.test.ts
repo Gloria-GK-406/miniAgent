@@ -3,16 +3,19 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { MessageType } from "../core/types.js";
-import type { AgentConfig } from "../core/config.js";
+import { AgentConfigSchema, type JsonValue, type NormalizedAgentConfig } from "../core/config.js";
 import { SubagentPlugin } from "./subagent.js";
 
-function makeConfig(path: string): AgentConfig {
-    return {
-        model: { provider: "test", model: "m", apiKey: "k" },
-        models: new Map(),
-        plugins: new Map([["subagent", { path }]]),
+function makeAgentConfig(plugins = new Map<string, JsonValue>()): NormalizedAgentConfig {
+    return AgentConfigSchema.parse({
+        providers: [{ provider: "test", key: "key" }],
+        plugins,
         paths: { sessiondir: "/tmp" },
-    };
+    });
+}
+
+function makeConfig(path: string): NormalizedAgentConfig {
+    return makeAgentConfig(new Map([["subagent", { path }]]));
 }
 
 function makeManifest(

@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { AgentConfigSchema } from "./config.js";
-import type { LLMGenerateRequest, ModelConfig, ModelPreset } from "./config.js";
+import type { LLMGenerateRequest, ResolvedModel } from "./config.js";
 import type { Store } from "../store/store.js";
-import type { Tool } from "../tool/types.js";
 
 export enum MessageType {
   System = "system",
@@ -102,8 +101,6 @@ export const LLMResponseSchema = z.object({
 
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 
-export type { ModelConfig } from "./config.js";
-
 export type { Tool } from "../tool/types.js";
 
 export enum LLMStreamChunkType {
@@ -140,6 +137,7 @@ export type TextDeltaChunk = z.infer<typeof TextDeltaChunkSchema>;
 export type ReasoningDeltaChunk = z.infer<typeof ReasoningDeltaChunkSchema>;
 export type ToolCallArgumentsDeltaChunk = z.infer<typeof ToolCallArgumentsDeltaChunkSchema>;
 export type LLMStreamChunk = z.infer<typeof LLMStreamChunkSchema>;
+export type MessageChunk = LLMStreamChunk;
 
 export interface LLMStreamHandle<T> extends PromiseLike<T> {
   onChunk(listener: (chunk: LLMStreamChunk) => void): () => void;
@@ -149,33 +147,11 @@ export interface LLMStreamHandle<T> extends PromiseLike<T> {
 export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();
 
 export interface LLMRequest {
-  streamInvoke(
-    messages: Message[],
-    config: ModelConfig,
-    tools: Tool[],
-  ): LLMStreamHandle<LLMResponse>;
-}
-
-export interface ModelAwareLLMRequest extends LLMRequest {
-  getEngineModels(engineName: string): ModelPreset[];
-  streamInvoke(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
-  streamInvoke(
-    messages: Message[],
-    config: ModelConfig,
-    tools: Tool[],
-  ): LLMStreamHandle<LLMResponse>;
+  getEngineModels(engineName: string): ResolvedModel[];
+  streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 
 export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "streamInvoke" in value &&
-    typeof (value as { streamInvoke?: unknown }).streamInvoke === "function"
-  );
-});
-
-export const ModelAwareLLMRequestSchema = z.custom<ModelAwareLLMRequest>((value) => {
   return (
     typeof value === "object" &&
     value !== null &&

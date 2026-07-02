@@ -4,7 +4,6 @@ import { MessageType } from "../../core/types.js";
 import {
   convertMessages,
   convertTools,
-  buildCreateParams,
   buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
@@ -12,7 +11,6 @@ import type { Message, Tool, ImageContent } from "../../core/types.js";
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-  type ModelConfig,
 } from "../../core/config.js";
 
 function sysMsg(content: string): Message {
@@ -73,36 +71,31 @@ function toolResultMsg(
   };
 }
 
-const baseConfig: ModelConfig = {
-  provider: "openai",
-  model: "gpt-4o",
-  apiKey: "test-key",
-  baseUrl: "",
-};
-
 function request(
   overrides: Partial<{
-    engine: string;
+    provider: string;
     model: string;
     thinking: ThinkingLevel;
     thinkingLevels: ThinkingLevel[];
+    tools: Tool[];
+    maxOutputTokens: number;
+    topP: number;
   }> = {},
 ): LLMGenerateRequest {
-  const engine = overrides.engine ?? "openai";
+  const provider = overrides.provider ?? "openai";
   const model = overrides.model ?? "o3";
   return {
     messages: [userMsg("hi")],
-    tools: [],
+    tools: overrides.tools ?? [],
     provider: {
-      name: "provider",
-      engine,
-      apiKey: "test-key",
+      provider,
+      key: "test-key",
+      baseUrl: "https://example.invalid/v1",
     },
     model: {
-      id: `provider/${model}`,
-      provider: "provider",
-      engine,
-      model,
+      id: `${provider}/${model}`,
+      provider,
+      name: model,
       thinkingLevels: overrides.thinkingLevels ?? [
         ThinkingLevel.None,
         ThinkingLevel.Low,
@@ -112,6 +105,10 @@ function request(
     },
     generation: {
       temperature: 0.7,
+      ...(overrides.topP !== undefined && { topP: overrides.topP }),
+      ...(overrides.maxOutputTokens !== undefined && {
+        maxOutputTokens: overrides.maxOutputTokens,
+      }),
       thinking: overrides.thinking ?? ThinkingLevel.High,
     },
   };
@@ -255,39 +252,31 @@ describe("convertTools", () => {
   });
 });
 
-describe("buildCreateParams", () => {
-  it("builds params with required fields only", () => {
-    const params = buildCreateParams([userMsg("hi")], baseConfig, []);
-    expect(params).toEqual({
+describe("buildCreateParamsFromRequest", () => {
+  it("builds params from request model, messages, and generation", () => {
+    const params = buildCreateParamsFromRequest(request({
+      model: "gpt-4o",
+      maxOutputTokens: 200,
+      topP: 0.9,
+      thinking: ThinkingLevel.None,
+    }));
+
+    expect(params).toMatchObject({
       model: "gpt-4o",
       messages: [{ role: "user", content: "hi" }],
       tools: [],
-    });
-  });
-
-  it("passes optional ModelConfig fields", () => {
-    const config: ModelConfig = {
-      ...baseConfig,
-      maxTokens: 100,
-      maxOutputTokens: 200,
-      temperature: 0.7,
-      topP: 0.9,
-    };
-    const params = buildCreateParams([userMsg("hi")], config, []);
-    expect(params).toMatchObject({
-      max_tokens: 100,
       max_completion_tokens: 200,
       temperature: 0.7,
       top_p: 0.9,
     });
+    expect(params).not.toHaveProperty("max_tokens");
   });
 
   it("includes tools when provided", () => {
-    const params = buildCreateParams(
-      [userMsg("hi")],
-      baseConfig,
-      [makeTool()],
-    );
+    const params = buildCreateParamsFromRequest(request({
+      tools: [makeTool()],
+      thinking: ThinkingLevel.None,
+    }));
     expect(params.tools).toHaveLength(1);
   });
 
@@ -299,7 +288,7 @@ describe("buildCreateParams", () => {
     expect(params).not.toHaveProperty("reasoning_effort");
   });
 
-  it("downgrades unsupported OpenAI reasoning effort to nearest supported level", () => {
+  it("downgrades unsupported OpenAI reasoning effort to nearest supported lower level", () => {
     const params = buildCreateParamsFromRequest(request({
       thinking: ThinkingLevel.Max,
     }));
@@ -307,10 +296,29 @@ describe("buildCreateParams", () => {
     expect(params).toMatchObject({ reasoning_effort: "high" });
   });
 
+  it("omits reasoning_effort instead of upgrading low to medium", () => {
+    const params = buildCreateParamsFromRequest(request({
+      thinking: ThinkingLevel.Low,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    }));
+
+    expect(params).not.toHaveProperty("reasoning_effort");
+  });
+
   it("omits reasoning_effort when no non-none level is supported", () => {
     const params = buildCreateParamsFromRequest(request({
       thinking: ThinkingLevel.High,
       thinkingLevels: [ThinkingLevel.None],
+    }));
+
+    expect(params).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("omits reasoning_effort for non-OpenAI providers", () => {
+    const params = buildCreateParamsFromRequest(request({
+      provider: "openai-compatible",
+      thinking: ThinkingLevel.High,
+      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
     }));
 
     expect(params).not.toHaveProperty("reasoning_effort");

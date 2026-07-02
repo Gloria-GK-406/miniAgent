@@ -6,15 +6,18 @@ describe("OpenAI model presets", () => {
   it("includes conservative OpenAI chat and reasoning models", () => {
     expect(OPENAI_MODEL_PRESETS.length).toBeGreaterThan(0);
     expect(
-      OPENAI_MODEL_PRESETS.some((model) => model.model.startsWith("gpt-")),
+      OPENAI_MODEL_PRESETS.some((model) => model.name.startsWith("gpt-")),
     ).toBe(true);
     expect(
-      OPENAI_MODEL_PRESETS.some((model) => model.model.startsWith("o")),
+      OPENAI_MODEL_PRESETS.some((model) => model.name.startsWith("o")),
     ).toBe(true);
     expect(
       OPENAI_MODEL_PRESETS.every((model) =>
         model.thinkingLevels.includes(ThinkingLevel.None),
       ),
+    ).toBe(true);
+    expect(
+      OPENAI_MODEL_PRESETS.every((model) => model.id === model.name),
     ).toBe(true);
   });
 });

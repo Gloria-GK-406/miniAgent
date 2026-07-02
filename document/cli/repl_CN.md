@@ -14,53 +14,37 @@ npm run chat
 {
   "providers": [
     {
-      "name": "anthropic-main",
       "engine": "anthropic",
-      "apiKey": "sk-ant-..."
+      "key": "sk-ant-...",
+      "models": [{ "id": "sonnet", "name": "claude-sonnet-4-5" }]
     },
     {
-      "name": "local-qwen",
       "engine": "openai-compatible",
-      "apiKey": "local",
-      "baseUrl": "http://localhost:8000/v1",
-      "models": {
-        "add": [
-          {
-            "model": "qwen3-coder",
-            "contextSize": 128000,
-            "maxOutputTokens": 32768,
-            "thinkingLevels": ["none", "medium"]
-          }
-        ]
-      }
+      "key": "local",
+      "baseURL": "http://localhost:11434/v1",
+      "models": [{ "id": "local", "name": "qwen2.5-coder" }]
     }
   ],
-  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "defaultModel": "sonnet",
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
-  },
-  "systemPrompt": "You are a helpful assistant.",
-  "subagent": {
-    "path": "./.cliagent/subagent/"
   }
 }
 ```
 
-Provider-mode model config uses `providers[].name` as the user-facing profile,
-`providers[].engine` as the built-in engine adapter, and optional
-`providers[].models.add` / `providers[].models.override` for custom model
-presets. `defaultModel` should be a resolved id such as
-`anthropic-main/claude-sonnet-4-5`. `generation.thinking` accepts `none`,
-`low`, `medium`, `high`, or `max`; unsupported levels downgrade inside the
-engine. Legacy top-level `models` entries still load during migration.
+CLI provider 配置使用 `providers[].engine` 指定内置引擎适配器，`providers[].key`
+填写 API 密钥，`providers[].baseURL` 可选，`providers[].models` 必须是
+`{ id, name }` 形状的模型预设数组。`defaultModel` 可填写 `sonnet` 这样的模型
+ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `none`、`low`、
+`medium`、`high` 或 `max`；不支持的级别会在引擎内降级。
 
 ## 命令
 
 | 命令 | 说明 |
 |------|------|
 | `/models` | 列出已配置的模型 |
-| `/model <provider/model>` | 切换活动模型 |
+| `/model <id\|provider/id>` | 切换活动模型 |
 | `/tools` | 列出已注册的工具 |
 | `/history [page]` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
@@ -110,12 +94,16 @@ CLI 使用 `ContextCompressor`，默认配置：
 
 ## 模型配置
 
-模型在 `.cliagent/config.json` 中配置。每个模型条目需要：
+模型在 `.cliagent/config.json` 中通过 provider 条目配置：
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `name` | 是 | 模型的显示名称 |
-| `provider` | 是 | 引擎提供者（`anthropic`、`openai`、`openai-compatible`、`glm`、`glm-codeplan`） |
-| `model` | 是 | 模型标识符 |
-| `apiKey` | 是 | API 密钥 |
-| `baseUrl` | 否 | 自定义基础 URL（`openai-compatible` 必填） |
+| `providers[].engine` | 是 | 引擎适配器（`anthropic`、`openai`、`openai-compatible`、`glm`、`glm-codeplan`、`nvidia`） |
+| `providers[].key` | 是 | API 密钥 |
+| `providers[].baseURL` | 否 | 自定义基础 URL，通常用于 `openai-compatible` |
+| `providers[].models` | 是 | 模型预设数组 |
+| `providers[].models[].id` | 是 | `/model` 和 `defaultModel` 使用的选择器 ID |
+| `providers[].models[].name` | 是 | 发送给引擎的真实模型名 |
+| `defaultModel` | 否 | 模型 ID，如 `sonnet`；有歧义时使用 `provider/id` |
+| `generation.temperature` | 否 | 默认 `0.7` |
+| `generation.thinking` | 否 | `none`、`low`、`medium`、`high` 或 `max` |

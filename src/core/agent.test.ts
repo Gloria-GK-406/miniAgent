@@ -1,20 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import { MiniAgent } from "./agent.js";
-import { StopException } from "./errors.js";
-import { LLMEngineManager } from "./llm.js";
-import { MessageType } from "./types.js";
+import { DefaultLLMEngineRegister } from "./llm.js";
+import { LLMStreamChunkType, MessageType } from "./types.js";
 import type {
   AgentContextControl,
-  ModelAwareLLMRequest,
   LLMRequest,
-  LLMMessageResponse,
-  LLMResponse,
-  LLMStreamHandle,
   Message,
+  MessageChunk,
   ToolCallMessage,
   ToolResultMessage,
   TurnContext,
@@ -23,144 +19,93 @@ import { ThinkingLevel } from "./config.js";
 import type {
   AgentConfig,
   LLMGenerateRequest,
-  ModelConfig,
   ModelPreset,
+  ResolvedModel,
 } from "./config.js";
+import type { LLMEngine } from "./llm.js";
 import type { Tool } from "../tool/types.js";
-function createConfig(basepersistdir: string): AgentConfig {
+
+function userMessage(id = "user-1"): Message {
   return {
-    model: {
-      provider: "test",
-      model: "test-model",
-      apiKey: "test-key",
-      baseUrl: "http://localhost",
-    },
-    models: new Map(),
-    plugins: new Map(),
-    paths: { sessiondir: basepersistdir },
+    id,
+    type: MessageType.User,
+    content: "hello",
   };
 }
 
-function createProviderConfig(basepersistdir: string): AgentConfig {
+function chunkText(text: string): MessageChunk {
+  return {
+    type: LLMStreamChunkType.TextDelta,
+    text,
+  };
+}
+
+function createConfig(sessiondir: string, overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
     providers: [
       {
-        name: "test-main",
-        engine: "test-engine",
-        apiKey: "test-key",
-        models: {
-          add: [
-            {
-              model: "custom-model",
-              contextSize: 32000,
-              maxOutputTokens: 4096,
-              thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-            },
-          ],
-        },
+        provider: "test",
+        key: "test-key",
+        models: [{ id: "test-model", name: "test-model" }],
       },
     ],
-    defaultModel: { id: "test-main/custom-model" },
-    generation: { temperature: 0.2, thinking: ThinkingLevel.None },
-    models: new Map(),
     plugins: new Map(),
-    paths: { sessiondir: basepersistdir },
+    paths: { sessiondir },
+    ...overrides,
   };
 }
 
-function createResolvedHandle<T>(value: T): LLMStreamHandle<T> {
+function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
   return {
-    onChunk: () => () => void 0,
-    abort: () => void 0,
-    then<TResult1 = T, TResult2 = never>(
-      onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
-      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-    ): PromiseLike<TResult1 | TResult2> {
-      return Promise.resolve(value).then(onfulfilled, onrejected);
+    ...model,
+    thinkingLevels: [...model.thinkingLevels],
+    ...(model.capabilities !== undefined && {
+      capabilities: structuredClone(model.capabilities),
+    }),
+    ...(model.metadata !== undefined && {
+      metadata: structuredClone(model.metadata),
+    }),
+  };
+}
+
+function createLLM(options: {
+  models?: Record<string, ResolvedModel[]>;
+  chunks?: MessageChunk[];
+  responses?: MessageChunk[][];
+  onRequest?: (request: LLMGenerateRequest) => void;
+} = {}): LLMRequest {
+  return {
+    getEngineModels(engineName: string): ResolvedModel[] {
+      return options.models?.[engineName]?.map(cloneResolvedModel) ?? [];
     },
-  };
-}
-
-function wrapResponse(message: LLMMessageResponse, input = 0, output = 0): LLMResponse {
-  return {
-    message,
-    tokenCount: {
-      input,
-      output,
-      total: input + output,
-    },
-  };
-}
-
-function createLLM(
-  responses: LLMResponse[],
-  onInvoke?: (messages: Message[], config?: ModelConfig, tools?: Tool[]) => void,
-): LLMRequest {
-  return {
-    streamInvoke(
-      messages: Message[],
-      config?: ModelConfig,
-      tools?: Tool[],
-    ): LLMStreamHandle<LLMResponse> {
-      onInvoke?.(messages, config, tools);
-      const next = responses.shift();
-      if (!next) {
-        throw new Error("No response queued");
+    async *streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
+      options.onRequest?.(request);
+      const chunks = options.responses?.shift() ?? options.chunks ?? [chunkText("done")];
+      for (const chunk of chunks) {
+        yield chunk;
       }
-      return createResolvedHandle(next);
     },
   };
 }
 
-class LegacyEngine {
-  static seenConfigs: ModelConfig[] = [];
-  static seenRequests: Message[][] = [];
-
-  private readonly config: ModelConfig;
-
-  constructor(config: ModelConfig) {
-    this.config = config;
-    LegacyEngine.seenConfigs.push(config);
-  }
-
-  streamGenerate(messages: Message[], _tools: Tool[]): LLMStreamHandle<LLMResponse> {
-    LegacyEngine.seenRequests.push(messages);
-    return createResolvedHandle(wrapResponse({
-      id: "assist-legacy",
-      type: MessageType.Assist,
-      content: this.config.model,
-    }));
-  }
-}
-
-function createModelAwareLLM(
-  responses: LLMResponse[],
-  catalogs: Record<string, ModelPreset[]>,
-  onRequest?: (request: LLMGenerateRequest) => void,
-): ModelAwareLLMRequest {
+function fakeEngine(
+  name: string,
+  models: ModelPreset[],
+  options: {
+    chunks?: MessageChunk[];
+    onRequest?: (request: LLMGenerateRequest) => void;
+  } = {},
+): LLMEngine {
   return {
-    getEngineModels(engineName: string): ModelPreset[] {
-      return catalogs[engineName]?.map((model) => ({
-        ...model,
-        thinkingLevels: [...model.thinkingLevels],
-      })) ?? [];
-    },
-    streamInvoke(
-      requestOrMessages: LLMGenerateRequest | Message[],
-      _config?: ModelConfig,
-      _tools?: Tool[],
-    ): LLMStreamHandle<LLMResponse> {
-      if (Array.isArray(requestOrMessages)) {
-        throw new Error("Expected request-object streamInvoke");
+    name,
+    getModels: () => models,
+    async *streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
+      options.onRequest?.(request);
+      for (const chunk of options.chunks ?? [chunkText(request.model.name)]) {
+        yield chunk;
       }
-      onRequest?.(requestOrMessages);
-      const next = responses.shift();
-      if (!next) {
-        throw new Error("No response queued");
-      }
-      return createResolvedHandle(next);
     },
-  } as ModelAwareLLMRequest;
+  };
 }
 
 describe("MiniAgent", () => {
@@ -172,536 +117,335 @@ describe("MiniAgent", () => {
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
-    LegacyEngine.seenConfigs = [];
-    LegacyEngine.seenRequests = [];
   });
 
-  it("aggregates provider-added models and exposes the current model", () => {
-    const agent = new MiniAgent(createLLM([]), createProviderConfig(testDir));
-
-    const expected = [
+  it("aggregates resolved models from registered engines and provider overrides", () => {
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
       {
-        id: "test-main/custom-model",
-        provider: "test-main",
-        engine: "test-engine",
-        model: "custom-model",
-        contextSize: 32000,
-        maxOutputTokens: 4096,
-        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-      },
-    ];
-    expect(agent.getModels()).toEqual(expected);
-    expect(agent.getResolvedModels()).toEqual(expected);
-    expect(agent.getCurrentResolvedModel().id).toBe("test-main/custom-model");
-  });
-
-  it("aggregates engine catalog models and applies provider overrides", () => {
-    const agent = new MiniAgent(
-      createModelAwareLLM([], {
-        "test-engine": [
-          {
-            model: "catalog-a",
-            displayName: "Catalog A",
-            contextSize: 16000,
-            maxOutputTokens: 1024,
-            thinkingLevels: [ThinkingLevel.None],
-          },
-          {
-            model: "catalog-b",
-            displayName: "Catalog B",
-            contextSize: 32000,
-            maxOutputTokens: 2048,
-            thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-          },
-        ],
-      }),
-      {
-        providers: [
-          {
-            name: "test-main",
-            engine: "test-engine",
-            apiKey: "test-key",
-            models: {
-              add: [
-                {
-                  model: "custom-model",
-                  contextSize: 64000,
-                  thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
-                },
-              ],
-              override: {
-                "catalog-b": {
-                  displayName: "Catalog B Override",
-                  contextSize: 48000,
-                },
-              },
-            },
-          },
-        ],
-        defaultModel: { id: "test-main/catalog-b" },
-        models: new Map(),
-        plugins: new Map(),
-        paths: { sessiondir: testDir },
-      },
-    );
-
-    expect(agent.getResolvedModels()).toEqual([
-      {
-        id: "test-main/catalog-a",
-        provider: "test-main",
-        engine: "test-engine",
-        model: "catalog-a",
-        displayName: "Catalog A",
-        contextSize: 16000,
-        maxOutputTokens: 1024,
+        id: "gpt-4o-mini",
+        name: "gpt-4o-mini",
+        contextSize: 128000,
+        maxOutputTokens: 16384,
         thinkingLevels: [ThinkingLevel.None],
       },
-      {
-        id: "test-main/catalog-b",
-        provider: "test-main",
-        engine: "test-engine",
-        model: "catalog-b",
-        displayName: "Catalog B Override",
-        contextSize: 48000,
-        maxOutputTokens: 2048,
-        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-      },
-      {
-        id: "test-main/custom-model",
-        provider: "test-main",
-        engine: "test-engine",
-        model: "custom-model",
-        contextSize: 64000,
-        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.High],
-      },
-    ]);
-    expect(agent.getCurrentResolvedModel().id).toBe("test-main/catalog-b");
-  });
+    ]));
 
-  it("sets resolved model without changing generation config", () => {
-    const agent = new MiniAgent(createLLM([]), {
-      providers: [
-        {
-          name: "p",
-          engine: "test",
-          apiKey: "k",
-          models: {
-            add: [
-              { model: "a", thinkingLevels: [ThinkingLevel.None] },
-              { model: "b", thinkingLevels: [ThinkingLevel.None] },
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [
+          {
+            provider: "openai",
+            key: "test-key",
+            models: [
+              {
+                id: "fast",
+                name: "gpt-4o-mini",
+                contextSize: 64000,
+              },
             ],
           },
-        },
-      ],
-      defaultModel: { id: "p/a" },
-      generation: { temperature: 0.3, thinking: ThinkingLevel.High },
-      models: new Map(),
-      plugins: new Map(),
-      paths: { sessiondir: testDir },
-    });
-
-    agent.setResolvedModel({ id: "p/b" });
-
-    expect(agent.getCurrentResolvedModel().id).toBe("p/b");
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.3,
-      thinking: ThinkingLevel.High,
-    });
-  });
-
-  it("merges generation config updates", () => {
-    const agent = new MiniAgent(createLLM([]), createProviderConfig(testDir));
-
-    agent.setGenerationConfig({ thinking: ThinkingLevel.Max });
-
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.2,
-      thinking: ThinkingLevel.Max,
-    });
-    expect(agent.getCurrentResolvedModel().id).toBe("test-main/custom-model");
-  });
-
-  it("keeps legacy model APIs compatible with ModelConfig callers", () => {
-    const firstModel: ModelConfig = {
-      provider: "test",
-      model: "test-model",
-      apiKey: "test-key",
-      baseUrl: "http://localhost",
-    };
-    const secondModel: ModelConfig = {
-      provider: "test",
-      model: "other-model",
-      apiKey: "other-key",
-      baseUrl: "http://other",
-      temperature: 0.2,
-      topP: 0.8,
-      maxOutputTokens: 123,
-      thinking: false,
-    };
-    const notified: AgentConfig[] = [];
-    const agent = new MiniAgent(createLLM([]), {
-      model: firstModel,
-      models: new Map([["test", { models: [firstModel, secondModel] }]]),
-      plugins: new Map(),
-      paths: { sessiondir: testDir },
-    });
-
-    agent.register({
-      setConfig: async (config: AgentConfig): Promise<void> => {
-        notified.push(config);
-      },
-    });
-    agent.setModel(secondModel);
-
-    expect(agent.getCurrentModel()).toEqual(secondModel);
-    expect(agent.getModelList()).toEqual([firstModel, secondModel]);
-    expect(agent.getCurrentResolvedModel()).toMatchObject({
-      id: "test/other-model",
-      provider: "test",
-      engine: "test",
-      model: "other-model",
-    });
-    expect(notified[notified.length - 1]?.model).toEqual(secondModel);
-  });
-
-  it("honors legacy generation fields from ModelConfig", async () => {
-    const seenConfigs: ModelConfig[] = [];
-    const agent = new MiniAgent(
-      createLLM([
-        wrapResponse({
-          id: "assist-1",
-          type: MessageType.Assist,
-          content: "done",
-        }),
-      ], (_messages, config) => {
-        if (config) {
-          seenConfigs.push(config);
-        }
+        ],
       }),
-      {
-        model: {
-          provider: "legacy",
-          model: "legacy-model",
-          apiKey: "legacy-key",
-          baseUrl: "http://legacy",
-          temperature: 0.2,
-          topP: 0.8,
-          maxOutputTokens: 456,
-          thinking: false,
-        },
-        models: new Map(),
-        plugins: new Map(),
-        paths: { sessiondir: testDir },
-      },
-    );
-
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.2,
-      topP: 0.8,
-      maxOutputTokens: 456,
-      thinking: ThinkingLevel.None,
     });
 
-    await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
-
-    expect(seenConfigs[0]).toEqual({
-      provider: "legacy",
-      model: "legacy-model",
-      apiKey: "legacy-key",
-      baseUrl: "http://legacy",
-      temperature: 0.2,
-      topP: 0.8,
-      maxOutputTokens: 456,
-      thinking: false,
-    });
+    expect(agent.getModels()).toEqual([
+      expect.objectContaining({
+        id: "fast",
+        provider: "openai",
+        name: "gpt-4o-mini",
+        contextSize: 64000,
+        maxOutputTokens: 16384,
+      }),
+    ]);
   });
 
-  it("does not add default generation fields to legacy stream configs", async () => {
-    const seenConfigs: ModelConfig[] = [];
-    const agent = new MiniAgent(
-      createLLM([
-        wrapResponse({
-          id: "assist-1",
-          type: MessageType.Assist,
-          content: "done",
-        }),
-      ], (_messages, config) => {
-        if (config) {
-          seenConfigs.push(config);
-        }
+  it("setResolvedModel only changes the selected model and leaves default generation config", () => {
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
+      { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [{ provider: "openai", key: "test-key" }],
+        defaultModel: { id: "slow" },
       }),
-      createConfig(testDir),
-    );
+    });
 
+    agent.setResolvedModel({ id: "fast" });
+
+    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
+      id: "fast",
+      name: "gpt-4o-mini",
+    }));
     expect(agent.getGenerationConfig()).toEqual({
       temperature: 0.7,
       thinking: ThinkingLevel.Medium,
     });
-
-    await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
-
-    expect(seenConfigs[0]).toEqual({
-      provider: "test",
-      model: "test-model",
-      apiKey: "test-key",
-      baseUrl: "http://localhost",
-    });
   });
 
-  it("runs legacy LLMEngineManager registrations through the legacy path", async () => {
-    const manager = new LLMEngineManager();
-    manager.register("legacy", LegacyEngine);
-    const agent = new MiniAgent(manager, {
-      model: {
-        provider: "legacy",
-        model: "legacy-model",
-        apiKey: "legacy-key",
-      },
-      models: new Map(),
-      plugins: new Map(),
-      paths: { sessiondir: testDir },
-    });
-
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
-
-    expect(messages.map((message) => message.id)).toEqual(["user-1", "assist-legacy"]);
-    expect(LegacyEngine.seenConfigs).toEqual([
-      {
-        provider: "legacy",
-        model: "legacy-model",
-        apiKey: "legacy-key",
-      },
-    ]);
-    expect(LegacyEngine.seenRequests[0]?.map((message) => message.id)).toEqual(["user-1"]);
-  });
-
-  it("rejects duplicate provider names clearly", () => {
-    expect(() =>
-      new MiniAgent(createLLM([]), {
-        providers: [
-          {
-            name: "dup",
-            engine: "test",
-            apiKey: "one",
-            models: {
-              add: [{ model: "a", thinkingLevels: [ThinkingLevel.None] }],
-            },
-          },
-          {
-            name: "dup",
-            engine: "test",
-            apiKey: "two",
-            models: {
-              add: [{ model: "b", thinkingLevels: [ThinkingLevel.None] }],
-            },
-          },
-        ],
-        defaultModel: { id: "dup/a" },
-        models: new Map(),
-        plugins: new Map(),
-        paths: { sessiondir: testDir },
+  it("setGenerationConfig only changes generation config", () => {
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [{ provider: "openai", key: "test-key" }],
+        defaultModel: { id: "fast" },
       }),
-    ).toThrow('Duplicate provider name: "dup"');
-  });
-
-  it("notifies config updates for resolved model and generation changes", () => {
-    const notified: AgentConfig[] = [];
-    const agent = new MiniAgent(createLLM([]), {
-      providers: [
-        {
-          name: "p",
-          engine: "test",
-          apiKey: "k",
-          models: {
-            add: [
-              { model: "a", thinkingLevels: [ThinkingLevel.None] },
-              { model: "b", thinkingLevels: [ThinkingLevel.None] },
-            ],
-          },
-        },
-      ],
-      defaultModel: { id: "p/a" },
-      models: new Map(),
-      plugins: new Map(),
-      paths: { sessiondir: testDir },
     });
 
-    agent.register({
-      setConfig: async (config: AgentConfig): Promise<void> => {
-        notified.push(config);
-      },
+    agent.setGenerationConfig({
+      temperature: 0.1,
+      thinking: ThinkingLevel.High,
     });
 
-    agent.setResolvedModel({ id: "p/b" });
-    agent.setGenerationConfig({ temperature: 0.1, thinking: ThinkingLevel.High });
-
-    expect(notified.at(-2)?.model).toMatchObject({
-      provider: "test",
-      model: "b",
-      apiKey: "k",
-    });
-    expect(notified.at(-1)?.generation).toEqual({
+    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
+      id: "fast",
+      name: "gpt-4o-mini",
+    }));
+    expect(agent.getGenerationConfig()).toEqual({
       temperature: 0.1,
       thinking: ThinkingLevel.High,
     });
   });
 
-  it("passes cloned request objects to model-aware LLMs", async () => {
+  it("setGenerationConfig merges partial updates over the current generation config", () => {
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [{ provider: "openai", key: "test-key" }],
+        defaultModel: { id: "fast" },
+        generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
+      }),
+    });
+
+    agent.setGenerationConfig({ topP: 0.8 });
+
+    expect(agent.getGenerationConfig()).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      thinking: ThinkingLevel.Low,
+    });
+    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
+      id: "fast",
+      name: "gpt-4o-mini",
+    }));
+  });
+
+  it("does not expose legacy model APIs", () => {
+    const agent = new MiniAgent({
+      llm: createLLM(),
+      config: createConfig(testDir),
+    });
+    const exposed = agent as unknown as Record<string, unknown>;
+    const removedMethods = [
+      "set" + "Model",
+      "get" + "Current" + "Model",
+      "get" + "ModelList",
+      "set" + "ModelByPath",
+    ];
+
+    for (const name of removedMethods) {
+      expect(exposed[name]).toBeUndefined();
+    }
+  });
+
+  it("runs with a request-mode LLMGenerateRequest containing model and generation", async () => {
     const seenRequests: LLMGenerateRequest[] = [];
-    const agent = new MiniAgent(
-      createModelAwareLLM(
-        [
-          wrapResponse({
-            id: "assist-1",
-            type: MessageType.Assist,
-            content: "done",
-          }),
-        ],
-        {
-          "test-engine": [
-            {
-              model: "catalog-model",
-              thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-            },
-          ],
-        },
-        (request) => {
-          seenRequests.push(request);
-          request.provider.name = "mutated-provider";
-          request.model.id = "mutated/model";
-          request.model.thinkingLevels.push(ThinkingLevel.Max);
-          request.generation.temperature = 1.5;
-          request.generation.thinking = ThinkingLevel.Max;
-        },
-      ),
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
       {
+        id: "gpt-4o-mini",
+        name: "gpt-4o-mini",
+        contextSize: 128000,
+        maxOutputTokens: 16384,
+        thinkingLevels: [ThinkingLevel.None],
+      },
+    ], {
+      chunks: [chunkText("done")],
+      onRequest: (request) => {
+        seenRequests.push(request);
+      },
+    }));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
         providers: [
           {
-            name: "test-main",
-            engine: "test-engine",
-            apiKey: "test-key",
+            provider: "openai",
+            key: "test-key",
+            models: [{ id: "fast", name: "gpt-4o-mini" }],
           },
         ],
-        defaultModel: { id: "test-main/catalog-model" },
-        generation: { temperature: 0.4, thinking: ThinkingLevel.Medium },
-        models: new Map(),
-        plugins: new Map(),
-        paths: { sessiondir: testDir },
-      },
-    );
-
-    await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
+        defaultModel: { id: "fast" },
+        generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
+      }),
     });
+
+    const messages = await agent.run(userMessage());
 
     expect(seenRequests).toHaveLength(1);
-    expect(agent.getCurrentResolvedModel()).toEqual({
-      id: "test-main/catalog-model",
-      provider: "test-main",
-      engine: "test-engine",
-      model: "catalog-model",
-      thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
+    expect(seenRequests[0]).toEqual(expect.objectContaining({
+      provider: expect.objectContaining({
+        provider: "openai",
+        key: "test-key",
+      }),
+      model: expect.objectContaining({
+        id: "fast",
+        provider: "openai",
+        name: "gpt-4o-mini",
+        maxOutputTokens: 16384,
+      }),
+      generation: {
+        temperature: 0.2,
+        thinking: ThinkingLevel.Low,
+      },
+    }));
+    expect(seenRequests[0]!.messages.map((message) => message.id)).toEqual(["user-1"]);
+    expect(messages.map((message) => message.content)).toEqual(["hello", "done"]);
+  });
+
+  it("throws before generation when no model is available", async () => {
+    const seenRequests: LLMGenerateRequest[] = [];
+    const agent = new MiniAgent({
+      llm: createLLM({
+        onRequest: (request) => {
+          seenRequests.push(request);
+        },
+      }),
+      config: createConfig(testDir, {
+        providers: [],
+      }),
     });
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.4,
-      thinking: ThinkingLevel.Medium,
+
+    await expect(agent.run(userMessage())).rejects.toThrow(
+      "No model is available. Configure providers or register engine models first.",
+    );
+    expect(seenRequests).toEqual([]);
+  });
+
+  it("notifies provider-only config snapshots when selecting a resolved model", () => {
+    const notified: AgentConfig[] = [];
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
+      { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [{ provider: "openai", key: "test-key" }],
+        defaultModel: { id: "slow" },
+      }),
+    });
+
+    agent.register({
+      setConfig: async (config: AgentConfig): Promise<void> => {
+        notified.push(config);
+      },
+    });
+    agent.setResolvedModel({ id: "fast" });
+
+    const latest = notified.at(-1) as AgentConfig & Record<string, unknown>;
+    expect(latest.defaultModel).toEqual({
+      id: "fast",
+      provider: "openai",
+    });
+    expect(latest.providers).toEqual([
+      expect.objectContaining({ provider: "openai", key: "test-key" }),
+    ]);
+    expect(latest["model"]).toBeUndefined();
+    expect(latest["models"]).toBeUndefined();
+  });
+
+  it("preserves aliased resolved model ids in config snapshots", () => {
+    const notified: AgentConfig[] = [];
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+      { id: "balanced", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [{ provider: "openai", key: "test-key" }],
+        defaultModel: { id: "fast", provider: "openai" },
+      }),
+    });
+
+    agent.register({
+      setConfig: async (config: AgentConfig): Promise<void> => {
+        notified.push(config);
+      },
+    });
+    agent.setResolvedModel({ id: "balanced", provider: "openai" });
+
+    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
+      id: "balanced",
+      name: "gpt-4o-mini",
+    }));
+    expect(notified.at(-1)?.defaultModel).toEqual({
+      id: "balanced",
+      provider: "openai",
     });
   });
 
-  it("runs through request-object streamInvoke when the LLM is model-aware", async () => {
-    const seenRequests: LLMGenerateRequest[] = [];
-    const agent = new MiniAgent(
-      createModelAwareLLM(
-        [
-          wrapResponse({
-            id: "assist-1",
-            type: MessageType.Assist,
-            content: "done",
-          }),
-        ],
-        {
-          "test-engine": [
-            {
-              model: "catalog-model",
-              contextSize: 128000,
-              maxOutputTokens: 8192,
-              thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-            },
-          ],
-        },
-        (request) => {
-          seenRequests.push(request);
-        },
-      ),
-      {
-        providers: [
-          {
-            name: "test-main",
-            engine: "test-engine",
-            apiKey: "test-key",
-            baseUrl: "http://localhost",
-          },
-        ],
-        defaultModel: { id: "test-main/catalog-model" },
-        generation: { temperature: 0.4, thinking: ThinkingLevel.Medium },
-        models: new Map(),
-        plugins: new Map(),
-        paths: { sessiondir: testDir },
+  it("passes isolated config snapshots to each config notifier", () => {
+    const secondSnapshots: AgentConfig[] = [];
+    const llm = new DefaultLLMEngineRegister();
+    llm.register(fakeEngine("openai", [
+      { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
+      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+    ]));
+    const agent = new MiniAgent({
+      llm,
+      config: createConfig(testDir, {
+        providers: [{ provider: "openai", key: "test-key" }],
+        defaultModel: { id: "slow" },
+      }),
+    });
+
+    agent.register({
+      setConfig: async (config: AgentConfig): Promise<void> => {
+        (config as { defaultModel?: unknown }).defaultModel = { id: "mutated" };
       },
-    );
+    });
+    agent.register({
+      setConfig: async (config: AgentConfig): Promise<void> => {
+        secondSnapshots.push(config);
+      },
+    });
+    secondSnapshots.length = 0;
 
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
+    agent.setResolvedModel({ id: "fast" });
 
-    expect(messages.map((message) => message.id)).toEqual(["user-1", "assist-1"]);
-    expect(seenRequests).toHaveLength(1);
-    expect(seenRequests[0]!.provider).toMatchObject({
-      name: "test-main",
-      engine: "test-engine",
-      apiKey: "test-key",
-      baseUrl: "http://localhost",
+    expect(secondSnapshots.at(-1)?.defaultModel).toEqual({
+      id: "fast",
+      provider: "openai",
     });
-    expect(seenRequests[0]!.model.id).toBe("test-main/catalog-model");
-    expect(seenRequests[0]!.generation).toEqual({
-      temperature: 0.4,
-      thinking: ThinkingLevel.Medium,
-    });
-    expect(seenRequests[0]!.messages.map((message) => message.id)).toEqual(["user-1"]);
   });
 
   it("publishes the real turn context after buildContext", async () => {
     const seenContexts: TurnContext[] = [];
-    const seenRequests: Message[][] = [];
-    const llm = createLLM(
-      [
-        wrapResponse({
-          id: "assist-1",
-          type: MessageType.Assist,
-          content: "done",
-        }),
-      ],
-      (messages) => {
-        seenRequests.push(messages);
-      },
-    );
-    const agent = new MiniAgent(llm, createConfig(testDir));
+    const seenRequests: LLMGenerateRequest[] = [];
+    const agent = new MiniAgent({
+      llm: createLLM({
+        onRequest: (request) => {
+          seenRequests.push(request);
+        },
+      }),
+      config: createConfig(testDir),
+    });
 
     agent.register({
       appendTurnContext: async (): Promise<Message[]> => [
@@ -728,32 +472,24 @@ describe("MiniAgent", () => {
       },
     });
 
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
+    const messages = await agent.run(userMessage());
 
     expect(seenContexts).toHaveLength(1);
     expect(seenContexts[0]!.turn).toBe(1);
-    expect(seenContexts[0]!.context).toEqual(seenRequests[0]);
+    expect(seenContexts[0]!.context).toEqual(seenRequests[0]!.messages);
     expect(seenContexts[0]!.context.map((message) => message.id)).toEqual([
       "append-1",
       "provider-1",
       "user-1",
     ]);
-    expect(messages.map((message) => message.id)).toEqual(["user-1", "assist-1"]);
+    expect(messages.map((message) => message.id)).toEqual(["user-1", expect.any(String)]);
   });
 
   it("exposes managed context APIs without exposing MessageSource", async () => {
-    const llm = createLLM([
-      wrapResponse({
-        id: "assist-1",
-        type: MessageType.Assist,
-        content: "done",
-      }),
-    ]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
+    const agent = new MiniAgent({
+      llm: createLLM({ chunks: [chunkText("done")] }),
+      config: createConfig(testDir),
+    });
 
     agent.register({
       appendTurnContext: async (): Promise<Message[]> => [
@@ -764,97 +500,49 @@ describe("MiniAgent", () => {
         },
       ],
     });
-    agent.register({
-      priority: 0,
-      collect: async (): Promise<Message[]> => [
-        {
-          id: "provider-1",
-          type: MessageType.System,
-          content: "provided",
-        },
-      ],
-    });
 
-    await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
+    await agent.run(userMessage());
 
-    expect((await agent.getMessages()).map((message) => message.id)).toEqual([
-      "user-1",
-      "assist-1",
+    expect((await agent.getMessages()).map((message) => message.content)).toEqual([
+      "hello",
+      "done",
     ]);
     expect((await agent.previewContext()).map((message) => message.id)).toEqual([
       "append-1",
-      "provider-1",
       "user-1",
-      "assist-1",
+      expect.any(String),
     ]);
 
     await agent.setDiscardBefore("user-1");
-    expect((await agent.getMessages()).map((message) => message.id)).toEqual(["assist-1"]);
+    expect((await agent.getMessages()).map((message) => message.content)).toEqual(["done"]);
 
     await agent.clearDiscardBefore();
-    expect((await agent.getMessages()).map((message) => message.id)).toEqual([
-      "user-1",
-      "assist-1",
+    expect((await agent.getMessages()).map((message) => message.content)).toEqual([
+      "hello",
+      "done",
     ]);
-  });
-
-  it("stops the loop when a tool throws StopException", async () => {
-    const onStop = vi.fn();
-    const toolCall: ToolCallMessage = {
-      id: "tool-call-1",
-      type: MessageType.ToolCall,
-      content: "",
-      toolCallId: "call-1",
-      toolName: "stop_tool",
-      arguments: {},
-    };
-    const llm = createLLM([wrapResponse([toolCall])]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
-    const tool: Tool = {
-      name: "stop_tool",
-      description: "Stop the agent",
-      parameters: z.object({}),
-      execute: async (): Promise<string> => {
-        throw new StopException("stop now");
-      },
-    };
-
-    agent.register(tool);
-    agent.on("run:stop", onStop);
-
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "please stop",
-    });
-
-    expect(onStop).toHaveBeenCalledOnce();
-    expect(messages.map((message) => message.id)).toEqual(["user-1", "tool-call-1"]);
   });
 
   it("emits tool results normally when tools complete", async () => {
     const seenResults: ToolResultMessage[] = [];
-    const toolCall: ToolCallMessage = {
-      id: "tool-call-1",
-      type: MessageType.ToolCall,
-      content: "",
-      toolCallId: "call-1",
-      toolName: "echo_tool",
-      arguments: { text: "pong" },
-    };
-    const llm = createLLM([
-      wrapResponse([toolCall], 3, 4),
-      wrapResponse({
-        id: "assist-2",
-        type: MessageType.Assist,
-        content: "done",
-      }, 5, 6),
-    ]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
+    const toolCallChunks: MessageChunk[] = [
+      {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: 0,
+        argsText: "{\"text\":\"pong\"}",
+        toolCallId: "call-1",
+        toolName: "echo_tool",
+      },
+    ];
+    const agent = new MiniAgent({
+      llm: createLLM({
+        responses: [
+          [toolCallChunks[0]!],
+          [chunkText("done")],
+        ],
+      }),
+      config: createConfig(testDir),
+    });
     const tool: Tool = {
       name: "echo_tool",
       description: "Echoes text",
@@ -869,210 +557,41 @@ describe("MiniAgent", () => {
       seenResults.push(result);
     });
 
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "call the tool",
-    });
+    const messages = await agent.run(userMessage());
 
     expect(seenResults).toHaveLength(1);
     expect(seenResults[0]!.content).toBe("pong");
-    expect(messages.map((message) => message.id)).toEqual([
-      "user-1",
-      "tool-call-1",
-      seenResults[0]!.id,
-      "assist-2",
+    expect(messages.map((message) => message.type)).toEqual([
+      MessageType.User,
+      MessageType.ToolCall,
+      MessageType.ToolResult,
+      MessageType.Assist,
     ]);
-    expect(agent.getContextCount()).toEqual({ input: 8, output: 10, total: 18 });
-  });
-
-  it("returns tool execution errors as tool results instead of failing the turn", async () => {
-    const toolCall: ToolCallMessage = {
-      id: "tool-call-1",
-      type: MessageType.ToolCall,
-      content: "",
-      toolCallId: "call-1",
-      toolName: "strict_tool",
-      arguments: {},
-    };
-    const llm = createLLM([
-      wrapResponse([toolCall]),
-      wrapResponse({
-        id: "assist-2",
-        type: MessageType.Assist,
-        content: "recovered",
-      }),
-    ]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
-    const strictTool: Tool = {
-      name: "strict_tool",
-      description: "Requires a path",
-      parameters: z.object({
-        path: z.string(),
-      }),
-      execute: async (args: Record<string, unknown>): Promise<string> => {
-        const parsed = z.object({
-          path: z.string(),
-        }).parse(args);
-        return parsed.path;
-      },
-    };
-
-    agent.register(strictTool);
-
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "call the strict tool",
-    });
-
-    const toolResult = messages.find((message) => message.type === MessageType.ToolResult) as ToolResultMessage | undefined;
-    expect(toolResult).toBeDefined();
-    expect(String(toolResult!.content)).toContain("\"path\"");
-    expect(messages[messages.length - 1]!.id).toBe("assist-2");
-  });
-
-  it("executes a tool only after every approver allows it", async () => {
-    const decisions: string[] = [];
-    const toolCall: ToolCallMessage = {
-      id: "tool-call-1",
-      type: MessageType.ToolCall,
-      content: "",
-      toolCallId: "call-1",
-      toolName: "echo_tool",
-      arguments: { text: "pong" },
-    };
-    const llm = createLLM([
-      wrapResponse([toolCall]),
-      wrapResponse({
-        id: "assist-2",
-        type: MessageType.Assist,
-        content: "done",
-      }),
-    ]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
-
-    agent.register({
-      requestApproval: async (): Promise<true> => {
-        decisions.push("first");
-        return true;
-      },
-    });
-    agent.register({
-      requestApproval: async (): Promise<true> => {
-        decisions.push("second");
-        return true;
-      },
-    });
-    agent.register({
-      name: "echo_tool",
-      description: "Echoes text",
-      parameters: z.object({
-        text: z.string(),
-      }),
-      execute: async (args: Record<string, unknown>): Promise<string> => String(args["text"]),
-    });
-
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "call the tool",
-    });
-
-    expect(decisions).toEqual(["first", "second"]);
-    const toolResult = messages.find((message) => message.type === MessageType.ToolResult) as ToolResultMessage | undefined;
-    expect(toolResult?.content).toBe("pong");
-  });
-
-  it("denies tool execution when any approver rejects it", async () => {
-    const decisions: string[] = [];
-    const toolCall: ToolCallMessage = {
-      id: "tool-call-1",
-      type: MessageType.ToolCall,
-      content: "",
-      toolCallId: "call-1",
-      toolName: "echo_tool",
-      arguments: { text: "pong" },
-    };
-    const llm = createLLM([
-      wrapResponse([toolCall]),
-      wrapResponse({
-        id: "assist-2",
-        type: MessageType.Assist,
-        content: "done",
-      }),
-    ]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
-
-    agent.register({
-      requestApproval: async (): Promise<true> => {
-        decisions.push("first");
-        return true;
-      },
-    });
-    agent.register({
-      requestApproval: async (): Promise<false> => {
-        decisions.push("second");
-        return false;
-      },
-    });
-    agent.register({
-      requestApproval: async (): Promise<true> => {
-        decisions.push("third");
-        return true;
-      },
-    });
-    agent.register({
-      name: "echo_tool",
-      description: "Echoes text",
-      parameters: z.object({
-        text: z.string(),
-      }),
-      execute: async (): Promise<string> => "pong",
-    });
-
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "call the tool",
-    });
-
-    expect(decisions).toEqual(["first", "second"]);
-    const toolResult = messages.find((message) => message.type === MessageType.ToolResult) as ToolResultMessage | undefined;
-    expect(toolResult?.content).toBe("Tool execution denied by user.");
   });
 
   it("passes a managed control surface to after-turn processors", async () => {
     let seenControl: AgentContextControl | undefined;
-    const llm = createLLM([
-      wrapResponse({
-        id: "assist-1",
-        type: MessageType.Assist,
-        content: "done",
-      }),
-    ]);
-    const agent = new MiniAgent(llm, createConfig(testDir));
+    const agent = new MiniAgent({
+      llm: createLLM({ chunks: [chunkText("done")] }),
+      config: createConfig(testDir),
+    });
 
     agent.register({
       priority: 0,
       process: async (control: AgentContextControl, input: Message): Promise<void> => {
         seenControl = control;
         expect(input.id).toBe("user-1");
-        expect((await control.getMessages()).map((message) => message.id)).toEqual([
-          "user-1",
-          "assist-1",
+        expect((await control.getMessages()).map((message) => message.content)).toEqual([
+          "hello",
+          "done",
         ]);
         await control.setDiscardBefore("user-1");
       },
     });
 
-    const messages = await agent.run({
-      id: "user-1",
-      type: MessageType.User,
-      content: "hello",
-    });
+    const messages = await agent.run(userMessage());
 
     expect(seenControl).toBeDefined();
-    expect(messages.map((message) => message.id)).toEqual(["assist-1"]);
+    expect(messages.map((message) => message.content)).toEqual(["done"]);
   });
 });

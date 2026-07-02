@@ -7,7 +7,7 @@ import type { Tool, ToolProvider } from "./types.js";
 import type { Message } from "../core/types.js";
 import { MessageType } from "../core/types.js";
 import type { MiniAgent } from "../core/agent.js";
-import type { AgentConfig } from "../core/config.js";
+import type { NormalizedAgentConfig } from "../core/config.js";
 import {
     AgentCapabilityRuleSchema,
     AgentCapabilitySelectorSchema,
@@ -149,7 +149,7 @@ export class SubagentPlugin {
         return true;
     }
 
-    async setConfig(agentConfig: AgentConfig): Promise<void> {
+    async setConfig(agentConfig: NormalizedAgentConfig): Promise<void> {
         const pluginConfig = agentConfig.plugins.get("subagent");
         if (pluginConfig === undefined || pluginConfig === null) {
             this.config = null;

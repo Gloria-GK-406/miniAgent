@@ -1,14 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  AgentConfigResolver,
   AgentConfigService,
-  PersistentConfigAggregator,
   PersistentConfigFileLoader,
 } from "./index.js";
-import type { PersistConfig } from "../../core/config.js";
 
 async function createTempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "miniagent-config-test-"));
@@ -16,198 +13,129 @@ async function createTempDir(): Promise<string> {
 
 describe("config service", () => {
   const tempDirs: string[] = [];
+  let tempDir: string;
+  let service: AgentConfigService;
+
+  async function writeConfig(name: string, config: unknown): Promise<void> {
+    await writeFile(join(tempDir, name), JSON.stringify(config), "utf-8");
+  }
+
+  beforeEach(async () => {
+    tempDir = await createTempDir();
+    tempDirs.push(tempDir);
+    service = new AgentConfigService();
+  });
 
   afterEach(async () => {
     await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
     tempDirs.length = 0;
   });
 
-  it("loads files in order and resolves the active model group", async () => {
-    const dir = await createTempDir();
-    tempDirs.push(dir);
-
-    const globalPath = join(dir, "global.json");
-    const localPath = join(dir, "local.json");
-
-    await writeFile(
-      globalPath,
-      JSON.stringify({
-        defaultModel: "general",
-        models: {
-          general: {
-            models: [
-              {
-                provider: "openai-compatible",
-                model: "gpt-global",
-                apiKey: "global-key",
-              },
-            ],
-          },
-          backup: {
-            models: [
-              {
-                provider: "glm",
-                model: "glm-4.5",
-                apiKey: "backup-key",
-              },
-            ],
-          },
-        },
-        plugins: {
-          search: {
-            enabled: true,
-          },
-          retries: 2,
-        },
-      }),
-      "utf-8",
-    );
-
-    await writeFile(
-      localPath,
-      JSON.stringify({
-        models: {
-          general: {
-            models: [
-              {
-                provider: "openai-compatible",
-                model: "gpt-local",
-                apiKey: "local-key",
-                temperature: 0.2,
-              },
-              {
-                provider: "openai-compatible",
-                model: "gpt-fallback",
-                apiKey: "local-fallback-key",
-              },
-            ],
-          },
-        },
-        plugins: {
-          search: {
-            enabled: false,
-          },
-        },
-      }),
-      "utf-8",
-    );
-
-    const config = await AgentConfigService.loadFromFiles(
-      [globalPath, localPath],
-      {
-        paths: {
-          sessiondir: "/tmp/session",
-        },
-      },
-    );
-
-    expect(config.model.model).toBe("gpt-local");
-    expect(config.model.apiKey).toBe("local-key");
-    expect(config.models.get("general")?.models).toHaveLength(2);
-    expect(config.models.get("backup")?.models[0]?.model).toBe("glm-4.5");
-    expect(config.plugins.get("retries")).toBe(2);
-    expect(config.plugins.get("search")).toEqual({ enabled: false });
-  });
-
-  it("prefers runtime.activeModel over persist.defaultModel", () => {
-    const persist: PersistConfig = {
-      defaultModel: "general",
-      models: {
-        general: {
+  it("merges provider-mode configs and lets runtime activeModel override defaultModel", async () => {
+    await writeConfig("base.json", {
+      providers: [
+        {
+          provider: "openai",
+          key: "base-key",
           models: [
-            {
-              provider: "openai-compatible",
-              model: "gpt-general",
-              apiKey: "general-key",
-            },
+            { id: "slow", name: "gpt-4o" },
+            { id: "fast", name: "gpt-4o-mini" },
           ],
         },
-        reasoning: {
-          models: [
-            {
-              provider: "anthropic",
-              model: "claude-opus",
-              apiKey: "reasoning-key",
-            },
-          ],
-        },
-      },
-      plugins: {},
-    };
+      ],
+      defaultModel: "slow",
+      generation: { temperature: 0.2, thinking: "low" },
+    });
 
-    const config = AgentConfigResolver.resolve(persist, {
-      activeModel: "reasoning",
-      paths: {
-        sessiondir: "/tmp/runtime",
+    const result = await service.load({
+      configFiles: [join(tempDir, "base.json")],
+      runtime: {
+        activeModel: "fast",
+        paths: { sessiondir: tempDir },
       },
     });
 
-    expect(config.model.model).toBe("claude-opus");
-    expect(config.models.get("general")?.models[0]?.model).toBe("gpt-general");
+    expect(result.agentConfig.providers).toHaveLength(1);
+    expect(result.agentConfig.defaultModel).toEqual({ id: "fast" });
+    expect(result.agentConfig.generation).toMatchObject({
+      temperature: 0.2,
+      thinking: "low",
+    });
+    expect(result.agentConfig.paths.sessiondir).toBe(tempDir);
   });
 
-  it("merges persist configs by top-level key and replaces colliding model groups", () => {
-    const merged = PersistentConfigAggregator.aggregate([
-      {
-        defaultModel: "general",
-        models: {
-          general: {
-            models: [
-              {
-                provider: "openai-compatible",
-                model: "gpt-global",
-                apiKey: "global-key",
-              },
-            ],
-          },
-        },
-        plugins: {
-          search: { enabled: true },
-          retries: 1,
-        },
-      },
-      {
-        models: {
-          general: {
-            models: [
-              {
-                provider: "openai-compatible",
-                model: "gpt-local",
-                apiKey: "local-key",
-              },
-            ],
-          },
-        },
-        plugins: {
-          retries: 3,
-        },
-      },
+  it("replaces duplicate providers by name during aggregation", async () => {
+    await writeConfig("base.json", {
+      providers: [{ provider: "openai", key: "old-key" }],
+    });
+    await writeConfig("override.json", {
+      providers: [{ provider: "openai", key: "new-key" }],
+    });
+
+    const result = await service.load({
+      configFiles: [join(tempDir, "base.json"), join(tempDir, "override.json")],
+      runtime: { paths: { sessiondir: tempDir } },
+    });
+
+    expect(result.agentConfig.providers).toEqual([
+      expect.objectContaining({ provider: "openai", key: "new-key" }),
     ]);
+  });
 
-    expect(merged.defaultModel).toBe("general");
-    expect(merged.models.general.models[0]?.model).toBe("gpt-local");
-    expect(merged.plugins).toEqual({
-      search: { enabled: true },
-      retries: 3,
+  it("shallow-merges generation config during aggregation", async () => {
+    await writeConfig("base.json", {
+      generation: { temperature: 0.2, thinking: "low" },
     });
+    await writeConfig("override.json", {
+      generation: { topP: 0.8 },
+    });
+
+    const result = await service.load({
+      configFiles: [join(tempDir, "base.json"), join(tempDir, "override.json")],
+      runtime: { paths: { sessiondir: tempDir } },
+    });
+
+    expect(result.agentConfig.generation).toMatchObject({
+      temperature: 0.2,
+      thinking: "low",
+      topP: 0.8,
+    });
+  });
+
+  it("normalizes persisted plugin records to a Map and lets later entries override earlier entries", async () => {
+    await writeConfig("base.json", {
+      plugins: {
+        alpha: { enabled: true },
+        shared: "base",
+      },
+    });
+    await writeConfig("override.json", {
+      plugins: {
+        shared: "override",
+        beta: 2,
+      },
+    });
+
+    const result = await service.load({
+      configFiles: [join(tempDir, "base.json"), join(tempDir, "override.json")],
+      runtime: { paths: { sessiondir: tempDir } },
+    });
+
+    expect(result.agentConfig.plugins).toBeInstanceOf(Map);
+    expect(result.agentConfig.plugins.get("alpha")).toEqual({ enabled: true });
+    expect(result.agentConfig.plugins.get("shared")).toBe("override");
+    expect(result.agentConfig.plugins.get("beta")).toBe(2);
   });
 
   it("includes file path in validation errors", async () => {
-    const dir = await createTempDir();
-    tempDirs.push(dir);
-
-    const invalidPath = join(dir, "invalid.json");
-    await writeFile(
-      invalidPath,
-      JSON.stringify({
-        models: {
-          broken: {
-            models: [],
-          },
+    const invalidPath = join(tempDir, "invalid.json");
+    await writeConfig("invalid.json", {
+      models: {
+        broken: {
+          models: [],
         },
-      }),
-      "utf-8",
-    );
+      },
+    });
 
     await expect(PersistentConfigFileLoader.loadFile(invalidPath)).rejects.toThrow(invalidPath);
   });

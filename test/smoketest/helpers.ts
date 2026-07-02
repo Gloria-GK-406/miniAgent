@@ -1,9 +1,25 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { ModelConfig } from "../../src/core/config.js";
-import { MessageType } from "../../src/core/types.js";
-import type { LLMEngineCtor } from "../../src/core/llm.js";
-import type { LLMResponse, LLMMessageResponse, Message, ToolCallMessage, Tool } from "../../src/core/types.js";
+import {
+  normalizeGenerationConfig,
+  ThinkingLevel,
+  type GenerationConfigInput,
+  type LLMGenerateRequest,
+  type ModelProviderConfig,
+  type ResolvedModel,
+} from "../../src/core/config.js";
+import { LLMEngineManager, emptyTokenCount, type LLMEngine } from "../../src/core/llm.js";
+import { resolveModelsFromProviders, selectResolvedModel } from "../../src/core/model-resolution.js";
+import {
+  LLMStreamChunkType,
+  MessageType,
+  type LLMMessageResponse,
+  type LLMResponse,
+  type Message,
+  type MessageChunk,
+  type Tool,
+  type ToolCallMessage,
+} from "../../src/core/types.js";
 
 const envCache = new Map<string, string | undefined>();
 
@@ -54,13 +70,17 @@ export function getProviderConfig(
   provider: ProviderKey,
   providerName: string,
   baseUrl?: string,
-): ModelConfig {
+): ModelProviderConfig {
   return {
     provider: providerName,
-    model: requireEnv("PROVIDER_" + provider + "_MODEL"),
-    apiKey: requireEnv("PROVIDER_" + provider + "_API_KEY"),
-    baseUrl: baseUrl ?? "",
+    key: requireEnv("PROVIDER_" + provider + "_API_KEY"),
+    ...(baseUrl !== undefined && { baseUrl }),
+    models: [],
   };
+}
+
+export function getProviderModel(provider: ProviderKey): string {
+  return requireEnv("PROVIDER_" + provider + "_MODEL");
 }
 
 export function isProviderConfigured(provider: ProviderKey): boolean {
@@ -68,24 +88,57 @@ export function isProviderConfigured(provider: ProviderKey): boolean {
   return !!key && key.length > 0;
 }
 
-export async function invokeEngine(
-  Engine: LLMEngineCtor,
-  config: ModelConfig,
+export interface InvokeEngineOptions {
+  generation?: GenerationConfigInput;
+  onChunk?: (chunk: MessageChunk) => void;
+}
+
+export function buildGenerateRequest(
+  engine: LLMEngine,
+  providerConfig: ModelProviderConfig,
+  modelName: string,
   messages: Message[],
   tools: Tool[],
+  generation?: GenerationConfigInput,
+): LLMGenerateRequest {
+  return {
+    messages,
+    tools,
+    provider: providerConfig,
+    model: resolveSmokeModel(engine, providerConfig, modelName),
+    generation: normalizeGenerationConfig(generation),
+  };
+}
+
+export async function invokeEngine(
+  engine: LLMEngine,
+  providerConfig: ModelProviderConfig,
+  modelName: string,
+  messages: Message[],
+  tools: Tool[],
+  options: InvokeEngineOptions = {},
 ): Promise<LLMResponse> {
-  const engine = new Engine(config);
-  return await engine.streamGenerate(messages, tools);
+  const request = buildGenerateRequest(
+    engine,
+    providerConfig,
+    modelName,
+    messages,
+    tools,
+    options.generation,
+  );
+  return await collectStreamResponse(engine.streamGenerate(request), options.onChunk);
 }
 
 export async function invokeEngineForSmoke(
-  Engine: LLMEngineCtor,
-  config: ModelConfig,
+  engine: LLMEngine,
+  providerConfig: ModelProviderConfig,
+  modelName: string,
   messages: Message[],
   tools: Tool[],
+  options: InvokeEngineOptions = {},
 ): Promise<LLMResponse | null> {
   try {
-    return await invokeEngine(Engine, config, messages, tools);
+    return await invokeEngine(engine, providerConfig, modelName, messages, tools, options);
   } catch (error: unknown) {
     if (isKnownSmokeInfraError(error)) {
       return null;
@@ -104,6 +157,135 @@ export function isToolCallResponse(response: LLMResponse): response is LLMRespon
   message: ToolCallMessage[];
 } {
   return Array.isArray(response.message) && response.message.every((message) => message.type === MessageType.ToolCall);
+}
+
+interface ToolCallBuffer {
+  id?: string;
+  name?: string;
+  argumentsText: string;
+}
+
+const FALLBACK_THINKING_LEVELS = [
+  ThinkingLevel.None,
+  ThinkingLevel.Low,
+  ThinkingLevel.Medium,
+  ThinkingLevel.High,
+  ThinkingLevel.Max,
+] as const;
+
+function resolveSmokeModel(
+  engine: LLMEngine,
+  providerConfig: ModelProviderConfig,
+  modelName: string,
+): ResolvedModel {
+  const llm = new LLMEngineManager();
+  llm.register(engine);
+  const resolvedModels = resolveModelsFromProviders([providerConfig], llm);
+  const selectedById = selectResolvedModel(resolvedModels, {
+    provider: providerConfig.provider,
+    id: modelName,
+  });
+  if (selectedById) {
+    return selectedById;
+  }
+  const selectedByName = selectResolvedModel(resolvedModels, {
+    provider: providerConfig.provider,
+    model: modelName,
+  });
+  if (selectedByName) {
+    return selectedByName;
+  }
+
+  return {
+    id: modelName,
+    provider: providerConfig.provider,
+    name: modelName,
+    thinkingLevels: [...FALLBACK_THINKING_LEVELS],
+  };
+}
+
+function getToolCallBuffer(buffers: ToolCallBuffer[], index: number): ToolCallBuffer {
+  const existing = buffers[index];
+  if (existing) {
+    return existing;
+  }
+  const created: ToolCallBuffer = {
+    argumentsText: "",
+  };
+  buffers[index] = created;
+  return created;
+}
+
+function parseToolArguments(toolCall: ToolCallBuffer): Record<string, unknown> {
+  if (toolCall.argumentsText === "") {
+    return {};
+  }
+  return JSON.parse(toolCall.argumentsText) as Record<string, unknown>;
+}
+
+async function collectStreamResponse(
+  stream: AsyncGenerator<MessageChunk>,
+  onChunk?: (chunk: MessageChunk) => void,
+): Promise<LLMResponse> {
+  let content = "";
+  let reasoningContent = "";
+  const toolCalls: ToolCallBuffer[] = [];
+
+  for await (const chunk of stream) {
+    onChunk?.(chunk);
+    switch (chunk.type) {
+      case LLMStreamChunkType.TextDelta:
+        content += chunk.text;
+        break;
+      case LLMStreamChunkType.ReasoningDelta:
+        reasoningContent += chunk.text;
+        break;
+      case LLMStreamChunkType.ToolCallArgumentsDelta: {
+        const buffer = getToolCallBuffer(toolCalls, chunk.index);
+        buffer.argumentsText += chunk.argsText;
+        if (chunk.toolCallId !== undefined) {
+          buffer.id = chunk.toolCallId;
+        }
+        if (chunk.toolName !== undefined) {
+          buffer.name = chunk.toolName;
+        }
+        break;
+      }
+    }
+  }
+
+  if (toolCalls.length > 0) {
+    return {
+      message: toolCalls.map((toolCall) => {
+        if (!toolCall.id) {
+          throw new Error("LLM stream ended without a tool call id");
+        }
+        if (!toolCall.name) {
+          throw new Error("LLM stream ended without a tool name");
+        }
+        return {
+          id: crypto.randomUUID(),
+          type: MessageType.ToolCall,
+          content,
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          arguments: parseToolArguments(toolCall),
+          ...(reasoningContent !== "" && { reasoningContent }),
+        };
+      }),
+      tokenCount: emptyTokenCount(),
+    };
+  }
+
+  return {
+    message: {
+      id: crypto.randomUUID(),
+      type: MessageType.Assist,
+      content,
+      ...(reasoningContent !== "" && { reasoningContent }),
+    },
+    tokenCount: emptyTokenCount(),
+  };
 }
 
 function isKnownSmokeInfraError(error: unknown): boolean {

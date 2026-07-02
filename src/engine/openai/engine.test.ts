@@ -6,7 +6,7 @@ import {
   type Message,
   type MessageChunk,
 } from "../../core/types.js";
-import { OpenAICompatibleEngine } from "./engine.js";
+import { OpenAIEngine } from "./engine.js";
 
 const openAIMocks = vi.hoisted(() => ({
   constructor: vi.fn(),
@@ -30,7 +30,7 @@ async function* completionStream() {
   yield {
     choices: [
       {
-        delta: { content: "ok" },
+        delta: { content: "pong" },
         finish_reason: null,
         index: 0,
       },
@@ -48,63 +48,60 @@ async function collect(stream: AsyncGenerator<MessageChunk>): Promise<MessageChu
 
 function request(): LLMGenerateRequest {
   const messages: Message[] = [
-    { id: "user-1", type: MessageType.User, content: "hi" },
+    { id: "user-1", type: MessageType.User, content: "ping" },
   ];
 
   return {
     messages,
     tools: [],
     provider: {
-      provider: "openai-compatible",
-      key: "request-key",
-      baseUrl: "http://localhost:9000/v1",
+      provider: "openai",
+      key: "openai-key",
+      baseUrl: "https://proxy.example/v1",
     },
     model: {
-      id: "openai-compatible/custom-model",
-      provider: "openai-compatible",
-      name: "custom-model",
-      maxOutputTokens: 1234,
-      thinkingLevels: [ThinkingLevel.None],
+      id: "openai/o3",
+      provider: "openai",
+      name: "o3",
+      thinkingLevels: [
+        ThinkingLevel.None,
+        ThinkingLevel.Low,
+        ThinkingLevel.Medium,
+        ThinkingLevel.High,
+      ],
     },
     generation: {
-      temperature: 0.2,
-      topP: 0.8,
-      maxOutputTokens: 777,
-      thinking: ThinkingLevel.None,
+      temperature: 0.1,
+      maxOutputTokens: 321,
+      thinking: ThinkingLevel.High,
     },
   };
 }
 
-describe("OpenAICompatibleEngine request mode", () => {
+describe("OpenAIEngine request mode", () => {
   beforeEach(() => {
     openAIMocks.constructor.mockClear();
     openAIMocks.create.mockReset();
     openAIMocks.create.mockResolvedValue(completionStream());
   });
 
-  it("uses request provider credentials and generation params", async () => {
-    const engine = new OpenAICompatibleEngine();
+  it("creates a request-scoped client and yields SDK chunks", async () => {
+    const engine = new OpenAIEngine();
 
-    const stream = engine.streamGenerate(request());
-    expect(stream[Symbol.asyncIterator]).toBeTypeOf("function");
-    await expect(collect(stream)).resolves.toEqual([
-      { type: LLMStreamChunkType.TextDelta, text: "ok" },
+    await expect(collect(engine.streamGenerate(request()))).resolves.toEqual([
+      { type: LLMStreamChunkType.TextDelta, text: "pong" },
     ]);
 
     expect(openAIMocks.constructor).toHaveBeenCalledWith({
-      apiKey: "request-key",
-      baseURL: "http://localhost:9000/v1",
+      apiKey: "openai-key",
+      baseURL: "https://proxy.example/v1",
     });
     expect(openAIMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "custom-model",
-        temperature: 0.2,
-        top_p: 0.8,
-        max_completion_tokens: 777,
+        model: "o3",
+        max_completion_tokens: 321,
+        reasoning_effort: "high",
         stream: true,
-        stream_options: {
-          include_usage: true,
-        },
       }),
     );
   });

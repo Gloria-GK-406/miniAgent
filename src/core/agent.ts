@@ -1,39 +1,43 @@
 import type {
-    Message,
     Action,
-    LLMRequest,
-    Tool,
-    ContextProvider,
-    ContextProcessor,
-    MessageNotifier,
-    ErrorHandler,
     AfterTurnProcessor,
-    ConfigNotifier,
-    PersistRequire,
-    TurnContextAppender,
-    TurnContextConsumer,
     AgentContextControl,
+    ConfigNotifier,
+    ContextProcessor,
+    ContextProvider,
+    ErrorHandler,
+    LLMRequest,
+    LLMRequire,
+    LLMResponse,
+    Message,
+    MessageChunk,
+    MessageNotifier,
+    PersistRequire,
+    TokenCount,
+    Tool,
     ToolCallMessage,
     ToolResultMessage,
-    TokenCount,
-    LLMRequire,
-    ModelAwareLLMRequest,
+    TurnContextAppender,
+    TurnContextConsumer,
 } from "./types.js";
 import {
-    ActionType, MessageType, ToolResultMessageSchema,
-    ContextProviderSchema, ContextProcessorSchema,
-    MessageNotifierSchema, ErrorHandlerSchema, AfterTurnProcessorSchema,
-    ConfigNotifierSchema, PersistRequireSchema, LLMRequireSchema,
-    TurnContextAppenderSchema, TurnContextConsumerSchema,
-    ModelAwareLLMRequestSchema,
+    ActionType,
+    AfterTurnProcessorSchema,
+    ConfigNotifierSchema,
+    ContextProcessorSchema,
+    ContextProviderSchema,
+    ErrorHandlerSchema,
+    LLMRequireSchema,
+    LLMStreamChunkType,
+    MessageNotifierSchema,
+    MessageType,
+    PersistRequireSchema,
+    ToolResultMessageSchema,
+    TurnContextAppenderSchema,
+    TurnContextConsumerSchema,
 } from "./types.js";
-import { ToolSchema, ToolProviderSchema } from "../tool/types.js";
-import type { ToolProvider } from "../tool/types.js";
-import type { MessageSource } from "../store/message-source.js";
-import { FileMessageSource } from "../store/message-source.js";
 import {
     AgentConfigSchema,
-    ModelPresetSchema,
     ThinkingLevel,
     normalizeGenerationConfig,
 } from "./config.js";
@@ -41,21 +45,30 @@ import type {
     AgentConfig,
     GenerationConfig,
     GenerationConfigInput,
-    ModelConfig,
+    JsonValue,
+    LLMGenerateRequest,
     ModelPreset,
     ModelProviderConfig,
     ModelSelector,
     NormalizedAgentConfig,
     ResolvedModel,
 } from "./config.js";
+import {
+    resolveModelsFromProviders,
+    selectResolvedModel,
+} from "./model-resolution.js";
+import { ToolProviderSchema, ToolSchema } from "../tool/types.js";
+import type { ToolProvider } from "../tool/types.js";
+import { ToolApproverSchema } from "../tool/approver.js";
+import type { ToolApprover } from "../tool/approver.js";
+import type { MessageSource } from "../store/message-source.js";
+import { FileMessageSource } from "../store/message-source.js";
 import type { Store } from "../store/store.js";
 import { FileStore } from "../store/file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 import { StopException } from "./errors.js";
 import { addTokenCount, emptyTokenCount } from "./llm.js";
-import type { ToolApprover } from "../tool/approver.js";
-import { ToolApproverSchema } from "../tool/approver.js";
 import type { AgentModule, AgentRegistrable } from "./module.js";
 
 export interface MiniAgentOptions {
@@ -63,264 +76,157 @@ export interface MiniAgentOptions {
     messageSource?: MessageSource;
 }
 
-function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
-    return {
-        id: model.id,
-        provider: model.provider,
-        engine: model.engine,
-        model: model.model,
-        ...(model.displayName !== undefined && { displayName: model.displayName }),
-        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        thinkingLevels: [...model.thinkingLevels],
-    };
+export interface MiniAgentCreateOptions extends MiniAgentOptions {
+    llm: LLMRequest;
+    config: AgentConfig;
+}
+
+const DEFAULT_GENERATION_CONFIG = {
+    temperature: 0.7,
+    thinking: ThinkingLevel.Medium,
+} satisfies GenerationConfig;
+
+interface ToolCallBuffer {
+    id?: string;
+    name?: string;
+    argumentsText: string;
+}
+
+function cloneJsonRecord<T extends Record<string, JsonValue>>(value: T): T {
+    return structuredClone(value) as T;
 }
 
 function cloneModelPreset(model: ModelPreset): ModelPreset {
     return {
-        model: model.model,
+        id: model.id,
+        name: model.name,
         ...(model.displayName !== undefined && { displayName: model.displayName }),
         ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
         ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        thinkingLevels: [...model.thinkingLevels],
-    };
-}
-
-function cloneModelConfig(config: ModelConfig): ModelConfig {
-    return {
-        provider: config.provider,
-        model: config.model,
-        apiKey: config.apiKey,
-        ...(config.baseUrl !== undefined && { baseUrl: config.baseUrl }),
-        ...(config.thinking !== undefined && { thinking: config.thinking }),
-        ...(config.maxTokens !== undefined && { maxTokens: config.maxTokens }),
-        ...(config.contextSize !== undefined && { contextSize: config.contextSize }),
-        ...(config.maxOutputTokens !== undefined && { maxOutputTokens: config.maxOutputTokens }),
-        ...(config.temperature !== undefined && { temperature: config.temperature }),
-        ...(config.topP !== undefined && { topP: config.topP }),
+        ...(model.thinkingLevels !== undefined && {
+            thinkingLevels: [...model.thinkingLevels],
+        }),
+        ...(model.capabilities !== undefined && {
+            capabilities: cloneJsonRecord(model.capabilities),
+        }),
+        ...(model.metadata !== undefined && {
+            metadata: cloneJsonRecord(model.metadata),
+        }),
     };
 }
 
 function cloneProviderConfig(provider: ModelProviderConfig): ModelProviderConfig {
     return {
-        name: provider.name,
-        engine: provider.engine,
-        apiKey: provider.apiKey,
+        provider: provider.provider,
+        key: provider.key,
         ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
-        ...(provider.models !== undefined && {
-            models: {
-                ...(provider.models.add !== undefined && {
-                    add: provider.models.add.map(cloneModelPreset),
-                }),
-                ...(provider.models.override !== undefined && {
-                    override: Object.fromEntries(
-                        Object.entries(provider.models.override).map(([model, override]) => [
-                            model,
-                            {
-                                ...(override.displayName !== undefined && { displayName: override.displayName }),
-                                ...(override.contextSize !== undefined && { contextSize: override.contextSize }),
-                                ...(override.maxOutputTokens !== undefined && { maxOutputTokens: override.maxOutputTokens }),
-                                ...(override.thinkingLevels !== undefined && {
-                                    thinkingLevels: [...override.thinkingLevels],
-                                }),
-                            },
-                        ]),
-                    ),
-                }),
-            },
+        models: (provider.models ?? []).map(cloneModelPreset),
+    };
+}
+
+function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
+    return {
+        id: model.id,
+        provider: model.provider,
+        name: model.name,
+        ...(model.displayName !== undefined && { displayName: model.displayName }),
+        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
+        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
+        thinkingLevels: [...model.thinkingLevels],
+        ...(model.capabilities !== undefined && {
+            capabilities: cloneJsonRecord(model.capabilities),
+        }),
+        ...(model.metadata !== undefined && {
+            metadata: cloneJsonRecord(model.metadata),
         }),
     };
 }
 
-function getModelAwareLLM(llm: LLMRequest): ModelAwareLLMRequest | null {
-    const parsed = ModelAwareLLMRequestSchema.safeParse(llm);
-    return parsed.success ? parsed.data : null;
+function cloneGenerationConfig(config: GenerationConfig): GenerationConfig {
+    return { ...config };
 }
 
-function addLegacyModelProvider(
-    providers: Map<string, ModelProviderConfig>,
-    model: ModelConfig,
-): void {
-    const existing = providers.get(model.provider);
-    const preset: ModelPreset = ModelPresetSchema.parse({
-        model: model.model,
-        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-    });
-
-    if (!existing) {
-        providers.set(model.provider, {
-            name: model.provider,
-            engine: model.provider,
-            apiKey: model.apiKey,
-            ...(model.baseUrl !== undefined && { baseUrl: model.baseUrl }),
-            models: { add: [preset] },
-        });
-        return;
+function cloneSelector(selector: ModelSelector): ModelSelector {
+    if ("id" in selector) {
+        return {
+            id: selector.id,
+            ...(selector.provider !== undefined && { provider: selector.provider }),
+        };
     }
-
-    const additions = existing.models?.add ?? [];
-    if (additions.some((entry) => entry.model === model.model)) {
-        return;
-    }
-    existing.models = {
-        ...(existing.models ?? {}),
-        add: [...additions, preset],
+    return {
+        provider: selector.provider,
+        model: selector.model,
     };
 }
 
-function legacyProvidersFromConfig(config: NormalizedAgentConfig): ModelProviderConfig[] {
-    const providers = new Map<string, ModelProviderConfig>();
-    if (config.model) {
-        addLegacyModelProvider(providers, config.model);
-    }
-    for (const group of config.models.values()) {
-        for (const model of group.models) {
-            addLegacyModelProvider(providers, model);
-        }
-    }
-    return [...providers.values()];
-}
-
-function flattenLegacyModelConfigs(config: NormalizedAgentConfig): ModelConfig[] {
-    return [...config.models.values()]
-        .flatMap((group) => group.models)
-        .map(cloneModelConfig);
-}
-
-function validateUniqueProviderNames(providers: ModelProviderConfig[]): void {
-    const seen = new Set<string>();
-    for (const provider of providers) {
-        if (seen.has(provider.name)) {
-            throw new Error(`Duplicate provider name: "${provider.name}"`);
-        }
-        seen.add(provider.name);
-    }
-}
-
-function resolveProviderModels(
-    llm: ModelAwareLLMRequest | null,
-    provider: ModelProviderConfig,
-): ResolvedModel[] {
-    const presets = new Map<string, ModelPreset>();
-    const overrides = provider.models?.override ?? {};
-
-    for (const preset of llm?.getEngineModels(provider.engine) ?? []) {
-        const override = overrides[preset.model];
-        const merged = ModelPresetSchema.parse({
-            ...preset,
-            ...(override ?? {}),
-        });
-        presets.set(merged.model, cloneModelPreset(merged));
-    }
-
-    for (const added of provider.models?.add ?? []) {
-        presets.set(added.model, cloneModelPreset(added));
-    }
-
-    return [...presets.values()].map((preset): ResolvedModel => ({
-        id: `${provider.name}/${preset.model}`,
-        provider: provider.name,
-        engine: provider.engine,
-        model: preset.model,
-        ...(preset.displayName !== undefined && { displayName: preset.displayName }),
-        ...(preset.contextSize !== undefined && { contextSize: preset.contextSize }),
-        ...(preset.maxOutputTokens !== undefined && { maxOutputTokens: preset.maxOutputTokens }),
-        thinkingLevels: [...preset.thinkingLevels],
-    }));
-}
-
-function resolveModels(
-    llm: LLMRequest,
-    providers: ModelProviderConfig[],
-): ResolvedModel[] {
-    const modelAwareLLM = getModelAwareLLM(llm);
-    return providers.flatMap((provider) =>
-        resolveProviderModels(modelAwareLLM, provider),
-    );
+function cloneAgentConfig(config: NormalizedAgentConfig): NormalizedAgentConfig {
+    return AgentConfigSchema.parse({
+        providers: config.providers.map(cloneProviderConfig),
+        ...(config.defaultModel !== undefined && {
+            defaultModel: cloneSelector(config.defaultModel),
+        }),
+        ...(config.generation !== undefined && {
+            generation: cloneGenerationConfig(config.generation),
+        }),
+        plugins: new Map(config.plugins),
+        paths: { ...config.paths },
+    });
 }
 
 function selectorDescription(selector: ModelSelector): string {
     if ("id" in selector) {
-        return selector.id;
+        return selector.provider !== undefined
+            ? `${selector.provider}:${selector.id}`
+            : selector.id;
     }
     return `${selector.provider}/${selector.model}`;
 }
 
-function matchModels(models: ResolvedModel[], selector: ModelSelector): ResolvedModel[] {
-    if ("id" in selector) {
-        return models.filter((model) => model.id === selector.id);
-    }
-    return models.filter((model) =>
-        model.provider === selector.provider && model.model === selector.model,
-    );
-}
-
 function availableModelIds(models: ResolvedModel[]): string {
-    return models.map((model) => model.id).join(", ") || "(none)";
+    return models.map((model) => `${model.provider}:${model.id}`).join(", ") || "(none)";
 }
 
-function selectModel(
-    models: ResolvedModel[],
-    selector: ModelSelector,
-    label = "Model",
-): ResolvedModel {
-    const matches = matchModels(models, selector);
-    if (matches.length === 0) {
-        throw new Error(`${label} not found: ${selectorDescription(selector)}. Available models: ${availableModelIds(models)}`);
-    }
-    if (matches.length > 1) {
-        throw new Error(`${label} selector is ambiguous: ${selectorDescription(selector)}. Use one of: ${matches.map((model) => model.id).join(", ")}`);
-    }
-    return matches[0]!;
-}
-
-function selectInitialModel(
-    config: NormalizedAgentConfig,
-    models: ResolvedModel[],
-): ResolvedModel {
-    if (config.defaultModel) {
-        return selectModel(models, config.defaultModel, "Default model");
-    }
-    if (config.model) {
-        return selectModel(models, {
-            provider: config.model.provider,
-            model: config.model.model,
-        }, "Default model");
-    }
-    const first = models[0];
-    if (!first) {
-        throw new Error("No models resolved. Configure provider models or register engine model catalogs.");
-    }
-    return first;
-}
-
-function generationInputFromModelConfig(config: ModelConfig): GenerationConfigInput {
+function selectorFromResolvedModel(model: ResolvedModel): ModelSelector {
     return {
-        ...(config.temperature !== undefined && { temperature: config.temperature }),
-        ...(config.topP !== undefined && { topP: config.topP }),
-        ...(config.maxOutputTokens !== undefined && { maxOutputTokens: config.maxOutputTokens }),
-        ...(config.thinking !== undefined && {
-            thinking: config.thinking ? ThinkingLevel.Medium : ThinkingLevel.None,
-        }),
+        id: model.id,
+        provider: model.provider,
     };
 }
 
-function hasGenerationFields(config: ModelConfig): boolean {
-    return config.temperature !== undefined
-        || config.topP !== undefined
-        || config.maxOutputTokens !== undefined
-        || config.thinking !== undefined;
+function validateUniqueProviders(providers: ModelProviderConfig[]): void {
+    const seen = new Set<string>();
+    for (const provider of providers) {
+        if (seen.has(provider.provider)) {
+            throw new Error(`Duplicate provider: "${provider.provider}"`);
+        }
+        seen.add(provider.provider);
+    }
 }
 
-function legacyGenerationFields(generation: GenerationConfig): Partial<ModelConfig> {
-    return {
-        temperature: generation.temperature,
-        ...(generation.topP !== undefined && { topP: generation.topP }),
-        ...(generation.maxOutputTokens !== undefined && { maxOutputTokens: generation.maxOutputTokens }),
-        thinking: generation.thinking !== ThinkingLevel.None,
+function isCreateOptions(value: LLMRequest | MiniAgentCreateOptions): value is MiniAgentCreateOptions {
+    return typeof value === "object"
+        && value !== null
+        && "llm" in value
+        && "config" in value;
+}
+
+function getToolCallBuffer(buffers: ToolCallBuffer[], index: number): ToolCallBuffer {
+    const existing = buffers[index];
+    if (existing) {
+        return existing;
+    }
+    const created: ToolCallBuffer = {
+        argumentsText: "",
     };
+    buffers[index] = created;
+    return created;
+}
+
+function parseToolArguments(buffer: ToolCallBuffer): Record<string, unknown> {
+    if (buffer.argumentsText.trim() === "") {
+        return {};
+    }
+    return JSON.parse(buffer.argumentsText) as Record<string, unknown>;
 }
 
 export class MiniAgent {
@@ -329,14 +235,10 @@ export class MiniAgent {
     private messageSource: MessageSource;
     private llm: LLMRequest;
     private config: NormalizedAgentConfig;
-    private providerConfigs: ModelProviderConfig[] = [];
-    private explicitProviderNames = new Set<string>();
-    private resolvedModels: ResolvedModel[] = [];
-    private currentModel!: ResolvedModel;
-    private currentLegacyModelConfig!: ModelConfig;
-    private legacyModelConfigs: ModelConfig[] = [];
-    private generationConfig!: GenerationConfig;
-    private generationWasExplicitlyConfigured = false;
+    private providerConfigs: ModelProviderConfig[];
+    private resolvedModels: ResolvedModel[];
+    private currentModel: ResolvedModel | undefined;
+    private generationConfig: GenerationConfig;
     private tools: Map<string, Tool> = new Map();
     private toolProviders: ToolProvider[] = [];
     private turnToolMap: Map<string, Tool> = new Map();
@@ -355,33 +257,38 @@ export class MiniAgent {
     private stopped = false;
     private contextCount: TokenCount = emptyTokenCount();
     private toolAbortController: AbortController | null = null;
+    private activeStream: AsyncGenerator<MessageChunk> | null = null;
 
-    constructor(llm: LLMRequest, config: AgentConfig, options: MiniAgentOptions = {}) {
+    constructor(options: MiniAgentCreateOptions);
+    constructor(llm: LLMRequest, config: AgentConfig, options?: MiniAgentOptions);
+    constructor(
+        llmOrOptions: LLMRequest | MiniAgentCreateOptions,
+        config?: AgentConfig,
+        options: MiniAgentOptions = {},
+    ) {
+        const resolvedOptions = isCreateOptions(llmOrOptions)
+            ? llmOrOptions
+            : {
+                llm: llmOrOptions,
+                config: config as AgentConfig,
+                ...options,
+            };
+
         this.guid = crypto.randomUUID();
         this.name = "";
-        this.llm = llm;
-        this.config = AgentConfigSchema.parse(config);
-        this.explicitProviderNames = new Set(this.config.providers?.map((provider) => provider.name) ?? []);
-        this.providerConfigs = (this.config.providers ?? legacyProvidersFromConfig(this.config))
-            .map(cloneProviderConfig);
-        validateUniqueProviderNames(this.providerConfigs);
-        if (this.providerConfigs.length === 0) {
-            throw new Error("No model providers configured. Configure providers or a legacy model.");
-        }
-        this.resolvedModels = resolveModels(this.llm, this.providerConfigs);
-        this.currentModel = selectInitialModel(this.config, this.resolvedModels);
-        this.legacyModelConfigs = flattenLegacyModelConfigs(this.config);
-        const initialLegacyConfig = this.findLegacyModelConfig(this.currentModel)
-            ?? (this.config.model ? cloneModelConfig(this.config.model) : undefined);
-        this.generationWasExplicitlyConfigured = this.config.generation !== undefined
-            || this.config.providers !== undefined;
-        this.generationConfig = this.getInitialGenerationConfig(initialLegacyConfig);
-        this.currentLegacyModelConfig = initialLegacyConfig
-            ? this.applyConfiguredGeneration(cloneModelConfig(initialLegacyConfig))
-            : this.buildLegacyModelConfig(this.currentModel);
+        this.llm = resolvedOptions.llm;
+        this.config = AgentConfigSchema.parse(resolvedOptions.config);
+        this.providerConfigs = this.config.providers.map(cloneProviderConfig);
+        validateUniqueProviders(this.providerConfigs);
+        this.resolvedModels = resolveModelsFromProviders(this.providerConfigs, this.llm);
+        this.currentModel = selectResolvedModel(this.resolvedModels, this.config.defaultModel);
+        this.generationConfig = normalizeGenerationConfig(
+            this.config.generation ?? DEFAULT_GENERATION_CONFIG,
+        );
         this.syncEffectiveConfig();
-        this.store = options.store ?? new FileStore(config.paths.sessiondir);
-        this.messageSource = options.messageSource ?? new FileMessageSource(this.store, "messages.jsonl");
+        this.store = resolvedOptions.store ?? new FileStore(this.config.paths.sessiondir);
+        this.messageSource = resolvedOptions.messageSource
+            ?? new FileMessageSource(this.store, "messages.jsonl");
     }
 
     getGuid(): string {
@@ -416,155 +323,45 @@ export class MiniAgent {
         return this;
     }
 
-    private getInitialGenerationConfig(initialLegacyConfig: ModelConfig | undefined): GenerationConfig {
-        if (this.config.generation !== undefined) {
-            return normalizeGenerationConfig(this.config.generation);
-        }
-        if (initialLegacyConfig && hasGenerationFields(initialLegacyConfig)) {
-            return normalizeGenerationConfig(generationInputFromModelConfig(initialLegacyConfig));
-        }
-        return normalizeGenerationConfig(undefined);
-    }
-
-    private findLegacyModelConfig(model: ResolvedModel): ModelConfig | undefined {
-        const candidates = [
-            ...(this.config.model ? [this.config.model] : []),
-            ...this.legacyModelConfigs,
-        ];
-        return candidates.find((candidate) =>
-            candidate.provider === model.provider && candidate.model === model.model,
-        );
-    }
-
-    private getProviderConfigForModel(model: ResolvedModel): ModelProviderConfig {
-        const provider = this.providerConfigs.find((entry) => entry.name === model.provider);
-        if (!provider) {
-            throw new Error(`Provider not found for current model: ${model.provider}`);
-        }
-        return provider;
-    }
-
-    private buildLegacyModelConfig(model: ResolvedModel): ModelConfig {
-        const provider = this.getProviderConfigForModel(model);
-        const config: ModelConfig = {
-            provider: model.engine,
-            model: model.model,
-            apiKey: provider.apiKey,
-            ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
-            ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-            ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        };
-        return this.applyConfiguredGeneration(config);
-    }
-
-    private applyConfiguredGeneration(config: ModelConfig): ModelConfig {
-        if (!this.generationWasExplicitlyConfigured) {
-            return config;
-        }
-        return {
-            ...config,
-            ...legacyGenerationFields(this.generationConfig),
-        };
-    }
-
     private syncEffectiveConfig(): void {
+        const defaultModel = this.currentModel
+            ? selectorFromResolvedModel(this.currentModel)
+            : this.config.defaultModel;
         this.config = AgentConfigSchema.parse({
-            ...this.config,
-            model: this.getLegacyModelConfig(),
-            generation: this.generationConfig,
+            providers: this.providerConfigs.map(cloneProviderConfig),
+            ...(defaultModel !== undefined && { defaultModel }),
+            generation: cloneGenerationConfig(this.generationConfig),
+            plugins: new Map(this.config.plugins),
+            paths: { ...this.config.paths },
         });
     }
 
     private notifyConfigChanged(): void {
         this.syncEffectiveConfig();
         for (const notifier of this.configNotifiers) {
-            void notifier.setConfig(this.config);
+            void notifier.setConfig(this.getConfig());
         }
     }
 
     getConfig(): NormalizedAgentConfig {
-        return this.config;
+        return cloneAgentConfig(this.config);
     }
 
-    private getLegacyModelConfig(): ModelConfig {
-        return cloneModelConfig(this.currentLegacyModelConfig);
-    }
-
-    private getCurrentProviderConfig(): ModelProviderConfig {
-        return this.getProviderConfigForModel(this.currentModel);
-    }
-
-    private upsertResolvedModelFromModelConfig(config: ModelConfig): ResolvedModel {
-        const preset: ModelPreset = ModelPresetSchema.parse({
-            model: config.model,
-            ...(config.contextSize !== undefined && { contextSize: config.contextSize }),
-            ...(config.maxOutputTokens !== undefined && { maxOutputTokens: config.maxOutputTokens }),
-            thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-        });
-        const providerConfig: ModelProviderConfig = {
-            name: config.provider,
-            engine: config.provider,
-            apiKey: config.apiKey,
-            ...(config.baseUrl !== undefined && { baseUrl: config.baseUrl }),
-            models: { add: [preset] },
-        };
-        const providerIndex = this.providerConfigs.findIndex((provider) =>
-            provider.name === config.provider,
+    private getProviderConfigForModel(model: ResolvedModel): ModelProviderConfig {
+        const provider = this.providerConfigs.find((entry) =>
+            entry.provider === model.provider,
         );
-        if (providerIndex === -1) {
-            this.providerConfigs = [...this.providerConfigs, providerConfig];
-        } else {
-            const existing = this.providerConfigs[providerIndex]!;
-            const additions = existing.models?.add?.filter((entry) => entry.model !== config.model) ?? [];
-            const updatedProvider: ModelProviderConfig = {
-                name: existing.name,
-                engine: config.provider,
-                apiKey: config.apiKey,
-                ...(config.baseUrl !== undefined && { baseUrl: config.baseUrl }),
-                models: {
-                    ...(existing.models ?? {}),
-                    add: [...additions, preset],
-                },
-            };
-            this.providerConfigs = this.providerConfigs.map((provider, index) =>
-                index === providerIndex ? updatedProvider : provider,
-            );
+        if (!provider) {
+            throw new Error(`Provider not found for current model: ${model.provider}`);
         }
-
-        const resolved = cloneResolvedModel({
-            id: `${config.provider}/${config.model}`,
-            provider: config.provider,
-            engine: config.provider,
-            model: config.model,
-            ...(config.contextSize !== undefined && { contextSize: config.contextSize }),
-            ...(config.maxOutputTokens !== undefined && { maxOutputTokens: config.maxOutputTokens }),
-            thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Medium],
-        });
-        const modelIndex = this.resolvedModels.findIndex((model) => model.id === resolved.id);
-        if (modelIndex === -1) {
-            this.resolvedModels = [...this.resolvedModels, resolved];
-        } else {
-            this.resolvedModels = this.resolvedModels.map((model, index) =>
-                index === modelIndex ? resolved : model,
-            );
-        }
-        const legacyIndex = this.legacyModelConfigs.findIndex((model) =>
-            model.provider === config.provider && model.model === config.model,
-        );
-        if (legacyIndex !== -1) {
-            this.legacyModelConfigs = this.legacyModelConfigs.map((model, index) =>
-                index === legacyIndex ? cloneModelConfig(config) : model,
-            );
-        }
-        return resolved;
+        return provider;
     }
 
-    private shouldUseModelAwareRequest(modelAwareLLM: ModelAwareLLMRequest): boolean {
-        if (this.explicitProviderNames.has(this.currentModel.provider)) {
-            return true;
+    private requireCurrentModel(): ResolvedModel {
+        if (!this.currentModel) {
+            throw new Error("No model is available. Configure providers or register engine models first.");
         }
-        return modelAwareLLM.getEngineModels(this.currentModel.engine)
-            .some((model) => model.model === this.currentModel.model);
+        return this.currentModel;
     }
 
     getModels(): ResolvedModel[] {
@@ -575,82 +372,35 @@ export class MiniAgent {
         return this.resolvedModels.map(cloneResolvedModel);
     }
 
-    getModelList(): ModelConfig[] {
-        if (this.legacyModelConfigs.length > 0) {
-            return this.legacyModelConfigs.map(cloneModelConfig);
-        }
-        if (this.config.providers !== undefined) {
-            return this.resolvedModels.map((model) =>
-                this.buildLegacyModelConfig(model),
-            );
-        }
-        return [];
-    }
-
     getModelDisplayList(): string[] {
-        if (this.config.providers !== undefined) {
-            return this.getResolvedModels().map((model) => model.id);
-        }
-        return this.getModelList().map((model) => `${model.provider}/${model.model}`);
+        return this.resolvedModels.map((model) => model.id);
     }
 
-    getCurrentResolvedModel(): ResolvedModel {
-        return cloneResolvedModel(this.currentModel);
-    }
-
-    getCurrentModel(): ModelConfig {
-        return this.getLegacyModelConfig();
+    getCurrentResolvedModel(): ResolvedModel | undefined {
+        return this.currentModel ? cloneResolvedModel(this.currentModel) : undefined;
     }
 
     setResolvedModel(selector: ModelSelector): void {
-        this.currentModel = selectModel(this.resolvedModels, selector);
-        const legacyConfig = this.findLegacyModelConfig(this.currentModel);
-        this.currentLegacyModelConfig = legacyConfig
-            ? this.applyConfiguredGeneration(cloneModelConfig(legacyConfig))
-            : this.buildLegacyModelConfig(this.currentModel);
-        this.notifyConfigChanged();
-    }
-
-    setModel(config: ModelConfig): void {
-        this.currentModel = this.upsertResolvedModelFromModelConfig(config);
-        this.currentLegacyModelConfig = cloneModelConfig(config);
-        this.generationWasExplicitlyConfigured = false;
-        this.generationConfig = hasGenerationFields(config)
-            ? normalizeGenerationConfig(generationInputFromModelConfig(config))
-            : normalizeGenerationConfig(undefined);
+        const selected = selectResolvedModel(this.resolvedModels, selector);
+        if (!selected) {
+            throw new Error(
+                `Model not found: ${selectorDescription(selector)}. Available models: ${availableModelIds(this.resolvedModels)}`,
+            );
+        }
+        this.currentModel = selected;
         this.notifyConfigChanged();
     }
 
     getGenerationConfig(): GenerationConfig {
-        return { ...this.generationConfig };
+        return cloneGenerationConfig(this.generationConfig);
     }
 
-    setGenerationConfig(update: GenerationConfigInput): void {
+    setGenerationConfig(config: GenerationConfigInput | GenerationConfig): void {
         this.generationConfig = normalizeGenerationConfig({
             ...this.generationConfig,
-            ...update,
+            ...config,
         });
-        this.generationWasExplicitlyConfigured = true;
-        this.currentLegacyModelConfig = this.applyConfiguredGeneration(
-            cloneModelConfig(this.currentLegacyModelConfig),
-        );
         this.notifyConfigChanged();
-    }
-
-    setModelByPath(path: string): void {
-        const sep = path.indexOf("/");
-        if (sep !== -1) {
-            const provider = path.slice(0, sep);
-            const model = path.slice(sep + 1);
-            const legacyModel = this.getModelList().find((entry) =>
-                entry.provider === provider && entry.model === model,
-            );
-            if (legacyModel) {
-                this.setModel(legacyModel);
-                return;
-            }
-        }
-        this.setResolvedModel({ id: path });
     }
 
     getContextCount(): TokenCount {
@@ -680,7 +430,7 @@ export class MiniAgent {
                 this.toolProviders.push(candidate as ToolProvider);
             }
         }
-        
+
         if (ToolSchema.safeParse(candidate).success) {
             matched = true;
             this.tools.set((candidate as Tool).name, candidate as Tool);
@@ -721,7 +471,7 @@ export class MiniAgent {
             matched = true;
             if (!this.configNotifiers.includes(candidate as ConfigNotifier)) {
                 const notifier = candidate as ConfigNotifier;
-                void notifier.setConfig(this.config);
+                void notifier.setConfig(this.getConfig());
                 this.configNotifiers.push(notifier);
             }
         }
@@ -800,8 +550,8 @@ export class MiniAgent {
         const map = new Map(this.tools);
         for (const provider of this.toolProviders) {
             const tools = await provider.getTools();
-            for (const t of tools) {
-                map.set(t.name, t);
+            for (const tool of tools) {
+                map.set(tool.name, tool);
             }
         }
         return [...map.values()];
@@ -809,7 +559,7 @@ export class MiniAgent {
 
     private async buildToolMap(): Promise<void> {
         this.turnToolMap = new Map(
-            (await this.getToolList()).map((t) => [t.name, t]),
+            (await this.getToolList()).map((tool) => [tool.name, tool]),
         );
     }
 
@@ -844,7 +594,7 @@ export class MiniAgent {
         }
 
         const deleteIds = new Set(
-            actions.filter((a) => a.type === ActionType.Delete).map((a) => a.targetId),
+            actions.filter((action) => action.type === ActionType.Delete).map((action) => action.targetId),
         );
 
         const replaceMap = new Map<string, Message>();
@@ -855,19 +605,21 @@ export class MiniAgent {
         }
 
         const addFirst: Message[] = actions
-            .filter((a): a is Extract<Action, { type: ActionType.AddFirst }> => a.type === ActionType.AddFirst)
-            .map((a) => a.message);
+            .filter((action): action is Extract<Action, { type: ActionType.AddFirst }> =>
+                action.type === ActionType.AddFirst)
+            .map((action) => action.message);
 
         const addLast: Message[] = actions
-            .filter((a): a is Extract<Action, { type: ActionType.AddLast }> => a.type === ActionType.AddLast)
-            .map((a) => a.message);
+            .filter((action): action is Extract<Action, { type: ActionType.AddLast }> =>
+                action.type === ActionType.AddLast)
+            .map((action) => action.message);
 
         const mirror: Message[] = [];
-        for (const msg of messages) {
-            if (deleteIds.has(msg.id)) {
+        for (const message of messages) {
+            if (deleteIds.has(message.id)) {
                 continue;
             }
-            mirror.push(replaceMap.get(msg.id) ?? msg);
+            mirror.push(replaceMap.get(message.id) ?? message);
         }
 
         return [...addFirst, ...mirror, ...addLast];
@@ -880,17 +632,24 @@ export class MiniAgent {
     }
 
     private async requestApproval(toolName: string, args: Record<string, unknown>): Promise<boolean> {
-        if (this.approvers.length === 0) return true;
+        if (this.approvers.length === 0) {
+            return true;
+        }
         for (const approver of this.approvers) {
             const decision = await approver.requestApproval(toolName, args);
-            if (!decision) return false;
+            if (!decision) {
+                return false;
+            }
         }
         return true;
     }
 
     async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage> {
         this.emitter.emit("tool:execute", { toolCall });
-        const approved = await this.requestApproval(toolCall.toolName, toolCall.arguments as Record<string, unknown>);
+        const approved = await this.requestApproval(
+            toolCall.toolName,
+            toolCall.arguments as Record<string, unknown>,
+        );
         if (!approved) {
             const result = ToolResultMessageSchema.parse({
                 id: crypto.randomUUID(),
@@ -909,12 +668,15 @@ export class MiniAgent {
             const abortController = new AbortController();
             this.toolAbortController = abortController;
             try {
-                content = await tool.execute(toolCall.arguments as Record<string, unknown>, abortController.signal);
-            } catch (e: unknown) {
-                if (e instanceof StopException) {
-                    throw e;
+                content = await tool.execute(
+                    toolCall.arguments as Record<string, unknown>,
+                    abortController.signal,
+                );
+            } catch (error: unknown) {
+                if (error instanceof StopException) {
+                    throw error;
                 }
-                content = e instanceof Error ? e.message : String(e);
+                content = error instanceof Error ? error.message : String(error);
             } finally {
                 this.toolAbortController = null;
             }
@@ -944,6 +706,93 @@ export class MiniAgent {
         }
         this.stopped = true;
         this.toolAbortController?.abort();
+        void this.activeStream?.return?.(undefined);
+    }
+
+    private async collectStreamResponse(stream: AsyncGenerator<MessageChunk>): Promise<LLMResponse> {
+        let content = "";
+        let reasoningContent = "";
+        const toolCalls: ToolCallBuffer[] = [];
+        this.activeStream = stream;
+        try {
+            for await (const chunk of stream) {
+                this.emitter.emit("llm:chunk", { chunk });
+                switch (chunk.type) {
+                    case LLMStreamChunkType.TextDelta:
+                        content += chunk.text;
+                        break;
+                    case LLMStreamChunkType.ReasoningDelta:
+                        reasoningContent += chunk.text;
+                        break;
+                    case LLMStreamChunkType.ToolCallArgumentsDelta: {
+                        const buffer = getToolCallBuffer(toolCalls, chunk.index);
+                        buffer.argumentsText += chunk.argsText;
+                        if (chunk.toolCallId !== undefined) {
+                            buffer.id = chunk.toolCallId;
+                        }
+                        if (chunk.toolName !== undefined) {
+                            buffer.name = chunk.toolName;
+                        }
+                        break;
+                    }
+                }
+                if (this.stopped) {
+                    await stream.return?.(undefined);
+                    break;
+                }
+            }
+        } finally {
+            if (this.activeStream === stream) {
+                this.activeStream = null;
+            }
+        }
+
+        if (toolCalls.length > 0) {
+            return {
+                message: toolCalls.map((toolCall) => {
+                    if (!toolCall.id) {
+                        throw new Error("LLM stream ended without a tool call id");
+                    }
+                    if (!toolCall.name) {
+                        throw new Error("LLM stream ended without a tool name");
+                    }
+                    return {
+                        id: crypto.randomUUID(),
+                        type: MessageType.ToolCall,
+                        content,
+                        toolCallId: toolCall.id,
+                        toolName: toolCall.name,
+                        arguments: parseToolArguments(toolCall),
+                        ...(reasoningContent !== "" && { reasoningContent }),
+                    };
+                }),
+                tokenCount: emptyTokenCount(),
+            };
+        }
+
+        return {
+            message: {
+                id: crypto.randomUUID(),
+                type: MessageType.Assist,
+                content,
+                ...(reasoningContent !== "" && { reasoningContent }),
+            },
+            tokenCount: emptyTokenCount(),
+        };
+    }
+
+    private buildGenerateRequest(
+        currentModel: ResolvedModel,
+        context: Message[],
+        tools: Tool[],
+    ): LLMGenerateRequest {
+        return {
+            provider: cloneProviderConfig(this.getProviderConfigForModel(currentModel)),
+            model: cloneResolvedModel(currentModel),
+            messages: [...context],
+            tools: [...tools],
+            generation: cloneGenerationConfig(this.generationConfig),
+        };
     }
 
     async run(input: Message): Promise<Message[]> {
@@ -963,33 +812,16 @@ export class MiniAgent {
                 turn++;
                 this.emitter.emit("turn:start", { turn });
                 try {
+                    const currentModel = this.requireCurrentModel();
                     const context = await this.buildContext();
                     await this.consumeTurnContext(turn, context);
                     await this.buildToolMap();
                     const tools = [...this.turnToolMap.values()];
                     this.emitter.emit("llm:request", { context, tools });
-                    const modelAwareLLM = getModelAwareLLM(this.llm);
-                    const stream = modelAwareLLM && this.shouldUseModelAwareRequest(modelAwareLLM)
-                        ? modelAwareLLM.streamInvoke({
-                            messages: context,
-                            tools,
-                            provider: cloneProviderConfig(this.getCurrentProviderConfig()),
-                            model: cloneResolvedModel(this.currentModel),
-                            generation: { ...this.generationConfig },
-                        })
-                        : this.llm.streamInvoke(context, this.getLegacyModelConfig(), tools);
-                    const unsubscribe = stream.onChunk((chunk) => {
-                        this.emitter.emit("llm:chunk", { chunk });
-                        if (this.stopped) {
-                            stream.abort();
-                        }
-                    });
-                    let response;
-                    try {
-                        response = await stream;
-                    } finally {
-                        unsubscribe();
-                    }
+                    const request = this.buildGenerateRequest(currentModel, context, tools);
+                    const response = await this.collectStreamResponse(
+                        this.llm.streamInvoke(request),
+                    );
                     this.contextCount = addTokenCount(this.contextCount, response.tokenCount);
                     this.emitter.emit("llm:response", { response });
 
@@ -1001,36 +833,36 @@ export class MiniAgent {
                     }
 
                     const toolCalls = response.message;
-                    for (const tc of toolCalls) {
-                        await this.notify(tc);
-                        await this.messageSource.add(tc);
+                    for (const toolCall of toolCalls) {
+                        await this.notify(toolCall);
+                        await this.messageSource.add(toolCall);
                     }
 
-                    for (const tc of toolCalls) {
-                        const result = await this.execute(tc);
+                    for (const toolCall of toolCalls) {
+                        const result = await this.execute(toolCall);
                         await this.notify(result);
                         await this.messageSource.add(result);
                     }
                     this.emitter.emit("turn:end", { turn });
-                } catch (e: unknown) {
-                    if (e instanceof StopException) {
+                } catch (error: unknown) {
+                    if (error instanceof StopException) {
                         this.stopped = true;
                         this.emitter.emit("turn:end", { turn });
                         break;
                     }
 
-                    this.emitter.emit("run:error", { error: e, turn });
+                    this.emitter.emit("run:error", { error, turn });
 
                     const candidates = this.errorHandlers
-                        .filter((h) => h.canHandle(e))
+                        .filter((handler) => handler.canHandle(error))
                         .sort((a, b) => a.priority - b.priority);
 
                     if (candidates.length === 0) {
-                        throw e;
+                        throw error;
                     }
 
                     for (const handler of candidates) {
-                        await handler.handle(e);
+                        await handler.handle(error);
                     }
                     continue;
                 }
@@ -1039,6 +871,7 @@ export class MiniAgent {
             wasStopped = this.stopped;
             this.running = false;
             this.stopped = false;
+            this.activeStream = null;
         }
 
         if (wasStopped) {

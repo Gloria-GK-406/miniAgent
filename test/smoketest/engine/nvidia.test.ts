@@ -3,9 +3,10 @@ import { z } from "zod";
 import { NVIDIAEngine } from "../../../src/engine/nvidia/index.js";
 import { MessageType, LLMStreamChunkType } from "../../../src/core/types.js";
 import type { Message, Tool, LLMStreamChunk } from "../../../src/core/types.js";
-import type { ModelConfig } from "../../../src/core/config.js";
+import { ThinkingLevel, type ModelProviderConfig } from "../../../src/core/config.js";
 import {
   getProviderConfig,
+  getProviderModel,
   isProviderConfigured,
   invokeEngineForSmoke,
   isAssistResponse,
@@ -13,19 +14,22 @@ import {
 } from "../helpers.js";
 
 const PROVIDER = "NVIDIA" as const;
+const engine = new NVIDIAEngine();
 
 describe.skipIf(!isProviderConfigured(PROVIDER))("NVIDIA Engine", () => {
-  let config: ModelConfig;
+  let providerConfig: ModelProviderConfig;
+  let providerModel: string;
 
   beforeAll(() => {
-    config = getProviderConfig(PROVIDER, "nvidia");
+    providerConfig = getProviderConfig(PROVIDER, "nvidia");
+    providerModel = getProviderModel(PROVIDER);
   });
 
   it("text: sends a text message and receives a response", async () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "Reply with exactly: pong" },
     ];
-    const result = await invokeEngineForSmoke(NVIDIAEngine, config, messages, []);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, []);
     if (result === null) {
       return;
     }
@@ -47,7 +51,7 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("NVIDIA Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is the weather in Beijing?" },
     ];
-    const result = await invokeEngineForSmoke(NVIDIAEngine, config, messages, [tool]);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, [tool]);
     if (result === null) {
       return;
     }
@@ -63,7 +67,9 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("NVIDIA Engine", () => {
     const messages: Message[] = [
       { id: "1", type: MessageType.User, content: "What is 15 * 37? Think step by step, then give the answer." },
     ];
-    const result = await invokeEngineForSmoke(NVIDIAEngine, config, messages, []);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, [], {
+      generation: { thinking: ThinkingLevel.Medium },
+    });
     if (result === null) {
       return;
     }
@@ -83,12 +89,11 @@ describe.skipIf(!isProviderConfigured(PROVIDER))("NVIDIA Engine", () => {
       { id: "1", type: MessageType.User, content: "Count from 1 to 5, one number per line." },
     ];
     const chunks: LLMStreamChunk[] = [];
-    const engine = new NVIDIAEngine(config);
-    const handle = engine.streamGenerate(messages, []);
-    handle.onChunk((chunk) => {
-      chunks.push(chunk);
+    const result = await invokeEngineForSmoke(engine, providerConfig, providerModel, messages, [], {
+      onChunk: (chunk) => {
+        chunks.push(chunk);
+      },
     });
-    const result = await handle;
     if (result === null) {
       return;
     }

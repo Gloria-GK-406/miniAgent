@@ -15,36 +15,37 @@ import {
   MiniAgent,
   LLMEngineManager,
   MessageType,
-  ThinkingLevel,
 } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
+import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
 import { z } from "zod";
 
 // 1. 配置 LLM 引擎
-const engines = new LLMEngineManager();
-engines.register(new AnthropicEngine());
+const llm = new LLMEngineManager();
+llm.register(new OpenAIEngine());
 
 // 2. 创建 Agent
-const agent = new MiniAgent(engines, {
-  providers: [
-    {
-      name: "anthropic-main",
-      engine: "anthropic",
-      apiKey: process.env.ANTHROPIC_API_KEY!,
+const agent = new MiniAgent({
+  llm,
+  config: {
+    providers: [
+      {
+        provider: "openai",
+        key: process.env.OPENAI_API_KEY!,
+        models: [{ id: "fast", name: "gpt-4o-mini" }],
+      },
+    ],
+    defaultModel: { id: "fast", provider: "openai" },
+    generation: {
+      temperature: 0.7,
+      thinking: "medium",
     },
-  ],
-  defaultModel: { id: "anthropic-main/claude-sonnet-4-5" },
-  generation: {
-    temperature: 0.7,
-    thinking: ThinkingLevel.Medium,
+    plugins: new Map(),
+    paths: { sessiondir: "./sessions" },
   },
-  models: new Map(),
-  plugins: new Map(),
-  paths: { sessiondir: "./sessions" },
 });
 
 console.log(agent.getModels().map((model) => model.id));
-agent.setGenerationConfig({ temperature: 0.2, thinking: ThinkingLevel.None });
+agent.setGenerationConfig({ temperature: 0.2, thinking: "none" });
 
 // 3. 打印流式输出
 agent.on("llm:chunk", ({ chunk }) => {
@@ -202,9 +203,9 @@ const processor = {
 
 MiniAgent 将 LLM 交互分为两层：
 
-- **`LLMRequest`** — Agent 调用的接口：`streamInvoke(messages, modelConfig, tools) → LLMStreamHandle`。这是契约。
-- **`LLMEngine`** — 引擎实现的接口：`streamGenerate(messages, tools) → LLMStreamHandle`。`ModelConfig` 在构造时绑定。
-- **`LLMEngineManager`** — 默认的 `LLMRequest` 实现。管理引擎构造函数，按 `ModelConfig` 创建引擎，并通过 LRU 淘汰策略缓存。
+- **`LLMRequest`** — Agent 调用的接口：`streamInvoke(request)`。
+- **`LLMEngine`** — 引擎实现的接口，暴露 `name`、`getModels()` 和 `streamGenerate(request)`。
+- **`LLMEngineManager`** — 默认的 `LLMRequest` 实现。注册引擎实例，并按已解析的模型请求路由。
 
 ```
   MiniAgent ──调用──► LLMRequest (接口)
@@ -234,15 +235,13 @@ engines.register(new GLMEngine());
 engines.register(new GLMCodePlanEngine());
 ```
 
-实现 `LLMEngine` 接口即可添加自定义引擎：
-
-Provider-mode engines expose a model catalog and receive a per-request provider/model/generation object:
+Provider-mode 引擎暴露模型目录，并接收包含 provider、model 和 generation 的请求对象：
 
 ```typescript
-interface ModelCatalogLLMEngine {
+interface LLMEngine {
   readonly name: string;
   getModels(): ModelPreset[];
-  streamGenerate(request: LLMGenerateRequest): LLMStreamHandle<LLMResponse>;
+  streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 ```
 
@@ -353,33 +352,22 @@ npm run chat
 {
   "providers": [
     {
-      "name": "anthropic-main",
       "engine": "anthropic",
-      "apiKey": "sk-ant-..."
+      "key": "sk-ant-...",
+      "models": [{ "id": "sonnet", "name": "claude-sonnet-4-5" }]
     },
     {
-      "name": "local-qwen",
       "engine": "openai-compatible",
-      "apiKey": "local",
-      "baseUrl": "http://localhost:8000/v1",
-      "models": {
-        "add": [
-          {
-            "model": "qwen3-coder",
-            "contextSize": 128000,
-            "maxOutputTokens": 32768,
-            "thinkingLevels": ["none", "medium"]
-          }
-        ]
-      }
+      "key": "local",
+      "baseURL": "http://localhost:11434/v1",
+      "models": [{ "id": "local", "name": "qwen2.5-coder" }]
     }
   ],
-  "defaultModel": "anthropic-main/claude-sonnet-4-5",
+  "defaultModel": "sonnet",
   "generation": {
     "temperature": 0.7,
     "thinking": "medium"
-  },
-  "systemPrompt": "你是一个有用的助手。"
+  }
 }
 ```
 
@@ -388,7 +376,7 @@ npm run chat
 | 命令 | 说明 |
 |------|------|
 | `/models` | 列出已配置的模型 |
-| `/model <provider/model>` | 切换当前模型 |
+| `/model <id\|provider/id>` | 切换当前模型 |
 | `/tools` | 列出已注册的工具 |
 | `/history [page]` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
@@ -426,15 +414,6 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 
 ## Agent API
 
-Current model APIs:
-
-- `getModels()` / `getResolvedModels()`
-- `getCurrentResolvedModel()`
-- `setResolvedModel({ id })` or `setResolvedModel({ provider, model })`
-- `getGenerationConfig()`
-- `setGenerationConfig(update)`
-- Legacy: `setModel(config)` and `setModelByPath(path)`
-
 | 方法 | 说明 |
 |------|------|
 | `run(input)` | 以用户消息启动 Agent 循环，返回所有消息 |
@@ -446,8 +425,11 @@ Current model APIs:
 | `getToolList()` | 获取当前所有可用工具 |
 | `previewContext()` | 预览将发送给 LLM 的上下文 |
 | `setDiscardBefore(id)` | 设置水位线，丢弃指定 ID 之前的消息 |
-| `setModel(config)` | 运行时切换到不同的模型 |
-| `setModelByPath(path)` | 通过 `provider/model` 路径字符串切换模型 |
+| `getModels()` / `getResolvedModels()` | 获取已解析的 provider 限定模型列表 |
+| `getCurrentResolvedModel()` | 获取当前活动模型 |
+| `setResolvedModel(selector)` | 通过 `{ id }` 或 `{ provider, model }` 切换活动模型 |
+| `getGenerationConfig()` | 获取 temperature、thinking 等生成配置 |
+| `setGenerationConfig(update)` | 更新生成配置，不切换活动模型 |
 | `setAutoApprovedTools(names)` | 设置绕过 HITL 审批的工具 |
 | `getConfig()` | 获取当前 Agent 配置 |
 | `getContextCount()` | 获取累计 token 使用统计 |

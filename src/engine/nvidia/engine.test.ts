@@ -6,7 +6,7 @@ import {
   type Message,
   type MessageChunk,
 } from "../../core/types.js";
-import { OpenAICompatibleEngine } from "./engine.js";
+import { NVIDIAEngine } from "./engine.js";
 
 const openAIMocks = vi.hoisted(() => ({
   constructor: vi.fn(),
@@ -30,7 +30,7 @@ async function* completionStream() {
   yield {
     choices: [
       {
-        delta: { content: "ok" },
+        delta: { content: "<think>check</think>done" },
         finish_reason: null,
         index: 0,
       },
@@ -55,56 +55,47 @@ function request(): LLMGenerateRequest {
     messages,
     tools: [],
     provider: {
-      provider: "openai-compatible",
-      key: "request-key",
-      baseUrl: "http://localhost:9000/v1",
+      provider: "nvidia",
+      key: "nvidia-key",
     },
     model: {
-      id: "openai-compatible/custom-model",
-      provider: "openai-compatible",
-      name: "custom-model",
-      maxOutputTokens: 1234,
+      id: "nvidia/meta-llama-3-3-70b-instruct",
+      provider: "nvidia",
+      name: "meta/llama-3.3-70b-instruct",
       thinkingLevels: [ThinkingLevel.None],
     },
     generation: {
-      temperature: 0.2,
-      topP: 0.8,
-      maxOutputTokens: 777,
+      temperature: 0.6,
+      topP: 0.7,
       thinking: ThinkingLevel.None,
     },
   };
 }
 
-describe("OpenAICompatibleEngine request mode", () => {
+describe("NVIDIAEngine request mode", () => {
   beforeEach(() => {
     openAIMocks.constructor.mockClear();
     openAIMocks.create.mockReset();
     openAIMocks.create.mockResolvedValue(completionStream());
   });
 
-  it("uses request provider credentials and generation params", async () => {
-    const engine = new OpenAICompatibleEngine();
+  it("uses the NVIDIA default base URL and yields parsed thinking/text chunks", async () => {
+    const engine = new NVIDIAEngine();
 
-    const stream = engine.streamGenerate(request());
-    expect(stream[Symbol.asyncIterator]).toBeTypeOf("function");
-    await expect(collect(stream)).resolves.toEqual([
-      { type: LLMStreamChunkType.TextDelta, text: "ok" },
+    await expect(collect(engine.streamGenerate(request()))).resolves.toEqual([
+      { type: LLMStreamChunkType.ReasoningDelta, text: "check" },
+      { type: LLMStreamChunkType.TextDelta, text: "done" },
     ]);
 
     expect(openAIMocks.constructor).toHaveBeenCalledWith({
-      apiKey: "request-key",
-      baseURL: "http://localhost:9000/v1",
+      apiKey: "nvidia-key",
+      baseURL: "https://integrate.api.nvidia.com/v1",
     });
     expect(openAIMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "custom-model",
-        temperature: 0.2,
-        top_p: 0.8,
-        max_completion_tokens: 777,
+        model: "meta/llama-3.3-70b-instruct",
+        top_p: 0.7,
         stream: true,
-        stream_options: {
-          include_usage: true,
-        },
       }),
     );
   });
