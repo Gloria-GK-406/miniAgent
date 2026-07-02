@@ -178,6 +178,11 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/prom")).toEqual(["/prompts"]);
   });
 
+  it("matches todo panel commands", () => {
+    expect(matchSuggestions("/tod")).toEqual(["/todo", "/todos"]);
+    expect(matchSuggestions("/ta")).toEqual(["/tasks"]);
+  });
+
   it("matches Phase 2 commands", () => {
     expect(matchSuggestions("/n")).toEqual(["/new"]);
     expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
@@ -367,6 +372,11 @@ describe("useSuggestion", () => {
 
   it("adds a trailing space for tools query completion", () => {
     expect(applySuggestion("/too", "/tools")).toBe("/tools ");
+  });
+
+  it("adds a trailing space for todo query completion", () => {
+    expect(applySuggestion("/tod", "/todos")).toBe("/todos ");
+    expect(applySuggestion("/ta", "/tasks")).toBe("/tasks ");
   });
 
   it("adds a trailing space for input history completion", () => {

@@ -4,6 +4,7 @@ import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 import type { SessionMeta } from "../../core/session.js";
 import { MessageType, type Message, type MessageContent, type ToolCallMessage } from "../../core/types.js";
 import type { Tool } from "../../tool/types.js";
+import type { TodoItemSnapshot } from "../../tool/todo.js";
 import { formatConfigForDisplay } from "../config-display.js";
 import { formatConfigPaths, resolveConfigPaths } from "../config-paths-runner.js";
 import { readPackageVersion } from "../package-info.js";
@@ -133,6 +134,17 @@ function filterTools(ctx: CLICommandContext, tools: Tool[], query: string): Tool
       toolName: tool.name,
       args: {},
     }, state.autoApprove).decision.includes(normalized));
+}
+
+function filterTodos(todos: TodoItemSnapshot[], query: string): TodoItemSnapshot[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return todos;
+  }
+  return todos.filter((todo) =>
+    todo.id.toLowerCase().includes(normalized) ||
+    todo.content.toLowerCase().includes(normalized) ||
+    todo.status.toLowerCase().includes(normalized));
 }
 
 function parsePermissionDecision(value: string | undefined): CLIPermissionDecision | null {
@@ -364,6 +376,21 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
           query,
           hits: searchTranscript(await ctx.agent.getMessages(), query),
         },
+      });
+    },
+  });
+  registry.register({
+    name: "todos",
+    aliases: ["todo", "tasks"],
+    description: "Show agent todo list",
+    usage: "/todos [query]",
+    execute: async (ctx, args) => {
+      const query = args.trim();
+      const todos = filterTodos(ctx.runtime.listTodos(), query);
+      ctx.updateState({
+        panel: query.length === 0
+          ? { type: "todos", todos }
+          : { type: "todos", query, todos },
       });
     },
   });

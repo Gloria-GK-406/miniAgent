@@ -104,6 +104,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     runDiagnostics: vi.fn(async () => undefined),
     runDoctor: vi.fn(async () => undefined),
     listTools: vi.fn(async () => []),
+    listTodos: vi.fn(() => []),
     showActivity: vi.fn(async () => undefined),
     showAgents: vi.fn(async () => undefined),
     initializeProjectInstructions: vi.fn(async () => ({ written: true, path: "AGENTS.md" })),
@@ -490,6 +491,44 @@ describe("App", () => {
 
     expect(output).toContain('Input History matching "deploy"');
     expect(output).toContain("No input history");
+  });
+
+  it("renders todo panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "todos",
+          todos: [
+            { id: "todo-1", content: "Write tests", status: "in_progress" },
+            { id: "todo-2", content: "Ship UI", status: "pending" },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Todos (2)");
+    expect(output).toContain("IN_PROGRESS");
+    expect(output).toContain("Write tests");
+    expect(output).toContain("todo-1");
+    expect(output).toContain("PENDING");
+    expect(output).toContain("Ship UI");
+  });
+
+  it("renders filtered empty todo panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "todos",
+          query: "blocked",
+          todos: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Todos matching "blocked" (0)');
+    expect(output).toContain("No todos");
   });
 
   it("renders sessions panel from runtime state", () => {

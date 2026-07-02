@@ -79,6 +79,7 @@ describe("registerBuiltinCommands", () => {
       "input-history",
       "references",
       "search",
+      "todos",
       "snapshots",
       "tools",
       "models",
@@ -250,6 +251,26 @@ describe("registerBuiltinCommands", () => {
       query: "TEST",
       entries: [
         { index: 2, text: "write tests" },
+      ],
+    });
+  });
+
+  it("opens a filtered todo panel from aliases", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.listTodos = vi.fn(() => [
+      { id: "todo-1", content: "Write tests", status: "completed" },
+      { id: "todo-2", content: "Render panel", status: "pending" },
+    ]);
+
+    await registry.execute(commandCtx, "/tasks pending");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "todos",
+      query: "pending",
+      todos: [
+        { id: "todo-2", content: "Render panel", status: "pending" },
       ],
     });
   });

@@ -179,6 +179,39 @@ describe("createCLIAgentFactory", () => {
     }
   });
 
+  it("exposes the todo manager used by the parent agent", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-agent-factory-todos-"));
+    await writeConfig(baseDir);
+    const factory = await createCLIAgentFactory({
+      baseDir,
+      mode: "build",
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: createShellService({ windows: "powershell", timeoutMs: 120000 }),
+    });
+    const built = await factory.build("session-todos");
+    try {
+      const createTodo = (await built.agent.getToolList())
+        .find((tool) => tool.name === "todo_create");
+      if (createTodo === undefined) {
+        throw new Error("todo_create was not registered");
+      }
+      await expect(createTodo.execute({
+        content: "Track current work",
+      })).resolves.toBe("Created todo [pending]: Track current work");
+
+      expect(built.todoManager.listTodos()).toEqual([
+        expect.objectContaining({
+          content: "Track current work",
+          status: "pending",
+        }),
+      ]);
+    } finally {
+      await built.agent.destroy();
+    }
+  });
+
   it("reads runtime config dynamically for each build", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-agent-factory-config-"));
     await writeConfig(baseDir);

@@ -218,9 +218,9 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       {state.commandHelp.length === 0 ? (
         <>
           <Text>/about /help /commands /keybindings /status /config /history /input-history</Text>
-          <Text>/context /search /references /tools /models /sessions /activity /snapshots</Text>
-          <Text>/permissions /system /agent build|plan /auto /details /thinking /git /diff</Text>
-          <Text>/editor /diagnostics /doctor /quit</Text>
+          <Text>/context /search /todos /references /tools /models /sessions /activity</Text>
+          <Text>/snapshots /permissions /system /agent build|plan /auto /details /thinking</Text>
+          <Text>/git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -442,6 +442,45 @@ function InputHistoryPanel({
             <Text>
               <Text color="cyan">#{entry.index}</Text>
               <Text> {entry.text}</Text>
+            </Text>
+          </Box>
+        ))
+      )}
+    </StaticPanelFrame>
+  );
+}
+
+function todoStatusColor(status: string): string {
+  if (status === "completed") return "green";
+  if (status === "in_progress") return "yellow";
+  return "gray";
+}
+
+function TodosPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "todos" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">
+        {panel.query === undefined
+          ? `Todos (${panel.todos.length})`
+          : `Todos matching "${panel.query}" (${panel.todos.length})`}
+      </Text>
+      {panel.todos.length === 0 ? (
+        <Text dimColor>No todos</Text>
+      ) : (
+        panel.todos.map((todo, index) => (
+          <Box key={todo.id} flexDirection="column">
+            <Text>
+              <Text color="cyan">#{index + 1}</Text>
+              <Text> </Text>
+              <Text color={todoStatusColor(todo.status)}>{todo.status.toUpperCase()}</Text>
+              <Text> {todo.content}</Text>
+              <Text dimColor> ({todo.id})</Text>
             </Text>
           </Box>
         ))
@@ -855,6 +894,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "input-history") {
     return <InputHistoryPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "todos") {
+    return <TodosPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "search") {

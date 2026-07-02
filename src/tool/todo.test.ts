@@ -174,6 +174,25 @@ describe("TodoManager", () => {
             expect(actions).toEqual([]);
         });
 
+        it("exposes todo snapshots for UI consumers", async () => {
+            const mgr = new TodoManager();
+            const tools = await mgr.getTools();
+            const create = tools.find((t) => t.name === "todo_create")!;
+            const update = tools.find((t) => t.name === "todo_update")!;
+
+            await create.execute({ content: "Plan UI" });
+            const id = mgr.listTodos()[0]!.id;
+            await update.execute({ id, status: "in_progress" });
+
+            expect(mgr.listTodos()).toEqual([{
+                id,
+                content: "Plan UI",
+                status: "in_progress",
+            }]);
+            mgr.clearTodos();
+            expect(mgr.listTodos()).toEqual([]);
+        });
+
         it("returns AddLast action with system message", async () => {
             const mgr = new TodoManager();
             const tools = await mgr.getTools();

@@ -7,6 +7,7 @@ import type {
   ToolResultMessage,
 } from "../../core/types.js";
 import type { Tool } from "../../tool/types.js";
+import type { TodoItemSnapshot } from "../../tool/todo.js";
 import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
 import type { DiagnosticResult } from "./diagnostics-service.js";
 import type { CLIDoctorCheck } from "./doctor-service.js";
@@ -23,6 +24,7 @@ export type CLIViewPanel =
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
   | { type: "input-history"; query?: string; entries: CLIInputHistoryPanelEntry[] }
+  | { type: "todos"; todos: TodoItemSnapshot[]; query?: string }
   | { type: "search"; query: string; hits: CLITranscriptSearchHit[] }
   | { type: "references"; references: string[] }
   | { type: "models" }
@@ -178,6 +180,7 @@ export interface CLIAppRuntime {
   runDiagnostics(): Promise<void>;
   runDoctor(): Promise<void>;
   listTools(): Promise<Tool[]>;
+  listTodos(): TodoItemSnapshot[];
   showActivity(): Promise<void>;
   showAgents(): Promise<void>;
   initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;

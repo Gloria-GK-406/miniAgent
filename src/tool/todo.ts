@@ -11,6 +11,14 @@ interface TodoItem {
     status: "pending" | "in_progress" | "completed";
 }
 
+export type TodoStatus = TodoItem["status"];
+
+export interface TodoItemSnapshot {
+    id: string;
+    content: string;
+    status: TodoStatus;
+}
+
 export class TodoManager implements ToolProvider, ContextProcessor {
     priority = 100;
     private todos: TodoItem[] = [];
@@ -76,6 +84,14 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                 },
             },
         ].filter((tool) => isCapabilityEnabled(tool.name, this.capabilities.tool));
+    }
+
+    listTodos(): TodoItemSnapshot[] {
+        return this.todos.map((todo) => ({ ...todo }));
+    }
+
+    clearTodos(): void {
+        this.todos = [];
     }
 
     async process(_messages: Message[]): Promise<Action[]> {

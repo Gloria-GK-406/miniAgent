@@ -21,6 +21,7 @@ import {
 import { SessionManager } from "../../core/session.js";
 import type { Message } from "../../core/types.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../../tool/subagent.js";
+import { TodoManager } from "../../tool/todo.js";
 import {
   CLIAGENT_DIR,
   loadConfig,
@@ -79,6 +80,7 @@ interface CreateCLIBlueprintOptions {
   };
   baseDir: string;
   capabilities?: AgentCapabilitySelector;
+  omitTodoTool?: boolean;
 }
 
 interface CreateBuiltinBlueprintManagerOptions {
@@ -126,6 +128,7 @@ export interface BuiltRuntimeAgent {
   agent: MiniAgent;
   config: CLIConfig;
   compressor: CLICompressor;
+  todoManager: TodoManager;
 }
 
 export interface CLIAgentFactory {
@@ -135,6 +138,7 @@ export interface CLIAgentFactory {
 interface BuiltCLIAgent {
   agent: MiniAgent;
   compressor: CLICompressor;
+  todoManager: TodoManager;
 }
 
 export function formatResolvedModelPath(model: ResolvedModel): string {
@@ -227,6 +231,16 @@ export async function createCLIAgentFactory(
   await sessionManager.load();
 
   let currentParentAgent: MiniAgent | undefined;
+  const todoManagers = new Map<string, TodoManager>();
+  const getTodoManager = (sessionId: string): TodoManager => {
+    const existing = todoManagers.get(sessionId);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const created = new TodoManager();
+    todoManagers.set(sessionId, created);
+    return created;
+  };
   const subagentFactory = createConfiguredSubagentFactory(
     sessionManager,
     config,
@@ -244,6 +258,7 @@ export async function createCLIAgentFactory(
         subagentFactory,
         getBaseSystemPrompt(activeConfig),
         () => currentParentAgent?.getConfig(),
+        getTodoManager(sessionId),
       );
       currentParentAgent = built.agent;
       return {
@@ -316,6 +331,7 @@ async function buildAgentInner(
   subagentFactory: ConfiguredSubagentFactory,
   userSystemPrompt: string,
   getCurrentAgentConfig: () => AgentConfig | undefined,
+  todoManager: TodoManager,
 ): Promise<BuiltCLIAgent> {
   const persistDir = new SessionManager(join(options.baseDir, CLIAGENT_DIR)).getSessionPersistDir(sessionId);
   const defaultModel = parseDefaultModel(config);
@@ -346,12 +362,13 @@ async function buildAgentInner(
       }),
     },
     baseDir: options.baseDir,
+    omitTodoTool: true,
   });
 
   const agent = await manager.assemble({
     config: agentConfig,
     blueprint,
-    extraUses: createRuntimeExtraUses(options),
+    extraUses: createRuntimeExtraUses(options, todoManager),
   });
   if (createdCompressor === undefined) {
     throw new Error("Expected assembled CLI agent to include a context compressor.");
@@ -359,10 +376,14 @@ async function buildAgentInner(
   return {
     agent,
     compressor: createdCompressor,
+    todoManager,
   };
 }
 
-function createRuntimeExtraUses(options: CLIAgentFactoryOptions): AgentUse[] {
+function createRuntimeExtraUses(
+  options: CLIAgentFactoryOptions,
+  todoManager?: TodoManager,
+): AgentUse[] {
   const permissionService = createModeAwarePermissionService({
     base: options.permissionService,
     getMode: () => resolveMode(options.mode),
@@ -395,6 +416,7 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): AgentUse[] {
     requestApproval: options.requestApproval,
   }).tools;
   return [
+    ...(todoManager === undefined ? [] : [todoManager]),
     ...cliTools,
     ...gitTools,
     ...diagnosticsTools,
@@ -447,6 +469,9 @@ function createCLIBlueprint(options: CreateCLIBlueprintOptions): AgentBlueprint 
     agentContext: { baseDir: options.baseDir },
   });
   blueprint.tools = blueprint.tools?.filter((tool) => tool.use !== "bash");
+  if (options.omitTodoTool === true) {
+    blueprint.tools = blueprint.tools?.filter((tool) => tool.use !== "todo");
+  }
 
   if (options.capabilities === undefined) {
     return blueprint;

@@ -116,6 +116,22 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("opens a todo panel from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-todo-panel-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    expect(runtime.listTodos()).toEqual([]);
+
+    await runtime.submitInput("/todos");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "todos",
+      todos: [],
+    });
+    await runtime.destroy();
+  });
+
   it("selects a model from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-model-command-"));
     await writeConfig(baseDir, {

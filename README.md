@@ -479,6 +479,7 @@ and shell integration:
 | `/tools [query]` | List or search registered tools |
 | `/history` | View conversation history |
 | `/input-history [query]` | Show submitted prompt history |
+| `/todos [query]` | Show or search the agent todo list |
 | `/context` | Preview context sent to LLM |
 | `/references` | List files available to `@file` references |
 | `/search <query>` | Search the current transcript |

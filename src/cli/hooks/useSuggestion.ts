@@ -37,7 +37,10 @@ const COMMANDS = [
   "/sessions",
   "/search",
   "/system",
+  "/tasks",
   "/thinking",
+  "/todo",
+  "/todos",
   "/tools",
   "/undo",
   "/version",
@@ -73,6 +76,9 @@ const COMMANDS_WITH_ARGS = new Set([
   "/sessions",
   "/find",
   "/system",
+  "/tasks",
+  "/todo",
+  "/todos",
   "/tools",
 ]);
 

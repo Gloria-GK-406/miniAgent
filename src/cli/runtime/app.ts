@@ -598,6 +598,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       const sessionId = state.sessionId;
       await sessionService.writeMessages(sessionId, []);
       await sessionService.updateSessionTokenUsage(sessionId, EMPTY_TOKEN_USAGE);
+      built.todoManager.clearTodos();
       for (let index = redoStack.length - 1; index >= 0; index--) {
         if (redoStack[index]!.sessionId === sessionId) {
           redoStack.splice(index, 1);
@@ -726,6 +727,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       });
     },
     listTools: async () => await built.agent.getToolList(),
+    listTodos: () => built.todoManager.listTodos(),
     showActivity: async () => {
       updateState({ panel: { type: "activity", entries: state.activity } });
     },
