@@ -50,6 +50,13 @@ describe("CLI package entry", () => {
     expect(scripts["prebuild"]).toBe("node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"");
   });
 
+  it("runs the full local quality gate before publishing", async () => {
+    const pkg = await readJson("package.json");
+    const scripts = pkg["scripts"] as Record<string, unknown>;
+
+    expect(scripts["prepublishOnly"]).toBe("npm run lint && npm run build && npm test");
+  });
+
   it("keeps the compiled CLI directly executable by Node package managers", async () => {
     const entry = await readFile("src/cli/index.tsx", "utf-8");
 

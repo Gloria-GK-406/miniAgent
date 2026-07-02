@@ -57,7 +57,7 @@
     "test:watch": "vitest --exclude 'test/smoketest/**'",
     "smoketest": "vitest run --config vitest.config.ts test/smoketest/",
     "chat": "tsx --tsconfig tsconfig.cli.json src/cli/index.tsx",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run lint && npm run build && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
