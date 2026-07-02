@@ -7,21 +7,21 @@ Load skill instructions from `SKILL.md` manifests in configurable directories.
 ```typescript
 import { SkillPlugin } from "@piaoxianguo/miniagent/tool/skill";
 
-const skill = new SkillPlugin();
+const skill = new SkillPlugin({
+  directories: ["./skills/", "~/.cliagent/skills/"],
+});
+await skill.initialize();
 agent.register(skill);
 ```
 
 ## Configuration
 
-Configure in `plugins.skill`:
+Pass skill directories to the plugin constructor:
 
 ```json
 {
-  "plugins": {
-    "skill": {
-      "directories": ["./skills/", "~/.cliagent/skills/"]
-    }
-  }
+  "directories": ["./skills/", "~/.cliagent/skills/"],
+  "capabilities": { "allow": ["my-skill"] }
 }
 ```
 

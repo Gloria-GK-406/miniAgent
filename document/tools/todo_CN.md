@@ -45,12 +45,14 @@
 
 ## 能力支持
 
-`TodoManager` 实现了 `AgentCapabilityAware`。可通过能力规则控制哪些 todo 工具可用：
+`TodoManager` 暴露 `consumeAgentCapabilities()` 用于手动组装。注册前调用它可以过滤单个 todo 工具：
 
 ```typescript
-const capabilities = {
-  tool: { deny: ["todo_delete"] }
-};
+const todo = new TodoManager();
+await todo.consumeAgentCapabilities({
+  tool: { deny: ["todo_delete"] },
+});
+agent.register(todo);
 ```
 
 ## 注册

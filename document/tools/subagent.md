@@ -33,19 +33,19 @@ Scans directories for Markdown files with frontmatter to define subagents. Each 
 ```typescript
 import { SubagentPlugin } from "@piaoxianguo/miniagent/tool/subagent";
 
-const subagent = new SubagentPlugin(factory);
+const subagent = new SubagentPlugin({
+  path: "./.cliagent/subagent/",
+}, factory);
+await subagent.initialize();
 agent.register(subagent);
 ```
 
-Configure in `plugins.subagent`:
+Pass the subagent directory to the plugin constructor:
 
 ```json
 {
-  "plugins": {
-    "subagent": {
-      "path": "./.cliagent/subagent/"
-    }
-  }
+  "path": "./.cliagent/subagent/",
+  "capabilities": { "deny": ["dangerous-agent"] }
 }
 ```
 
@@ -91,10 +91,12 @@ Frontmatter fields:
 
 ### Capability Support
 
-`SubagentPlugin` implements `AgentCapabilityAware`. Control which subagents are visible:
+`SubagentPlugin` accepts a capability rule in its constructor config to control
+which configured subagents are visible:
 
 ```typescript
-const capabilities = {
-  subagent: { deny: ["dangerous-agent"] }
-};
+const subagent = new SubagentPlugin({
+  path: "./.cliagent/subagent/",
+  capabilities: { deny: ["dangerous-agent"] },
+}, factory);
 ```

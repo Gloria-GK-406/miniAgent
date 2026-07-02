@@ -39,7 +39,6 @@ const agent = new MiniAgent({
       temperature: 0.7,
       thinking: "medium",
     },
-    plugins: new Map(),
     paths: { sessiondir: "./sessions" },
   },
 });
@@ -262,7 +261,7 @@ const blueprint = {
   engines: [{ use: "openai" }],
   persistence: {
     use: "file",
-    config: { rootDir: ".miniagent", fileName: "session.json" },
+    config: { rootDir: ".miniagent/session/default", fileName: "messages.jsonl" },
   },
   compression: {
     use: "summary",
@@ -443,6 +442,7 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 |--------|-------------|
 | `run(input)` | Run the agent loop with a user message. Returns all messages. |
 | `stop()` | Stop the running agent loop. |
+| `destroy()` | Stop the agent and clean up registered destroyable resources. |
 | `register(item)` | Register a component (tool, provider, processor, etc.) |
 | `on(event, listener)` | Subscribe to lifecycle events. |
 | `getMessages()` | Get all messages in the session. |
@@ -455,7 +455,6 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 | `setResolvedModel(selector)` | Switch active model by `{ id }` or `{ provider, model }`. |
 | `getGenerationConfig()` | Get generation preferences such as temperature and thinking level. |
 | `setGenerationConfig(update)` | Update generation preferences without changing the active model. |
-| `setAutoApprovedTools(names)` | Set tools that bypass HITL approval. |
 | `getConfig()` | Get the current agent configuration. |
 | `getContextCount()` | Get cumulative token usage statistics. |
 

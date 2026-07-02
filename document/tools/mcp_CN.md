@@ -53,4 +53,4 @@ agent.register(mcp);
 - MCP 工具以 `mcp__{serverName}__{toolName}` 格式注册，避免命名冲突
 - `McpPlugin` 实现 `ToolProvider`
 - 每个 turn 动态重建工具列表
-- 连接失败的服务器会被静默跳过
+- 连接失败的服务器会输出到控制台并被跳过

@@ -7,21 +7,21 @@
 ```typescript
 import { SkillPlugin } from "@piaoxianguo/miniagent/tool/skill";
 
-const skill = new SkillPlugin();
+const skill = new SkillPlugin({
+  directories: ["./skills/", "~/.cliagent/skills/"],
+});
+await skill.initialize();
 agent.register(skill);
 ```
 
 ## 配置
 
-在 `plugins.skill` 中配置：
+将技能目录传给插件构造函数：
 
 ```json
 {
-  "plugins": {
-    "skill": {
-      "directories": ["./skills/", "~/.cliagent/skills/"]
-    }
-  }
+  "directories": ["./skills/", "~/.cliagent/skills/"],
+  "capabilities": { "allow": ["my-skill"] }
 }
 ```
 

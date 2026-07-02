@@ -56,7 +56,8 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 
 ## Built-in Tools
 
-The CLI agent comes pre-configured with the following tools from its semantic blueprint:
+The CLI agent is assembled from a semantic blueprint. The default blueprint
+always includes:
 
 - **read** — Read files and directories
 - **write** — Write files
@@ -65,17 +66,21 @@ The CLI agent comes pre-configured with the following tools from its semantic bl
 - **grep** — Search file contents
 - **bash** — Execute shell commands
 - **todo** — Task management (todo_create, todo_update, todo_delete)
-- **subagent** — Delegate tasks to sub-agents
-- **mcp** — Connect to MCP servers
-- **skill** — Load skill instructions
+
+When `.cliagent/config.json` includes `mcp`, `skill`, or `subagent` fields,
+those CLI convenience fields are copied into blueprint component config during
+assembly:
+
+- **mcp** — Connect to MCP servers and expose prefixed MCP tools
+- **skill** — Load local skill instructions through `load_skill`
+- **subagent** — Delegate tasks to configured file-based subagents
 
 ## HITL (Human-in-the-Loop)
 
-By default, HITL is enabled. Use `/hitl off` to auto-approve all tool calls. The following tools are always auto-approved:
-
-- `read`
-- `glob`
-- `grep`
+The CLI tracks HITL state with `/hitl [on|off]`, but the current default CLI
+blueprint uses the built-in `allow-all` approval implementation. Tool calls are
+not blocked by the HITL toggle until an interactive approval implementation is
+registered.
 
 ## Context Compression
 

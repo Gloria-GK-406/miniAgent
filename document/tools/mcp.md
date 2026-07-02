@@ -53,4 +53,4 @@ Pass MCP server configuration to the plugin constructor:
 - MCP tools are registered as `mcp__{serverName}__{toolName}` to avoid naming conflicts
 - `McpPlugin` implements `ToolProvider`
 - Tool list is dynamically rebuilt each turn
-- Failed server connections are silently skipped
+- Failed server connections are reported to the console and skipped

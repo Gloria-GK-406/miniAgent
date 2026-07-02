@@ -62,7 +62,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 
 ## 内置工具
 
-CLI Agent 通过语义蓝图预配置了以下工具：
+CLI Agent 通过语义蓝图组装。默认蓝图始终包含：
 
 - **read** — 读取文件和目录
 - **write** — 写入文件
@@ -71,17 +71,18 @@ CLI Agent 通过语义蓝图预配置了以下工具：
 - **grep** — 搜索文件内容
 - **bash** — 执行 Shell 命令
 - **todo** — 任务管理（todo_create、todo_update、todo_delete）
-- **subagent** — 委托任务给子 Agent
-- **mcp** — 连接 MCP 服务器
-- **skill** — 加载技能指令
+
+当 `.cliagent/config.json` 包含 `mcp`、`skill` 或 `subagent` 字段时，这些
+CLI 便捷字段会在组装时复制到蓝图组件配置中：
+
+- **mcp** — 连接 MCP 服务器并暴露带前缀的 MCP 工具
+- **skill** — 通过 `load_skill` 加载本地技能指令
+- **subagent** — 将任务委托给基于文件配置的子 Agent
 
 ## HITL（人工审批）
 
-默认启用 HITL。使用 `/hitl off` 可自动批准所有工具调用。以下工具始终自动批准：
-
-- `read`
-- `glob`
-- `grep`
+CLI 通过 `/hitl [on|off]` 记录 HITL 状态，但当前默认 CLI 蓝图使用内置的
+`allow-all` 审批实现。在接入交互式审批实现前，工具调用不会被 HITL 开关阻塞。
 
 ## 上下文压缩
 

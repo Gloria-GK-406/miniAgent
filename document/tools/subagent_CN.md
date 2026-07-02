@@ -33,19 +33,19 @@ agent.register(provider);
 ```typescript
 import { SubagentPlugin } from "@piaoxianguo/miniagent/tool/subagent";
 
-const subagent = new SubagentPlugin(factory);
+const subagent = new SubagentPlugin({
+  path: "./.cliagent/subagent/",
+}, factory);
+await subagent.initialize();
 agent.register(subagent);
 ```
 
-在 `plugins.subagent` 中配置：
+将子 Agent 目录传给插件构造函数：
 
 ```json
 {
-  "plugins": {
-    "subagent": {
-      "path": "./.cliagent/subagent/"
-    }
-  }
+  "path": "./.cliagent/subagent/",
+  "capabilities": { "deny": ["dangerous-agent"] }
 }
 ```
 
@@ -91,10 +91,11 @@ Frontmatter 字段：
 
 ### 能力支持
 
-`SubagentPlugin` 实现了 `AgentCapabilityAware`。控制哪些子 Agent 可见：
+`SubagentPlugin` 在构造函数配置中接收能力规则，用来控制哪些子 Agent 可见：
 
 ```typescript
-const capabilities = {
-  subagent: { deny: ["dangerous-agent"] }
-};
+const subagent = new SubagentPlugin({
+  path: "./.cliagent/subagent/",
+  capabilities: { deny: ["dangerous-agent"] },
+}, factory);
 ```

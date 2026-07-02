@@ -39,7 +39,6 @@ const agent = new MiniAgent({
       temperature: 0.7,
       thinking: "medium",
     },
-    plugins: new Map(),
     paths: { sessiondir: "./sessions" },
   },
 });
@@ -258,7 +257,7 @@ const blueprint = {
   engines: [{ use: "openai" }],
   persistence: {
     use: "file",
-    config: { rootDir: ".miniagent", fileName: "session.json" },
+    config: { rootDir: ".miniagent/session/default", fileName: "messages.jsonl" },
   },
   compression: {
     use: "summary",
@@ -437,6 +436,7 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 |------|------|
 | `run(input)` | 以用户消息启动 Agent 循环，返回所有消息 |
 | `stop()` | 停止运行中的 Agent 循环 |
+| `destroy()` | 停止 Agent 并清理已注册的可销毁资源 |
 | `register(item)` | 注册组件（工具、提供者、处理器等） |
 | `on(event, listener)` | 订阅生命周期事件 |
 | `getMessages()` | 获取会话中的所有消息 |
@@ -449,7 +449,6 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 | `setResolvedModel(selector)` | 通过 `{ id }` 或 `{ provider, model }` 切换活动模型 |
 | `getGenerationConfig()` | 获取 temperature、thinking 等生成配置 |
 | `setGenerationConfig(update)` | 更新生成配置，不切换活动模型 |
-| `setAutoApprovedTools(names)` | 设置绕过 HITL 审批的工具 |
 | `getConfig()` | 获取当前 Agent 配置 |
 | `getContextCount()` | 获取累计 token 使用统计 |
 

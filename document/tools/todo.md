@@ -45,12 +45,15 @@ When todos exist, `TodoManager` appends a system message to the context with the
 
 ## Capability Support
 
-`TodoManager` implements `AgentCapabilityAware`. Use capability rules to control which todo tools are available:
+`TodoManager` exposes `consumeAgentCapabilities()` for manual assembly. Call it
+before registering the manager to filter individual todo tools:
 
 ```typescript
-const capabilities = {
-  tool: { deny: ["todo_delete"] }
-};
+const todo = new TodoManager();
+await todo.consumeAgentCapabilities({
+  tool: { deny: ["todo_delete"] },
+});
+agent.register(todo);
 ```
 
 ## Registration
