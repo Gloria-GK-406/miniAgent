@@ -1074,6 +1074,7 @@ export function formatCLIHelp(): string {
     "  --git-status    Print git status headlessly",
     "  --git-log       Print recent git commits headlessly",
     "  --git-diff      Print git diff headlessly",
+    "  --staged        Show staged changes with --git-diff",
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",

@@ -2,6 +2,28 @@ import { describe, expect, it } from "vitest";
 import { formatCompletionScript } from "./completion-runner.js";
 
 describe("formatCompletionScript", () => {
+  it("includes every public headless flag in shell completions", () => {
+    const longFlags = [
+      "--list-models",
+      "--config-paths",
+      "--show-config",
+      "--init",
+      "--force",
+      "--staged",
+    ];
+    const bash = formatCompletionScript("bash");
+    const zsh = formatCompletionScript("zsh");
+    const fish = formatCompletionScript("fish");
+    const powershell = formatCompletionScript("powershell");
+
+    for (const flag of longFlags) {
+      expect(bash).toContain(flag);
+      expect(zsh).toContain(flag);
+      expect(fish).toContain(`-l ${flag.slice(2)}`);
+      expect(powershell).toContain(flag);
+    }
+  });
+
   it("formats bash completions", () => {
     const script = formatCompletionScript("bash");
 

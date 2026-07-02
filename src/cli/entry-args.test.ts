@@ -823,6 +823,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--git-status");
     expect(help).toContain("--git-log");
     expect(help).toContain("--git-diff");
+    expect(help).toContain("--staged");
     expect(help).toContain("--diagnostics");
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");
