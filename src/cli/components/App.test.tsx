@@ -454,6 +454,44 @@ describe("App", () => {
     expect(output).toContain("hello");
   });
 
+  it("renders input history panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "input-history",
+          entries: [
+            { index: 3, text: "fix lint" },
+            { index: 2, text: "write tests" },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Input History");
+    expect(output).toContain("2 prompts");
+    expect(output).toContain("#3");
+    expect(output).toContain("fix lint");
+    expect(output).toContain("#2");
+    expect(output).toContain("write tests");
+  });
+
+  it("renders filtered empty input history panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "input-history",
+          query: "deploy",
+          entries: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Input History matching "deploy"');
+    expect(output).toContain("No input history");
+  });
+
   it("renders sessions panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

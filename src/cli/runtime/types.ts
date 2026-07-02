@@ -22,6 +22,7 @@ export type CLIViewPanel =
   | { type: "keybindings" }
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
+  | { type: "input-history"; query?: string; entries: CLIInputHistoryPanelEntry[] }
   | { type: "search"; query: string; hits: CLITranscriptSearchHit[] }
   | { type: "references"; references: string[] }
   | { type: "models" }
@@ -76,6 +77,11 @@ export interface CLIActivityEntry {
   startedAt: string;
   endedAt?: string;
   summary: string;
+}
+
+export interface CLIInputHistoryPanelEntry {
+  index: number;
+  text: string;
 }
 
 export interface CLITranscriptSearchHit {

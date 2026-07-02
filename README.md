@@ -478,6 +478,7 @@ and shell integration:
 | `/new [name]` | Create and switch to a new session |
 | `/tools` | List registered tools |
 | `/history` | View conversation history |
+| `/input-history [query]` | Show submitted prompt history |
 | `/context` | Preview context sent to LLM |
 | `/references` | List files available to `@file` references |
 | `/search <query>` | Search the current transcript |

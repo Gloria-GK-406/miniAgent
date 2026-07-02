@@ -217,9 +217,10 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/about /help /commands /keybindings /status /config /history /context /search</Text>
-          <Text>/references /tools /models /sessions /activity /snapshots /permissions /system</Text>
-          <Text>/agent build|plan /auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/about /help /commands /keybindings /status /config /history /input-history</Text>
+          <Text>/context /search /references /tools /models /sessions /activity /snapshots</Text>
+          <Text>/permissions /system /agent build|plan /auto /details /thinking /git /diff</Text>
+          <Text>/editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -406,6 +407,35 @@ function ReferencesPanel({
       ) : (
         panel.references.map((path) => (
           <Text key={path}>{path}</Text>
+        ))
+      )}
+    </StaticPanelFrame>
+  );
+}
+
+function InputHistoryPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "input-history" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">
+        {panel.query === undefined ? "Input History" : `Input History matching "${panel.query}"`}
+      </Text>
+      <Text dimColor>{plural(panel.entries.length, "prompt")}</Text>
+      {panel.entries.length === 0 ? (
+        <Text dimColor>No input history</Text>
+      ) : (
+        panel.entries.map((entry) => (
+          <Box key={`${entry.index}:${entry.text}`} flexDirection="column">
+            <Text>
+              <Text color="cyan">#{entry.index}</Text>
+              <Text> {entry.text}</Text>
+            </Text>
+          </Box>
         ))
       )}
     </StaticPanelFrame>
@@ -813,6 +843,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "references") {
     return <ReferencesPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "input-history") {
+    return <InputHistoryPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "search") {

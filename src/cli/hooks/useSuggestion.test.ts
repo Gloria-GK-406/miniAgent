@@ -173,10 +173,15 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/fi")).toEqual(["/find"]);
   });
 
+  it("matches input history commands", () => {
+    expect(matchSuggestions("/inp")).toEqual(["/input-history", "/inputs"]);
+    expect(matchSuggestions("/prom")).toEqual(["/prompts"]);
+  });
+
   it("matches Phase 2 commands", () => {
     expect(matchSuggestions("/n")).toEqual(["/new"]);
     expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
-    expect(matchSuggestions("/i")).toEqual(["/import", "/init"]);
+    expect(matchSuggestions("/i")).toEqual(["/import", "/init", "/input-history", "/inputs"]);
     expect(matchSuggestions("/u")).toEqual(["/undo"]);
     expect(matchSuggestions("/r")).toEqual(["/references", "/redo"]);
     expect(matchSuggestions("/comp")).toEqual(["/compact"]);
@@ -189,7 +194,7 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/ac")).toEqual(["/activity"]);
     expect(matchSuggestions("/pe")).toEqual(["/permission", "/permissions"]);
     expect(matchSuggestions("/sy")).toEqual(["/system"]);
-    expect(matchSuggestions("/in")).toEqual(["/init"]);
+    expect(matchSuggestions("/in")).toEqual(["/init", "/input-history", "/inputs"]);
   });
 
   it("matches command aliases", () => {
@@ -358,6 +363,11 @@ describe("useSuggestion", () => {
   it("adds a trailing space for transcript search completion", () => {
     expect(applySuggestion("/sea", "/search")).toBe("/search ");
     expect(applySuggestion("/fi", "/find")).toBe("/find ");
+  });
+
+  it("adds a trailing space for input history completion", () => {
+    expect(applySuggestion("/input-h", "/input-history")).toBe("/input-history ");
+    expect(applySuggestion("/prom", "/prompts")).toBe("/prompts ");
   });
 
   it("applies selected diff flag completion", () => {

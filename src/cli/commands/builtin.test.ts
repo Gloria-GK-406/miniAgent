@@ -76,6 +76,7 @@ describe("registerBuiltinCommands", () => {
       "compact",
       "context",
       "history",
+      "input-history",
       "references",
       "search",
       "snapshots",
@@ -211,6 +212,45 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.getState().panel).toEqual({
       type: "references",
       references: ["README.md", "src/cli/index.tsx"],
+    });
+  });
+
+  it("opens input history panel with newest prompts first", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.updateState({
+      inputHistory: ["plan the change", "write tests", "fix lint"],
+    });
+
+    await registry.execute(commandCtx, "/input-history");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "input-history",
+      entries: [
+        { index: 3, text: "fix lint" },
+        { index: 2, text: "write tests" },
+        { index: 1, text: "plan the change" },
+      ],
+    });
+  });
+
+  it("filters input history from aliases", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.updateState({
+      inputHistory: ["plan the change", "write tests", "fix lint"],
+    });
+
+    await registry.execute(commandCtx, "/prompts TEST");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "input-history",
+      query: "TEST",
+      entries: [
+        { index: 2, text: "write tests" },
+      ],
     });
   });
 

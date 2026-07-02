@@ -114,6 +114,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/new [name]` | 创建并切换到新会话 |
 | `/tools` | 列出已注册的工具 |
 | `/history` | 查看对话历史 |
+| `/input-history [query]` | 查看已提交 prompt 历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
 | `/references` | 列出可用于 `@file` 引用的文件 |
 | `/search <query>` | 搜索当前会话 transcript |

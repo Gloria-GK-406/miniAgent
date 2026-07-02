@@ -1,5 +1,5 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
-import type { CLICommandContext } from "../runtime/types.js";
+import type { CLICommandContext, CLIInputHistoryPanelEntry } from "../runtime/types.js";
 import type { CLIPermissionDecision } from "../config.js";
 import type { SessionMeta } from "../../core/session.js";
 import { MessageType, type Message, type MessageContent, type ToolCallMessage } from "../../core/types.js";
@@ -86,6 +86,30 @@ function searchTranscript(messages: Message[], query: string) {
       role: transcriptSearchRole(message),
       preview: transcriptSearchPreview(text, query),
     }];
+  });
+}
+
+function buildInputHistoryEntries(
+  inputHistory: string[],
+  query?: string,
+): CLIInputHistoryPanelEntry[] {
+  const normalizedQuery = query?.toLowerCase();
+  return inputHistory
+    .map((text, index) => ({ index: index + 1, text }))
+    .filter((entry) => normalizedQuery === undefined || entry.text.toLowerCase().includes(normalizedQuery))
+    .reverse();
+}
+
+function showInputHistoryPanel(ctx: CLICommandContext, args: string): void {
+  const query = args.trim();
+  const entries = buildInputHistoryEntries(
+    ctx.getState().inputHistory,
+    query.length === 0 ? undefined : query,
+  );
+  ctx.updateState({
+    panel: query.length === 0
+      ? { type: "input-history", entries }
+      : { type: "input-history", query, entries },
   });
 }
 
@@ -282,6 +306,15 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     usage: "/history",
     execute: async (ctx) => {
       ctx.updateState({ panel: { type: "history", messages: await ctx.agent.getMessages() } });
+    },
+  });
+  registry.register({
+    name: "input-history",
+    aliases: ["inputs", "prompts"],
+    description: "Show submitted prompt history",
+    usage: "/input-history [query]",
+    execute: async (ctx, args) => {
+      showInputHistoryPanel(ctx, args);
     },
   });
   registry.register({
