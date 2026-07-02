@@ -25,6 +25,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     reasoningText: "",
     turnCount: 0,
     tokenUsage: { input: 0, output: 0, total: 0 },
+    activity: [],
     panel: { type: "none" },
     approval: null,
     error: null,
@@ -77,6 +78,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showDiff: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => ""),
     runDiagnostics: vi.fn(async () => undefined),
+    showActivity: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   };
 }
@@ -282,5 +284,42 @@ describe("App", () => {
     expect(output).toContain("FAIL npm test");
     expect(output).toContain("lint ok");
     expect(output).toContain("failed test");
+  });
+
+  it("renders activity panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        activity: [
+          {
+            id: "call-1",
+            kind: "subagent",
+            name: "run_subagent",
+            status: "done",
+            startedAt: "2026-07-02T00:00:00.000Z",
+            endedAt: "2026-07-02T00:00:01.000Z",
+            summary: "subtask complete",
+          },
+        ],
+        panel: {
+          type: "activity",
+          entries: [
+            {
+              id: "call-1",
+              kind: "subagent",
+              name: "run_subagent",
+              status: "done",
+              startedAt: "2026-07-02T00:00:00.000Z",
+              endedAt: "2026-07-02T00:00:01.000Z",
+              summary: "subtask complete",
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Activity (1)");
+    expect(output).toContain("DONE AGENT run_subagent");
+    expect(output).toContain("subtask complete");
   });
 });

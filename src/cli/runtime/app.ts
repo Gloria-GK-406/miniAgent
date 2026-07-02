@@ -1,6 +1,7 @@
 import { MessageType, type Message } from "../../core/types.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
 import { loadConfig } from "../config.js";
+import { completeActivityEntry, createActivityEntry } from "./activity.js";
 import {
   createCLIAgentFactory,
   formatResolvedModelPath,
@@ -93,6 +94,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     reasoningText: "",
     turnCount: 0,
     tokenUsage: { input: 0, output: 0, total: 0 },
+    activity: [],
     panel: { type: "none" },
     approval: null,
     error: null,
@@ -166,11 +168,25 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     });
     built.agent.on("llm:response", (payload) => updateState({ tokenUsage: payload.response.tokenCount }));
     built.agent.on("tool:execute", (payload) => {
-      updateState({ currentTool: payload.toolCall.toolName });
+      updateState({
+        currentTool: payload.toolCall.toolName,
+        activity: [
+          ...state.activity,
+          createActivityEntry(payload.toolCall, new Date().toISOString()),
+        ].slice(-100),
+      });
       emit({ type: "tool:start", toolCall: payload.toolCall });
     });
     built.agent.on("tool:result", (payload) => {
-      updateState({ currentTool: null });
+      updateState({
+        currentTool: null,
+        activity: completeActivityEntry(
+          state.activity,
+          payload.toolCall,
+          payload.result,
+          new Date().toISOString(),
+        ),
+      });
       emit({ type: "tool:result", toolCall: payload.toolCall, result: payload.result });
     });
     built.agent.on("message:notify", (payload) => {
@@ -352,6 +368,9 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
           results: await diagnosticsService.runDiagnostics(),
         },
       });
+    },
+    showActivity: async () => {
+      updateState({ panel: { type: "activity", entries: state.activity } });
     },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);

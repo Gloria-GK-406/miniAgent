@@ -23,6 +23,7 @@ function state(): CLIState {
     reasoningText: "",
     turnCount: 0,
     tokenUsage: { input: 0, output: 0, total: 0 },
+    activity: [],
     panel: { type: "none" },
     approval: null,
     error: null,
@@ -135,6 +136,7 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
     commandCtx.runtime.showDiff = vi.fn(async () => undefined);
     commandCtx.runtime.runDiagnostics = vi.fn(async () => undefined);
+    commandCtx.runtime.showActivity = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
@@ -143,6 +145,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/git log 3");
     await registry.execute(commandCtx, "/diff src/cli");
     await registry.execute(commandCtx, "/diagnostics");
+    await registry.execute(commandCtx, "/activity");
 
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
     expect(commandCtx.runtime.redo).toHaveBeenCalled();
@@ -151,6 +154,7 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
+    expect(commandCtx.runtime.showActivity).toHaveBeenCalled();
   });
 
   it("submits edited content from the external editor command", async () => {

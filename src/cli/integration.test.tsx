@@ -31,6 +31,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     reasoningText: "",
     turnCount: 0,
     tokenUsage: { input: 0, output: 0, total: 0 },
+    activity: [],
     panel: { type: "none" },
     approval: null,
     error: null,
@@ -64,6 +65,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showDiff: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => ""),
     runDiagnostics: vi.fn(async () => undefined),
+    showActivity: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   };
 }

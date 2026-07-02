@@ -25,6 +25,7 @@ function state(): CLIState {
     reasoningText: "",
     turnCount: 0,
     tokenUsage: { input: 0, output: 0, total: 0 },
+    activity: [],
     panel: { type: "none" },
     approval: null,
     error: null,
@@ -61,6 +62,7 @@ describe("useRuntime", () => {
       showDiff: vi.fn(),
       openEditor: vi.fn(),
       runDiagnostics: vi.fn(),
+      showActivity: vi.fn(),
       destroy: vi.fn(),
     };
 

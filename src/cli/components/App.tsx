@@ -12,6 +12,7 @@ import { InputBox } from "./InputBox.js";
 import { ModelSelectView } from "./ModelSelectView.js";
 import { PanelView } from "./PanelView.js";
 import { DiffView } from "./DiffView.js";
+import { ActivityView } from "./ActivityView.js";
 
 export interface AppProps {
   runtime: CLIAppRuntime;
@@ -71,8 +72,9 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">Help</Text>
-      <Text>/help /history /context /tools /models /sessions</Text>
+      <Text>/help /history /context /tools /models /sessions /activity</Text>
       <Text>/agent build|plan /auto /details /thinking /quit</Text>
+      <Text>/git /diff /editor /diagnostics</Text>
       <Text dimColor>ESC is handled by focused panels. Use /panel-close to close.</Text>
       <Text dimColor>{runtime.getState().mode} mode</Text>
     </Box>
@@ -275,6 +277,15 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "diagnostics") {
     return <DiagnosticsPanel panel={state.panel} />;
+  }
+
+  if (state.panel.type === "activity") {
+    return (
+      <ActivityView
+        entries={state.panel.entries}
+        onClose={() => closePanel(runtime)}
+      />
+    );
   }
 
   if (state.panel.type === "git" || state.panel.type === "diff") {

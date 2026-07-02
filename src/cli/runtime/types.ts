@@ -21,6 +21,7 @@ export type CLIViewPanel =
   | { type: "git"; title: string; content: string }
   | { type: "diff"; title: string; content: string }
   | { type: "diagnostics"; results: DiagnosticResult[] }
+  | { type: "activity"; entries: CLIActivityEntry[] }
   | { type: "error"; message: string };
 
 export interface CLIApprovalRequest {
@@ -28,6 +29,16 @@ export interface CLIApprovalRequest {
   toolName: string;
   args: Record<string, unknown>;
   decision: "pending";
+}
+
+export interface CLIActivityEntry {
+  id: string;
+  kind: "tool" | "subagent";
+  name: string;
+  status: "running" | "done" | "error";
+  startedAt: string;
+  endedAt?: string;
+  summary: string;
 }
 
 export interface CLIState {
@@ -49,6 +60,7 @@ export interface CLIState {
   reasoningText: string;
   turnCount: number;
   tokenUsage: TokenCount;
+  activity: CLIActivityEntry[];
   panel: CLIViewPanel;
   approval: CLIApprovalRequest | null;
   error: string | null;
@@ -85,6 +97,7 @@ export interface CLIAppRuntime {
   showDiff(path?: string): Promise<void>;
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
+  showActivity(): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

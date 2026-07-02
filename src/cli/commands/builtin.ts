@@ -260,6 +260,14 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "activity",
+    description: "Show recent tool and subagent activity",
+    usage: "/activity",
+    execute: async (ctx) => {
+      await ctx.runtime.showActivity();
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",
