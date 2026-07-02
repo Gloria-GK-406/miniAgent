@@ -347,7 +347,11 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--system-prompt-file") {
       const next = args[index + 1];
-      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+      if (
+        next === undefined
+        || next.trim().length === 0
+        || (next.startsWith("-") && next !== "-")
+      ) {
         return parseError("Missing path after --system-prompt-file");
       }
       systemPromptAction = "set";
@@ -1105,7 +1109,7 @@ export function formatCLIHelp(): string {
     "  --set-permission Set a project permission rule",
     "  --unset-permission Unset a project permission rule",
     "  --set-system-prompt Set the project system prompt",
-    "  --system-prompt-file Read project system prompt from a file",
+    "  --system-prompt-file Read project system prompt from a file. Use - to read stdin for prompt files",
     "  --unset-system-prompt Unset the project system prompt",
     "  --completion     Generate shell completions: bash, zsh, fish, powershell",
     "  --json          Emit JSON for supported headless modes",

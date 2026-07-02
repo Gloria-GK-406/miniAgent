@@ -62,6 +62,27 @@ describe("runSystemPromptUpdate", () => {
     expect(stderr).not.toHaveBeenCalled();
   });
 
+  it("sets a project system prompt from stdin", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-system-prompt-stdin-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runSystemPromptUpdate({
+      baseDir,
+      action: "set",
+      promptFile: "-",
+      output: "json",
+      readStdin: async () => "Stdin prompt.\n",
+    }, { stdout, stderr })).resolves.toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith(formatSystemPromptUpdateResultJson({
+      ok: true,
+      action: "set",
+      systemPrompt: "Stdin prompt.",
+    }));
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
   it("unsets a project system prompt", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-system-prompt-headless-"));
     const stdout = vi.fn();

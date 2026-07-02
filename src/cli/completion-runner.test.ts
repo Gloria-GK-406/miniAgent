@@ -58,6 +58,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("complete -c miniagent");
     expect(script).toContain("-l diagnostics");
     expect(script).toContain("-l system-prompt-file");
+    expect(script).toContain("Use - to read stdin");
   });
 
   it("formats powershell completions", () => {

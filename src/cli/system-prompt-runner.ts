@@ -3,6 +3,7 @@ import { isAbsolute, resolve } from "node:path";
 import type { PrintStreams } from "./print-runner.js";
 import { createSystemPromptConfigService } from "./runtime/system-prompt-config-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
+import { readStdin } from "./stdin.js";
 
 export type SystemPromptUpdateAction = "set" | "unset";
 export type SystemPromptUpdateOutput = "text" | "json";
@@ -13,6 +14,7 @@ export interface SystemPromptUpdateRequest {
   prompt?: string;
   promptFile?: string;
   output?: SystemPromptUpdateOutput;
+  readStdin?: () => Promise<string>;
 }
 
 export interface SystemPromptUpdateResult {
@@ -30,6 +32,9 @@ async function readPrompt(request: SystemPromptUpdateRequest): Promise<string> {
     return request.prompt;
   }
   if (request.promptFile !== undefined) {
+    if (request.promptFile === "-") {
+      return await (request.readStdin ?? readStdin)();
+    }
     return await readFile(resolvePromptFile(request.baseDir, request.promptFile), "utf-8");
   }
   throw new Error("Missing system prompt");

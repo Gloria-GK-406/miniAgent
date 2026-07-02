@@ -481,6 +481,12 @@ describe("CLI entry args", () => {
       cwd: "C:/repo",
       promptFile: "prompt.md",
     });
+    expect(parseCLIEntryArgs(["--system-prompt-file", "-", "--json"])).toEqual({
+      type: "system-prompt-update",
+      action: "set",
+      promptFile: "-",
+      output: "json",
+    });
     expect(parseCLIEntryArgs(["--unset-system-prompt", "--json"])).toEqual({
       type: "system-prompt-update",
       action: "unset",
@@ -881,6 +887,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--unset-permission");
     expect(help).toContain("--set-system-prompt");
     expect(help).toContain("--system-prompt-file");
+    expect(help).toContain("Use - to read stdin for prompt files");
     expect(help).toContain("--unset-system-prompt");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
