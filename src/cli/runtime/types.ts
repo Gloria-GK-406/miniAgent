@@ -52,6 +52,7 @@ export interface CLIState {
   mode: CLIAgentMode;
   modelName: string;
   modelPaths: string[];
+  referencePaths: string[];
   sessionId: string;
   sessionName: string;
   sessions: SessionMeta[];

@@ -14,6 +14,25 @@ describe("extractReferenceTokens", () => {
 });
 
 describe("ReferenceService", () => {
+  it("lists workspace file reference candidates while skipping noisy directories", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-ref-list-"));
+    await mkdir(join(baseDir, "src"), { recursive: true });
+    await mkdir(join(baseDir, "node_modules", "pkg"), { recursive: true });
+    await mkdir(join(baseDir, ".git"), { recursive: true });
+    await mkdir(join(baseDir, ".cliagent"), { recursive: true });
+    await writeFile(join(baseDir, "README.md"), "readme", "utf-8");
+    await writeFile(join(baseDir, "src", "agent.ts"), "agent", "utf-8");
+    await writeFile(join(baseDir, "node_modules", "pkg", "index.js"), "pkg", "utf-8");
+    await writeFile(join(baseDir, ".git", "HEAD"), "ref", "utf-8");
+    await writeFile(join(baseDir, ".cliagent", "config.json"), "{}", "utf-8");
+    const service = createReferenceService(baseDir);
+
+    await expect(service.listReferenceCandidates()).resolves.toEqual([
+      "README.md",
+      "src/agent.ts",
+    ]);
+  });
+
   it("resolves a referenced file range", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-ref-"));
     await mkdir(join(baseDir, "src"), { recursive: true });

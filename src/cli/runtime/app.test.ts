@@ -44,11 +44,18 @@ describe("createCLIRuntime", () => {
   it("creates initial state and handles command input", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-"));
     await writeConfig(baseDir);
+    await writeFile(join(baseDir, "README.md"), "readme", "utf-8");
+    await mkdir(join(baseDir, "src"), { recursive: true });
+    await writeFile(join(baseDir, "src", "index.ts"), "export {};\n", "utf-8");
 
     const runtime = await createCLIRuntime(baseDir);
     await runtime.submitInput("/help");
 
     expect(runtime.getState().panel).toEqual({ type: "help" });
+    expect(runtime.getState().referencePaths).toEqual([
+      "README.md",
+      "src/index.ts",
+    ]);
     await runtime.destroy();
   });
 

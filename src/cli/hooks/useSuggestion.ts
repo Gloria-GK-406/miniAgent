@@ -52,9 +52,16 @@ const COMMANDS_WITH_ARGS = new Set([
 export function matchSuggestions(
   input: string,
   modelPaths?: string[],
+  referencePaths?: string[],
 ): string[] {
   if (!input) return [];
-  if (!input.startsWith("/")) return [];
+  if (!input.startsWith("/")) {
+    const referenceQuery = getReferenceQuery(input);
+    if (referenceQuery === null) return [];
+    return (referencePaths ?? [])
+      .filter((path) => path.startsWith(referenceQuery))
+      .map((path) => `@${path}`);
+  }
 
   const parts = input.trimStart().split(/\s+/);
   const cmd = parts[0] ?? "";
@@ -89,7 +96,22 @@ export function matchSuggestions(
   return matches;
 }
 
+function getReferenceQuery(input: string): string | null {
+  const match = /(?:^|\s)@([^\s]*)$/.exec(input);
+  return match === null ? null : match[1]!;
+}
+
 export function applySuggestion(input: string, suggestion: string): string {
+  if (suggestion.startsWith("@")) {
+    const match = /(^|\s)@[^\s]*$/.exec(input);
+    if (match === null) {
+      return input;
+    }
+    const tokenStart = match.index + match[1]!.length;
+    const nextInput = `${input.slice(0, tokenStart)}${suggestion}`;
+    return nextInput === input ? input : `${nextInput} `;
+  }
+
   const leadingWhitespace = input.match(/^\s*/)?.[0] ?? "";
   const commandInput = input.slice(leadingWhitespace.length);
 
@@ -131,10 +153,12 @@ export function applySuggestion(input: string, suggestion: string): string {
 
 export interface UseSuggestionOptions {
   modelPaths?: string[];
+  referencePaths?: string[];
 }
 
 export function useSuggestion(options?: UseSuggestionOptions) {
   const modelPaths = options?.modelPaths;
+  const referencePaths = options?.referencePaths;
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -161,9 +185,9 @@ export function useSuggestion(options?: UseSuggestionOptions) {
   }, []);
 
   const updateInput = useCallback((input: string): void => {
-    setSuggestions(matchSuggestions(input, modelPaths));
+    setSuggestions(matchSuggestions(input, modelPaths, referencePaths));
     setSelectedIndex(0);
-  }, [modelPaths]);
+  }, [modelPaths, referencePaths]);
 
   const applySelected = useCallback((input: string): string | null => {
     const suggestion = suggestions[selectedIndex];

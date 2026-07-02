@@ -65,6 +65,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const gitService = createGitService(baseDir);
   let activeTurnId: string | null = null;
   let activeMode = config.defaultAgent;
+  const referenceService = createReferenceService(baseDir);
   const snapshotService = createSnapshotService({
     baseDir,
     sessionService,
@@ -99,6 +100,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     mode: activeMode,
     modelName: formatCurrentModel(built.agent),
     modelPaths: getResolvedModelPaths(built.agent),
+    referencePaths: await referenceService.listReferenceCandidates(),
     sessionId: session.id,
     sessionName: session.name,
     sessions: sessionService.listSessions(),
@@ -141,7 +143,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     getAutoApprove: () => state.autoApprove,
     requestApproval,
     shellService,
-    referenceService: createReferenceService(baseDir),
+    referenceService,
     cwd: baseDir,
   });
 

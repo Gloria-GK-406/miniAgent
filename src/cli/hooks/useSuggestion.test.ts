@@ -16,6 +16,14 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("hello")).toEqual([]);
   });
 
+  it("matches file references after @", () => {
+    const paths = ["README.md", "src/agent.ts", "src/core/types.ts"];
+    expect(matchSuggestions("Explain @sr", undefined, paths)).toEqual([
+      "@src/agent.ts",
+      "@src/core/types.ts",
+    ]);
+  });
+
   it("matches /h to help and history", () => {
     const result = matchSuggestions("/h");
     expect(result).toEqual(["/help", "/history"]);
@@ -222,6 +230,11 @@ describe("useSuggestion", () => {
       result.current.updateInput("/he");
     });
     expect(result.current.applySelected("/he")).toBe("/help");
+  });
+
+  it("applies selected file reference completion", () => {
+    expect(applySuggestion("Explain @sr", "@src/agent.ts")).toBe("Explain @src/agent.ts ");
+    expect(applySuggestion("Check @README.md", "@README.md")).toBe("Check @README.md");
   });
 
   it("adds a trailing space for permissions command completion", () => {

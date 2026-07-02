@@ -1,4 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
+import type { Dirent } from "node:fs";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
 
 export interface ResolvedReference {
@@ -12,9 +13,16 @@ export interface ResolvedReference {
 
 export interface ReferenceService {
   resolveReferences(input: string): Promise<ResolvedReference[]>;
+  listReferenceCandidates(): Promise<string[]>;
 }
 
 const REF_PATTERN = /(^|\s)(@[^\s]+)/g;
+const IGNORED_REFERENCE_DIRS = new Set([
+  ".cliagent",
+  ".git",
+  "dist",
+  "node_modules",
+]);
 
 export function extractReferenceTokens(input: string): string[] {
   const tokens: string[] = [];
@@ -58,9 +66,40 @@ function sliceLines(
   return lines.slice(startLine - 1, endLine).join("\n");
 }
 
+async function collectReferenceCandidates(
+  root: string,
+  dir: string,
+): Promise<string[]> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const paths: string[] = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (IGNORED_REFERENCE_DIRS.has(entry.name)) {
+        continue;
+      }
+      paths.push(...await collectReferenceCandidates(root, resolve(dir, entry.name)));
+      continue;
+    }
+    if (!entry.isFile()) {
+      continue;
+    }
+    paths.push(relative(root, resolve(dir, entry.name)).replaceAll("\\", "/"));
+  }
+  return paths;
+}
+
 export function createReferenceService(baseDir: string): ReferenceService {
   const root = resolve(baseDir);
   return {
+    listReferenceCandidates: async (): Promise<string[]> => {
+      return (await collectReferenceCandidates(root, root)).sort((a, b) => a.localeCompare(b));
+    },
     resolveReferences: async (input): Promise<ResolvedReference[]> => {
       const refs: ResolvedReference[] = [];
       for (const token of extractReferenceTokens(input)) {

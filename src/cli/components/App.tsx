@@ -269,7 +269,10 @@ export function App({ runtime }: AppProps) {
     selectNext,
     selectPrev,
     applySelected,
-  } = useSuggestion({ modelPaths: state.modelPaths });
+  } = useSuggestion({
+    modelPaths: state.modelPaths,
+    referencePaths: state.referencePaths,
+  });
   const { stdout } = useStdout();
   const [scrollFromBottom, setScrollFromBottom] = useState(0);
   const [exitArmed, setExitArmed] = useState(false);

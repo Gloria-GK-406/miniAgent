@@ -21,6 +21,7 @@ function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
     mode: "build",
     modelName: "test/model",
     modelPaths: ["test/model"],
+    referencePaths: [],
     sessionId: "s1",
     sessionName: "default",
     sessions: [],
