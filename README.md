@@ -441,6 +441,7 @@ and shell integration:
 | `--list-agents [--json]` | List primary mode and configured subagents |
 | `--preview-context [--json]` | Preview the assembled runtime context |
 | `--show-history [--json]` | Show current session messages |
+| `--list-references [--json]` | List files available to `@file` references |
 | `--git-status`, `--git-log [limit]`, `--git-diff [path] [--staged]` | Inspect git state headlessly |
 | `--list-sessions [--json]` | List project sessions |
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |

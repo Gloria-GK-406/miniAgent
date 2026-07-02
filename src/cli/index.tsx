@@ -24,6 +24,7 @@ import { runPermissionShow } from "./permission-show-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { runProjectInstructionsInit } from "./project-instructions-runner.js";
+import { runReferenceList } from "./reference-list-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { runSessionClear } from "./session-clear-runner.js";
@@ -190,6 +191,16 @@ async function main(): Promise<void> {
   }
   if (action.type === "list-models") {
     process.exitCode = await runModelList({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "list-references") {
+    process.exitCode = await runReferenceList({
       baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.output !== undefined && { output: action.output }),
     }, {

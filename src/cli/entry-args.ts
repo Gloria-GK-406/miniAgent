@@ -149,6 +149,7 @@ export type CLIEntryAction =
     newSession?: string;
     output?: CLIEntryOutput;
   }
+  | { type: "list-references"; cwd?: string; output?: CLIEntryOutput }
   | {
     type: "list-snapshots";
     cwd?: string;
@@ -199,6 +200,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let listAgentsMode = false;
   let previewContextMode = false;
   let showHistoryMode = false;
+  let listReferencesMode = false;
   let listSnapshotsMode = false;
   let gitAction: CLIEntryGitAction | undefined;
   let gitLogLimit: number | undefined;
@@ -308,6 +310,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--show-history") {
       showHistoryMode = true;
+      continue;
+    }
+    if (arg === "--list-references") {
+      listReferencesMode = true;
       continue;
     }
     if (arg === "--list-snapshots") {
@@ -619,7 +625,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
-  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --status with another headless mode");
   }
   if (
@@ -642,6 +648,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listAgentsMode
       || previewContextMode
       || showHistoryMode
+      || listReferencesMode
       || listSnapshotsMode
       || gitAction !== undefined
       || permissionAction !== undefined
@@ -672,6 +679,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || showHistoryMode
       || showPermissionsMode
       || showSystemPromptMode
+      || listReferencesMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -704,6 +712,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || showHistoryMode
       || showPermissionsMode
       || showSystemPromptMode
+      || listReferencesMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -779,16 +788,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   ) {
     return parseError("Cannot combine --init-instructions with another headless mode");
   }
-  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode)) {
+  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --delete-session with another headless mode");
   }
-  if (clearSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (clearSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --clear-session with another headless mode");
   }
-  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
+  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --rename-session with another headless mode");
   }
-  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
+  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
     return parseError("Cannot combine --fork-session with another headless mode");
   }
   if (listSessionsMode && printMode) {
@@ -803,25 +812,28 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return parseError("Cannot combine --import-session with another headless mode");
   }
-  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --list-models with another headless mode");
   }
-  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --list-commands with another headless mode");
   }
-  if (listToolsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listToolsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --list-tools with another headless mode");
   }
-  if (listAgentsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listAgentsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --list-agents with another headless mode");
   }
-  if (previewContextMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (previewContextMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || showHistoryMode || listReferencesMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --preview-context with another headless mode");
   }
-  if (showHistoryMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (showHistoryMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || listReferencesMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --show-history with another headless mode");
   }
-  if (listSnapshotsMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+  if (listReferencesMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+    return parseError("Cannot combine --list-references with another headless mode");
+  }
+  if (listSnapshotsMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
     return parseError("Cannot combine --list-snapshots with another headless mode");
   }
   if (gitAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
@@ -1136,6 +1148,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (listReferencesMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --list-references");
+    }
+    return {
+      type: "list-references",
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (listSnapshotsMode) {
     if (prompt.length > 0) {
       return parseError("Unexpected prompt for --list-snapshots");
@@ -1196,7 +1218,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1236,6 +1258,7 @@ export function formatCLIHelp(): string {
     "  --list-agents   List primary and configured agents headlessly",
     "  --preview-context Preview assembled runtime context headlessly",
     "  --show-history  Show session history headlessly",
+    "  --list-references List file reference candidates headlessly",
     "  --list-snapshots Show workspace snapshots headlessly",
     "  --git-status    Print git status headlessly",
     "  --git-log       Print recent git commits headlessly",

@@ -95,6 +95,7 @@ also accept `--json`.
 | `--list-agents` | Yes | List primary mode and configured subagents |
 | `--preview-context` | Yes | Preview the assembled runtime context for the selected session and agent |
 | `--show-history` | Yes | Show current session messages |
+| `--list-references` | Yes | List files available to `@file` reference autocomplete |
 | `--git-status` | Yes | Print short git status |
 | `--git-log [limit]` | Yes | Print recent git commits |
 | `--git-diff [path] [--staged]` | Yes | Print workspace or staged git diff |
@@ -127,6 +128,7 @@ miniagent --list-tools --agent plan --json
 miniagent --list-agents --json
 miniagent --preview-context --json
 miniagent --show-history --json
+miniagent --list-references --json
 miniagent --git-status
 miniagent --show-permissions --json
 miniagent --set-permission "shell:npm *" allow

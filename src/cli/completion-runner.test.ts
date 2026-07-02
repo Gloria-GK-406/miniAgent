@@ -11,6 +11,7 @@ describe("formatCompletionScript", () => {
       "--init",
       "--force",
       "--staged",
+      "--list-references",
       "--list-snapshots",
       "--show-permissions",
       "--show-system-prompt",
@@ -39,6 +40,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--list-agents");
     expect(script).toContain("--preview-context");
     expect(script).toContain("--show-history");
+    expect(script).toContain("--list-references");
     expect(script).toContain("--list-snapshots");
     expect(script).toContain("--git-status");
     expect(script).toContain("--git-log");

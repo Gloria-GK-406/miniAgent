@@ -8,6 +8,7 @@
 - `/diagnostics`：运行配置的诊断命令，或从 `package.json` 自动发现 `npm run typecheck`、`npm run lint`、`npm test`。
 - `/activity`：查看最近工具调用和子 Agent 形态工具调用的活动时间线。
 - `/permissions`：查看当前 allow/ask/deny 权限策略。
+- `--list-references [--json]`：以 headless 方式查看可用于 `@file` 引用补全的文件。
 - `--show-permissions [--json]`：以 headless 方式查看当前 allow/ask/deny 权限策略。
 - `--show-system-prompt [--json]`：以 headless 方式查看基础和实际生效的系统提示词。
 - `/system`：查看基础系统提示词和实际生效的系统提示词。
