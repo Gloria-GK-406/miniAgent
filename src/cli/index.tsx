@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render } from "ink";
+import { runAgentList } from "./agent-list-runner.js";
 import { formatCompletionScript } from "./completion-runner.js";
 import { runCommandList } from "./command-list-runner.js";
 import { runConfigPaths } from "./config-paths-runner.js";
@@ -184,6 +185,31 @@ async function main(): Promise<void> {
       runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
       await applyCLIEntryRuntimeOptions(runtime, action);
       process.exitCode = await runToolList(
+        runtime,
+        {
+          stdout: (text) => process.stdout.write(text),
+          stderr: (text) => process.stderr.write(text),
+        },
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      );
+      runtime = undefined;
+    } catch (e: unknown) {
+      if (runtime !== undefined) {
+        await runtime.destroy();
+      }
+      process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+  if (action.type === "list-agents") {
+    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
+    try {
+      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+      await applyCLIEntryRuntimeOptions(runtime, action);
+      process.exitCode = await runAgentList(
         runtime,
         {
           stdout: (text) => process.stdout.write(text),

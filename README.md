@@ -428,6 +428,7 @@ and shell integration:
 | `--list-models [--json]` | List configured model selectors |
 | `--list-commands [--json]` | List built-in and project custom slash commands |
 | `--list-tools [--json]` | List runtime tools for the selected agent |
+| `--list-agents [--json]` | List primary mode and configured subagents |
 | `--git-status`, `--git-log [limit]`, `--git-diff [path] [--staged]` | Inspect git state headlessly |
 | `--list-sessions [--json]` | List project sessions |
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |
