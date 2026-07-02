@@ -168,6 +168,11 @@ describe("matchSuggestions", () => {
     expect(result).toEqual(["/references"]);
   });
 
+  it("matches transcript search commands", () => {
+    expect(matchSuggestions("/sea")).toEqual(["/search"]);
+    expect(matchSuggestions("/fi")).toEqual(["/find"]);
+  });
+
   it("matches Phase 2 commands", () => {
     expect(matchSuggestions("/n")).toEqual(["/new"]);
     expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
@@ -348,6 +353,11 @@ describe("useSuggestion", () => {
   it("adds a trailing space for commands query completion", () => {
     expect(applySuggestion("/comm", "/commands")).toBe("/commands ");
     expect(applySuggestion("/commands di", "diff")).toBe("/commands diff ");
+  });
+
+  it("adds a trailing space for transcript search completion", () => {
+    expect(applySuggestion("/sea", "/search")).toBe("/search ");
+    expect(applySuggestion("/fi", "/find")).toBe("/find ");
   });
 
   it("applies selected diff flag completion", () => {

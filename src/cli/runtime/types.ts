@@ -22,6 +22,7 @@ export type CLIViewPanel =
   | { type: "keybindings" }
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
+  | { type: "search"; query: string; hits: CLITranscriptSearchHit[] }
   | { type: "references"; references: string[] }
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[]; query?: string }
@@ -75,6 +76,13 @@ export interface CLIActivityEntry {
   startedAt: string;
   endedAt?: string;
   summary: string;
+}
+
+export interface CLITranscriptSearchHit {
+  id: string;
+  index: number;
+  role: "system" | "user" | "assistant" | "tool-call" | "tool-result";
+  preview: string;
 }
 
 export type CLICommandHelpSource = "builtin" | "custom";

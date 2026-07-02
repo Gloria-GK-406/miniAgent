@@ -667,6 +667,55 @@ describe("App", () => {
     expect(output).toContain("src/cli/index.tsx");
   });
 
+  it("renders transcript search panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "search",
+          query: "weather",
+          hits: [
+            {
+              id: "u1",
+              index: 1,
+              role: "user",
+              preview: "What is the weather?",
+            },
+            {
+              id: "a1",
+              index: 2,
+              role: "assistant",
+              preview: "The weather is sunny.",
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Search "weather"');
+    expect(output).toContain("2 matches");
+    expect(output).toContain("#1 user");
+    expect(output).toContain("What is the weather?");
+    expect(output).toContain("#2 assistant");
+    expect(output).toContain("The weather is sunny.");
+  });
+
+  it("renders empty transcript search state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "search",
+          query: "missing",
+          hits: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Search "missing"');
+    expect(output).toContain("No transcript matches");
+  });
+
   it("renders empty references panel state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

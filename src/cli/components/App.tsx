@@ -181,6 +181,10 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
+function pluralMatches(count: number): string {
+  return `${count} ${count === 1 ? "match" : "matches"}`;
+}
+
 const KEYBINDING_ROWS = [
   ["Enter", "Submit prompt or confirm selection"],
   ["Tab", "Complete suggestion or switch build/plan"],
@@ -213,7 +217,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/about /help /commands /keybindings /status /config /history /context</Text>
+          <Text>/about /help /commands /keybindings /status /config /history /context /search</Text>
           <Text>/references /tools /models /sessions /activity /snapshots /permissions /system</Text>
           <Text>/agent build|plan /auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
@@ -402,6 +406,35 @@ function ReferencesPanel({
       ) : (
         panel.references.map((path) => (
           <Text key={path}>{path}</Text>
+        ))
+      )}
+    </StaticPanelFrame>
+  );
+}
+
+function SearchPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "search" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">
+        Search "{panel.query}"
+      </Text>
+      <Text dimColor>{pluralMatches(panel.hits.length)}</Text>
+      {panel.hits.length === 0 ? (
+        <Text dimColor>No transcript matches</Text>
+      ) : (
+        panel.hits.map((hit) => (
+          <Box key={`${hit.id}:${hit.index}`} flexDirection="column">
+            <Text>
+              <Text color="cyan">#{hit.index} {hit.role}</Text>
+              <Text> {hit.preview}</Text>
+            </Text>
+          </Box>
         ))
       )}
     </StaticPanelFrame>
@@ -780,6 +813,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "references") {
     return <ReferencesPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "search") {
+    return <SearchPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "snapshots") {

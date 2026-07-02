@@ -2,6 +2,7 @@ import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext } from "../runtime/types.js";
 import type { CLIPermissionDecision } from "../config.js";
 import type { SessionMeta } from "../../core/session.js";
+import { MessageType, type Message, type MessageContent, type ToolCallMessage } from "../../core/types.js";
 import { formatConfigForDisplay } from "../config-display.js";
 import { formatConfigPaths, resolveConfigPaths } from "../config-paths-runner.js";
 import { readPackageVersion } from "../package-info.js";
@@ -26,6 +27,66 @@ function filterSessions(sessions: SessionMeta[], query: string): SessionMeta[] {
   return sessions.filter((session) =>
     session.name.toLowerCase().includes(normalized) ||
     session.id.toLowerCase().includes(normalized));
+}
+
+function messageContentText(content: MessageContent): string {
+  if (typeof content === "string") return content;
+  if (content.type === "text") return content.text;
+  return "[image]";
+}
+
+function transcriptSearchText(message: Message): string {
+  if (message.type === MessageType.ToolCall) {
+    const toolCall = message as ToolCallMessage;
+    return `${toolCall.toolName} ${JSON.stringify(toolCall.arguments)}`;
+  }
+  return messageContentText(message.content);
+}
+
+function transcriptSearchRole(
+  message: Message,
+): "system" | "user" | "assistant" | "tool-call" | "tool-result" {
+  switch (message.type) {
+    case MessageType.System:
+      return "system";
+    case MessageType.User:
+      return "user";
+    case MessageType.Assist:
+      return "assistant";
+    case MessageType.ToolCall:
+      return "tool-call";
+    case MessageType.ToolResult:
+      return "tool-result";
+  }
+}
+
+function transcriptSearchPreview(text: string, query: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const index = normalized.toLowerCase().indexOf(query.toLowerCase());
+  if (index === -1) {
+    return normalized.length > 120 ? `${normalized.slice(0, 117)}...` : normalized;
+  }
+
+  const start = Math.max(0, index - 40);
+  const end = Math.min(normalized.length, index + query.length + 80);
+  const preview = normalized.slice(start, end);
+  return `${start > 0 ? "..." : ""}${preview}${end < normalized.length ? "..." : ""}`;
+}
+
+function searchTranscript(messages: Message[], query: string) {
+  const normalizedQuery = query.toLowerCase();
+  return messages.flatMap((message, index) => {
+    const text = transcriptSearchText(message);
+    if (!text.toLowerCase().includes(normalizedQuery)) {
+      return [];
+    }
+    return [{
+      id: message.id,
+      index: index + 1,
+      role: transcriptSearchRole(message),
+      preview: transcriptSearchPreview(text, query),
+    }];
+  });
 }
 
 function parsePermissionDecision(value: string | undefined): CLIPermissionDecision | null {
@@ -229,6 +290,26 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     usage: "/context",
     execute: async (ctx) => {
       ctx.updateState({ panel: { type: "context", messages: await ctx.agent.previewContext() } });
+    },
+  });
+  registry.register({
+    name: "search",
+    aliases: ["find"],
+    description: "Search current transcript",
+    usage: "/search <query>",
+    execute: async (ctx, args) => {
+      const query = args.trim();
+      if (query.length === 0) {
+        ctx.updateState({ panel: { type: "error", message: "Usage: /search <query>" } });
+        return;
+      }
+      ctx.updateState({
+        panel: {
+          type: "search",
+          query,
+          hits: searchTranscript(await ctx.agent.getMessages(), query),
+        },
+      });
     },
   });
   registry.register({

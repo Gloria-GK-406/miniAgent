@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { MessageType, type Message } from "../../core/types.js";
 import { CLIConfigSchema } from "../config.js";
 import { createCommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext, CLIState } from "../runtime/types.js";
@@ -76,6 +77,7 @@ describe("registerBuiltinCommands", () => {
       "context",
       "history",
       "references",
+      "search",
       "snapshots",
       "tools",
       "models",
@@ -209,6 +211,52 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.getState().panel).toEqual({
       type: "references",
       references: ["README.md", "src/cli/index.tsx"],
+    });
+  });
+
+  it("opens transcript search panel from alias", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    const messages: Message[] = [
+      { id: "u1", type: MessageType.User, content: "What is the weather?" },
+      { id: "a1", type: MessageType.Assist, content: "It is sunny." },
+      { id: "u2", type: MessageType.User, content: "Search WEATHER again." },
+    ];
+    commandCtx.agent.getMessages = vi.fn(async () => messages);
+
+    await registry.execute(commandCtx, "/find weather");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "search",
+      query: "weather",
+      hits: [
+        {
+          id: "u1",
+          index: 1,
+          role: "user",
+          preview: "What is the weather?",
+        },
+        {
+          id: "u2",
+          index: 3,
+          role: "user",
+          preview: "Search WEATHER again.",
+        },
+      ],
+    });
+  });
+
+  it("shows an error panel for empty transcript search", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/search");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /search <query>",
     });
   });
 

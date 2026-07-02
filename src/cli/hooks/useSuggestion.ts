@@ -15,6 +15,7 @@ const COMMANDS = [
   "/editor",
   "/exit",
   "/export",
+  "/find",
   "/git",
   "/help",
   "/history",
@@ -31,6 +32,7 @@ const COMMANDS = [
   "/redo",
   "/session",
   "/sessions",
+  "/search",
   "/system",
   "/thinking",
   "/tools",
@@ -61,7 +63,9 @@ const COMMANDS_WITH_ARGS = new Set([
   "/new",
   "/permission",
   "/permissions",
+  "/search",
   "/sessions",
+  "/find",
   "/system",
 ]);
 
