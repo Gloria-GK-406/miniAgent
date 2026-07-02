@@ -3,7 +3,7 @@
 ## CLI Phase 3 命令与面板
 
 - `/git [status|log]`：查看 git 状态或近期日志。
-- `/diff [path]`：打开可滚动的 unified diff 面板。
+- `/diff [--staged] [path]`：打开可滚动的 unified diff 面板。
 - `/editor [initial text]`：用外部编辑器撰写下一条提示，非空内容会走正常输入路径提交。
 - `/diagnostics`：运行配置的诊断命令，或从 `package.json` 自动发现 `npm run typecheck`、`npm run lint`、`npm test`。
 - `/activity`：查看最近工具调用和子 Agent 形态工具调用的活动时间线。

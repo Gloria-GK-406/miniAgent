@@ -218,6 +218,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/git status");
     await registry.execute(commandCtx, "/git log 3");
     await registry.execute(commandCtx, "/diff src/cli");
+    await registry.execute(commandCtx, "/diff --staged src/cli");
     await registry.execute(commandCtx, "/diagnostics");
     await registry.execute(commandCtx, "/doctor");
     await registry.execute(commandCtx, "/activity");
@@ -228,6 +229,7 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showGitStatus).toHaveBeenCalled();
     expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
+    expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli", { staged: true });
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
     expect(commandCtx.runtime.runDoctor).toHaveBeenCalled();
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();

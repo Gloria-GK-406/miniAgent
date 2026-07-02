@@ -463,7 +463,7 @@ and shell integration:
 | `/auto` | Toggle auto approval for requests that are not denied |
 | `/details` | Toggle expanded tool details |
 | `/diagnostics` | Run configured project diagnostics |
-| `/diff [path]` | Open a scrollable git diff panel |
+| `/diff [--staged] [path]` | Open a scrollable git diff panel |
 | `/editor [initial text]` | Compose the next prompt in an external editor |
 | `/git [status\|log]` | Show git status or recent log |
 | `/thinking` | Toggle reasoning visibility |

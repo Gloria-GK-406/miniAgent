@@ -412,11 +412,22 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register({
     name: "diff",
     description: "Show git diff",
-    usage: "/diff [path]",
+    usage: "/diff [--staged] [path]",
     execute: async (ctx, args) => {
       await runSessionMutation(ctx, async () => {
-        const path = args.trim();
-        await ctx.runtime.showDiff(path.length === 0 ? undefined : path);
+        const parts = splitArgs(args);
+        const staged = parts.includes("--staged");
+        const unknown = parts.find((part) => part.startsWith("-") && part !== "--staged");
+        if (unknown !== undefined) {
+          throw new Error("Usage: /diff [--staged] [path]");
+        }
+        const path = parts.filter((part) => part !== "--staged").join(" ");
+        const targetPath = path.length === 0 ? undefined : path;
+        if (staged) {
+          await ctx.runtime.showDiff(targetPath, { staged: true });
+          return;
+        }
+        await ctx.runtime.showDiff(targetPath);
       });
     },
   });

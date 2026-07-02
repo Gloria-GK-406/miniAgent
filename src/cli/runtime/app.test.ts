@@ -690,6 +690,16 @@ describe("createCLIRuntime", () => {
       title: "Git Diff",
       content: expect.stringContaining("+two"),
     });
+
+    await runGit(baseDir, ["add", "a.txt"]);
+    await writeFile(join(baseDir, "a.txt"), "three\n", "utf-8");
+    await runtime.submitInput("/diff --staged a.txt");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "diff",
+      title: "Git Diff (staged)",
+      content: expect.stringContaining("+two"),
+    });
     await runtime.destroy();
   });
 });

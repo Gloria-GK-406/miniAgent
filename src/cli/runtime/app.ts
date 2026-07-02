@@ -643,12 +643,15 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     },
-    showDiff: async (path) => {
+    showDiff: async (path, options = {}) => {
       updateState({
         panel: {
           type: "diff",
-          title: "Git Diff",
-          content: await gitService.diff(path === undefined ? undefined : { path }),
+          title: options.staged === true ? "Git Diff (staged)" : "Git Diff",
+          content: await gitService.diff({
+            ...(path !== undefined && { path }),
+            ...(options.staged !== undefined && { staged: options.staged }),
+          }),
         },
       });
     },

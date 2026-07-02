@@ -143,7 +143,7 @@ miniagent --completion powershell
 | `/auto` | Toggle auto approval for requests that are not denied |
 | `/details` | Toggle expanded tool details |
 | `/diagnostics` | Run configured project diagnostics |
-| `/diff [path]` | Open a scrollable git diff panel |
+| `/diff [--staged] [path]` | Open a scrollable git diff panel |
 | `/editor [initial text]` | Compose the next prompt in an external editor |
 | `/git [status|log]` | Show git status or recent log |
 | `/thinking` | Toggle reasoning visibility |
@@ -217,7 +217,7 @@ the config can switch to Git Bash, WSL, cmd, or an explicit executable.
 
 ## Git, Editor, Diagnostics
 
-`/git status` and `/git log [limit]` open read-only git panels. `/diff [path]`
+`/git status` and `/git log [limit]` open read-only git panels. `/diff [--staged] [path]`
 opens a scrollable unified diff panel. The agent also receives read-only git
 tools plus guarded `git_commit`; the commit tool uses the `git_commit`
 permission key.

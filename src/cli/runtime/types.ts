@@ -90,6 +90,10 @@ export interface CLIInputOverrides {
   model?: string;
 }
 
+export interface CLIDiffOptions {
+  staged?: boolean;
+}
+
 export type CLIEvent =
   | { type: "state"; state: CLIState }
   | { type: "notice"; level: "info" | "warn" | "error"; message: string }
@@ -121,7 +125,7 @@ export interface CLIAppRuntime {
   compactContext(): Promise<void>;
   showGitStatus(): Promise<void>;
   showGitLog(limit?: number): Promise<void>;
-  showDiff(path?: string): Promise<void>;
+  showDiff(path?: string, options?: CLIDiffOptions): Promise<void>;
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
   runDoctor(): Promise<void>;
