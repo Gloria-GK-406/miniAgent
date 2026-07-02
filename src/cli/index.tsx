@@ -13,8 +13,8 @@ import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { writeCLIEntryError } from "./entry-fatal.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
+import { runTUIEntry } from "./entry-tui-runner.js";
 import { runRuntimeBackedCLIEntry } from "./entry-runtime-runner.js";
-import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runContextPreview } from "./context-preview-runner.js";
 import { runGitHeadless } from "./git-headless-runner.js";
 import { runHistory } from "./history-runner.js";
@@ -365,41 +365,19 @@ async function main(): Promise<void> {
     return;
   }
 
-  process.stdout.write("\x1b[?1049h");
-  process.stdout.write("\x1b[2J\x1b[H");
-
-  const cleanup = (): void => {
-    process.stdout.write("\x1b[?1049l");
-  };
-  process.on("exit", cleanup);
-
-  try {
-    const cwd = resolve(action.cwd ?? process.cwd());
-    const runtime = await createCLIRuntime(cwd);
-    await applyCLIEntryRuntimeOptions(runtime, action);
-    const app = render(<App runtime={runtime} />, { exitOnCtrlC: false });
-    let exitStarted = false;
-    runtime.subscribe((event) => {
-      if (event.type !== "state" || !event.state.exitRequested || exitStarted) {
-        return;
-      }
-      exitStarted = true;
-      app.unmount();
-      void runtime.destroy().finally(() => {
-        process.exit(0);
-      });
-    });
-    const prompt = await loadEntryPrompt(action, cwd);
-    if (prompt !== undefined) {
-      void runtime.submitInput(prompt);
-    }
-  } catch (e: unknown) {
-    process.stdout.write("\x1b[?1049l");
-    process.exit(writeCLIEntryError({
-      stdout: (text) => process.stdout.write(text),
-      stderr: (text) => process.stderr.write(text),
-    }, e, "text"));
-  }
+  await runTUIEntry({
+    action,
+    createRuntime: createCLIRuntime,
+    renderApp: (runtime) => render(<App runtime={runtime} />, { exitOnCtrlC: false }),
+    streams,
+    exit: (code) => process.exit(code),
+    onProcessExit: (listener) => {
+      process.on("exit", listener);
+      return () => {
+        process.off("exit", listener);
+      };
+    },
+  });
 }
 
 main();
