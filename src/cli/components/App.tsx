@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import type { Message } from "../../core/types.js";
 import { useRuntime } from "../hooks/useRuntime.js";
@@ -24,6 +24,7 @@ export interface AppProps {
 const BOTTOM_RESERVED = 6;
 const EXIT_CONFIRM_MS = 2000;
 export const EXIT_CONFIRM_TEXT = "Press Ctrl+C again to exit";
+export const STATIC_PANEL_CLOSE_TEXT = "ESC close";
 
 export type CtrlCAction = "stop" | "arm-exit" | "exit";
 
@@ -78,26 +79,52 @@ function closePanel(runtime: CLIAppRuntime): void {
   void runtime.runCommand("panel-close", "");
 }
 
+function StaticPanelFrame({
+  children,
+  onClose,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  useInput((_input, key) => {
+    if (key.escape) {
+      onClose();
+    }
+  });
+
+  return (
+    <Box flexDirection="column">
+      {children}
+      <Text dimColor>{STATIC_PANEL_CLOSE_TEXT}</Text>
+    </Box>
+  );
+}
+
 function panelTitle(panel: Extract<CLIViewPanel, { type: "history" | "context" }>): string {
   return panel.type === "history" ? "History" : "Context";
 }
 
 function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
   return (
-    <Box flexDirection="column">
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Help</Text>
       <Text>/help /history /context /tools /models /sessions /activity</Text>
       <Text>/permissions /system /agent build|plan /auto /details</Text>
       <Text>/thinking /git /diff /editor /diagnostics /quit</Text>
-      <Text dimColor>ESC is handled by focused panels. Use /panel-close to close.</Text>
       <Text dimColor>{runtime.getState().mode} mode</Text>
-    </Box>
+    </StaticPanelFrame>
   );
 }
 
-function ToolsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "tools" }> }) {
+function ToolsPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "tools" }>;
+  runtime: CLIAppRuntime;
+}) {
   return (
-    <Box flexDirection="column">
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Tools ({panel.tools.length})</Text>
       {panel.tools.map((tool) => (
         <Text key={tool.name}>
@@ -105,14 +132,14 @@ function ToolsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "tools" }>
           <Text dimColor> {tool.description}</Text>
         </Text>
       ))}
-    </Box>
+    </StaticPanelFrame>
   );
 }
 
 function SessionsPanel({ runtime, panel }: { runtime: CLIAppRuntime; panel: Extract<CLIViewPanel, { type: "sessions" }> }) {
   const state = runtime.getState();
   return (
-    <Box flexDirection="column">
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Sessions</Text>
       {panel.sessions.map((session) => {
         const marker = session.id === state.sessionId ? "*" : " ";
@@ -122,16 +149,22 @@ function SessionsPanel({ runtime, panel }: { runtime: CLIAppRuntime; panel: Extr
           </Text>
         );
       })}
-    </Box>
+    </StaticPanelFrame>
   );
 }
 
-function ErrorPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "error" }> }) {
+function ErrorPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "error" }>;
+  runtime: CLIAppRuntime;
+}) {
   return (
-    <Box flexDirection="column">
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="red">Error</Text>
       <Text>{panel.message}</Text>
-    </Box>
+    </StaticPanelFrame>
   );
 }
 
@@ -142,9 +175,15 @@ function summarizeDiagnosticOutput(stdout: string, stderr: string): string {
   return firstLine.length > 120 ? `${firstLine.slice(0, 117)}...` : firstLine;
 }
 
-function DiagnosticsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "diagnostics" }> }) {
+function DiagnosticsPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "diagnostics" }>;
+  runtime: CLIAppRuntime;
+}) {
   return (
-    <Box flexDirection="column">
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Diagnostics</Text>
       {panel.results.length === 0 ? (
         <Text dimColor>No diagnostics configured</Text>
@@ -165,7 +204,7 @@ function DiagnosticsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "dia
           );
         })
       )}
-    </Box>
+    </StaticPanelFrame>
   );
 }
 
@@ -327,7 +366,7 @@ export function App({ runtime }: AppProps) {
   }
 
   if (state.panel.type === "tools") {
-    return <ToolsPanel panel={state.panel} />;
+    return <ToolsPanel panel={state.panel} runtime={runtime} />;
   }
 
   if (state.panel.type === "permissions") {
@@ -355,11 +394,11 @@ export function App({ runtime }: AppProps) {
   }
 
   if (state.panel.type === "error") {
-    return <ErrorPanel panel={state.panel} />;
+    return <ErrorPanel panel={state.panel} runtime={runtime} />;
   }
 
   if (state.panel.type === "diagnostics") {
-    return <DiagnosticsPanel panel={state.panel} />;
+    return <DiagnosticsPanel panel={state.panel} runtime={runtime} />;
   }
 
   if (state.panel.type === "activity") {

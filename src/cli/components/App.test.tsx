@@ -3,6 +3,7 @@ import { renderToString } from "ink";
 import {
   App,
   EXIT_CONFIRM_TEXT,
+  STATIC_PANEL_CLOSE_TEXT,
   getMessageWindow,
   padMessageWindow,
   resolveCtrlCAction,
@@ -167,6 +168,14 @@ describe("App", () => {
 
   it("exports Ctrl+C confirmation text for the idle exit prompt", () => {
     expect(EXIT_CONFIRM_TEXT).toBe("Press Ctrl+C again to exit");
+  });
+
+  it("renders static panel close affordance", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({ panel: { type: "tools", tools: [] } })} />,
+    );
+
+    expect(output).toContain(STATIC_PANEL_CLOSE_TEXT);
   });
 
   it("renders focused approval prompt instead of normal input when approval is pending", () => {
