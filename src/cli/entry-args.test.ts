@@ -149,6 +149,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("runs diagnostics without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--diagnostics"])).toEqual({
+      type: "diagnostics",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--diagnostics", "--json"])).toEqual({
+      type: "diagnostics",
+      cwd: "C:/repo",
+      output: "json",
+    });
+  });
+
   it("lists sessions without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--list-sessions"])).toEqual({
       type: "list-sessions",
@@ -310,6 +321,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects prompted diagnostics mode", () => {
+    expect(parseCLIEntryArgs(["--diagnostics", "hello"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --diagnostics",
+    });
+  });
+
   it("rejects conflicting or prompted session listing mode", () => {
     expect(parseCLIEntryArgs(["--list-sessions", "--print", "hello"])).toEqual({
       type: "error",
@@ -358,7 +376,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --list-sessions, --export-session, or --import-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, or --import-session",
     });
   });
 
@@ -373,6 +391,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--session");
     expect(help).toContain("--new-session");
     expect(help).toContain("--list-sessions");
+    expect(help).toContain("--diagnostics");
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");
     expect(help).toContain("--name");

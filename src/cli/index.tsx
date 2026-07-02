@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render } from "ink";
 import { App } from "./components/App.js";
+import { runHeadlessDiagnostics } from "./diagnostics-runner.js";
 import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
@@ -75,6 +76,16 @@ async function main(): Promise<void> {
       baseDir: resolve(action.cwd ?? process.cwd()),
       inputPath: action.inputPath,
       ...(action.name !== undefined && { name: action.name }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "diagnostics") {
+    process.exitCode = await runHeadlessDiagnostics({
+      baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

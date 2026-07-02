@@ -36,6 +36,7 @@ export type CLIEntryAction =
     newSession?: string;
     output?: CLIEntryOutput;
   }
+  | { type: "diagnostics"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-sessions"; cwd?: string; output?: CLIEntryOutput }
   | {
     type: "export-session";
@@ -65,6 +66,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let newSession: string | undefined;
   let printMode = false;
   let doctorMode = false;
+  let diagnosticsMode = false;
   let listSessionsMode = false;
   let exportSessionMode = false;
   let importSessionMode = false;
@@ -90,6 +92,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--doctor") {
       doctorMode = true;
+      continue;
+    }
+    if (arg === "--diagnostics") {
+      diagnosticsMode = true;
       continue;
     }
     if (arg === "--list-sessions") {
@@ -227,6 +233,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (doctorMode && printMode) {
     return { type: "error", message: "Cannot use --doctor with --print" };
   }
+  if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
+    return { type: "error", message: "Cannot combine --diagnostics with another headless mode" };
+  }
   if (listSessionsMode && printMode) {
     return { type: "error", message: "Cannot use --list-sessions with --print" };
   }
@@ -238,6 +247,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return { type: "error", message: "Cannot combine --import-session with another headless mode" };
+  }
+  if (diagnosticsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --diagnostics" };
+    }
+    return {
+      type: "diagnostics",
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
   }
   if (importSessionMode) {
     if (prompt.length > 0) {
@@ -310,7 +329,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --list-sessions, --export-session, or --import-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, or --import-session",
     };
   }
 
@@ -351,6 +370,7 @@ export function formatCLIHelp(): string {
     "  --output         Set export output path",
     "  -m, --model     Select a configured model by id or provider/id",
     "  --doctor        Run setup checks headlessly",
+    "  --diagnostics   Run configured diagnostics headlessly",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
     "  --prompt-file   Read the initial prompt from a file",
