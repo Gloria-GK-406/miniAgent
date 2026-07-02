@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
 import type { Tool } from "../../tool/types.js";
 import type { PermissionService } from "../runtime/permission-service.js";
@@ -14,6 +14,17 @@ const PathParamsSchema = z.object({
 const ReadParamsSchema = PathParamsSchema.extend({
   offset: z.number().int().positive().optional(),
   limit: z.number().int().positive().optional(),
+});
+
+const GlobParamsSchema = z.object({
+  pattern: z.string().min(1),
+  path: z.string().min(1).optional(),
+});
+
+const GrepParamsSchema = z.object({
+  pattern: z.string().min(1),
+  path: z.string().min(1).optional(),
+  include: z.string().min(1).optional(),
 });
 
 const WriteParamsSchema = PathParamsSchema.extend({
@@ -46,6 +57,16 @@ const ShellParamsSchema = z.object({
   command: z.string().min(1),
   timeoutMs: z.number().int().positive().optional(),
 });
+
+const SEARCH_IGNORED_DIRS = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+]);
 
 export interface CLIToolkitOptions {
   baseDir: string;
@@ -108,6 +129,111 @@ async function pathExists(path: string): Promise<boolean> {
 
 function countOccurrences(content: string, needle: string): number {
   return content.split(needle).length - 1;
+}
+
+function toPosixPath(path: string): string {
+  return path.replaceAll("\\", "/");
+}
+
+function matchGlob(pattern: string, path: string): boolean {
+  return matchGlobParts(pattern.split("/"), 0, path.split("/"), 0);
+}
+
+function matchGlobParts(
+  patternParts: string[],
+  patternIndex: number,
+  pathParts: string[],
+  pathIndex: number,
+): boolean {
+  if (patternIndex === patternParts.length && pathIndex === pathParts.length) {
+    return true;
+  }
+  if (patternIndex === patternParts.length) {
+    return false;
+  }
+  const part = patternParts[patternIndex]!;
+  if (part === "**") {
+    const nextPatternIndex = patternIndex + 1;
+    if (nextPatternIndex === patternParts.length) {
+      return true;
+    }
+    for (let nextPathIndex = pathIndex; nextPathIndex <= pathParts.length; nextPathIndex++) {
+      if (matchGlobParts(patternParts, nextPatternIndex, pathParts, nextPathIndex)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (pathIndex === pathParts.length) {
+    return false;
+  }
+  if (!matchGlobSegment(part, pathParts[pathIndex]!)) {
+    return false;
+  }
+  return matchGlobParts(patternParts, patternIndex + 1, pathParts, pathIndex + 1);
+}
+
+function matchGlobSegment(pattern: string, segment: string): boolean {
+  const regex = "^" + pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replaceAll("*", "[^/]*")
+    .replaceAll("?", "[^/]") + "$";
+  return new RegExp(regex).test(segment);
+}
+
+interface SearchFile {
+  absolutePath: string;
+  displayPath: string;
+  matchPath: string;
+}
+
+async function collectSearchFiles(
+  baseDir: string,
+  inputPath: string,
+): Promise<SearchFile[]> {
+  const target = resolveWorkspacePath(baseDir, inputPath);
+  const info = await stat(target.absolutePath);
+  if (!info.isDirectory()) {
+    return [{
+      absolutePath: target.absolutePath,
+      displayPath: target.displayPath,
+      matchPath: basename(target.displayPath),
+    }];
+  }
+
+  const files: SearchFile[] = [];
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && SEARCH_IGNORED_DIRS.has(entry.name)) {
+        continue;
+      }
+      const absolutePath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absolutePath);
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+      const displayPath = resolveWorkspacePath(baseDir, absolutePath).displayPath;
+      files.push({
+        absolutePath,
+        displayPath,
+        matchPath: toPosixPath(relative(target.absolutePath, absolutePath)),
+      });
+    }
+  }
+  await walk(target.absolutePath);
+  return files.sort((left, right) => left.displayPath.localeCompare(right.displayPath));
+}
+
+function matchesInclude(include: string, file: SearchFile): boolean {
+  const normalized = toPosixPath(include);
+  if (normalized.includes("/")) {
+    return matchGlob(normalized, file.matchPath);
+  }
+  return matchGlobSegment(normalized, basename(file.displayPath));
 }
 
 function stripPatchPath(path: string): string {
@@ -209,6 +335,56 @@ function createReadTool(options: CLIToolkitOptions): Tool {
       const start = (parsed.offset ?? 1) - 1;
       const end = parsed.limit === undefined ? lines.length : start + parsed.limit;
       return lines.slice(start, end).join("\n");
+    },
+  };
+}
+
+function createGlobTool(options: CLIToolkitOptions): Tool {
+  return {
+    name: "glob",
+    description: "Find workspace files matching a glob pattern.",
+    parameters: GlobParamsSchema,
+    execute: async (args): Promise<string> => {
+      await assertPermission(options, "glob", args);
+      const parsed = GlobParamsSchema.parse(args);
+      const files = await collectSearchFiles(options.baseDir, parsed.path ?? ".");
+      const matched = files
+        .filter((file) => matchGlob(parsed.pattern, file.matchPath))
+        .map((file) => file.displayPath);
+      return matched.length === 0 ? "No files matched the pattern." : matched.join("\n");
+    },
+  };
+}
+
+function createGrepTool(options: CLIToolkitOptions): Tool {
+  return {
+    name: "grep",
+    description: "Search workspace file contents using a regular expression.",
+    parameters: GrepParamsSchema,
+    execute: async (args): Promise<string> => {
+      await assertPermission(options, "grep", args);
+      const parsed = GrepParamsSchema.parse(args);
+      const regex = new RegExp(parsed.pattern);
+      const files = await collectSearchFiles(options.baseDir, parsed.path ?? ".");
+      const filtered = parsed.include === undefined
+        ? files
+        : files.filter((file) => matchesInclude(parsed.include!, file));
+      const lines: string[] = [];
+      for (const file of filtered) {
+        let content: string;
+        try {
+          content = await readFile(file.absolutePath, "utf-8");
+        } catch {
+          continue;
+        }
+        const fileLines = content.split("\n");
+        for (let index = 0; index < fileLines.length; index++) {
+          if (regex.test(fileLines[index]!)) {
+            lines.push(`${file.displayPath}:${index + 1}: ${fileLines[index]!}`);
+          }
+        }
+      }
+      return lines.length === 0 ? "No matches found." : lines.join("\n");
     },
   };
 }
@@ -427,6 +603,8 @@ export function createCLIToolkit(options: CLIToolkitOptions): CLIToolkit {
   return {
     tools: [
       createReadTool(options),
+      createGlobTool(options),
+      createGrepTool(options),
       createWriteTool(options),
       createDeleteTool(options),
       createMoveTool(options),

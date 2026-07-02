@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -25,6 +25,61 @@ describe("createCLIToolkit", () => {
 
     const read = toolkit.tools.find((tool) => tool.name === "read")!;
     expect(await read.execute({ path: "a.txt" })).toBe("hello");
+  });
+
+  it("provides workspace-aware glob and grep tools", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-search-"));
+    await mkdir(join(baseDir, "src"), { recursive: true });
+    await mkdir(join(baseDir, "node_modules", "pkg"), { recursive: true });
+    await writeFile(join(baseDir, "src", "a.ts"), "hello\nline2", "utf-8");
+    await writeFile(join(baseDir, "src", "b.test.ts"), "hello test", "utf-8");
+    await writeFile(join(baseDir, "src", "notes.md"), "hello docs", "utf-8");
+    await writeFile(join(baseDir, "node_modules", "pkg", "hidden.ts"), "hello hidden", "utf-8");
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+    });
+
+    const names = toolkit.tools.map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(["glob", "grep"]));
+    const glob = toolkit.tools.find((tool) => tool.name === "glob")!;
+    const grep = toolkit.tools.find((tool) => tool.name === "grep")!;
+
+    await expect(glob.execute({ pattern: "**/*.ts", path: "." }))
+      .resolves.toBe("src/a.ts\nsrc/b.test.ts");
+    await expect(grep.execute({ pattern: "hello", path: "src", include: "*.ts" }))
+      .resolves.toBe("src/a.ts:1: hello\nsrc/b.test.ts:1: hello test");
+    await expect(glob.execute({ pattern: "*", path: ".." }))
+      .rejects.toThrow("Path escapes workspace");
+  });
+
+  it("checks permissions before glob and grep tools", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-search-permission-"));
+    await writeFile(join(baseDir, "a.ts"), "hello", "utf-8");
+    const requestApproval = vi.fn(async () => false);
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({
+        "*": "allow",
+        glob: "ask",
+        grep: "ask",
+      }),
+      getAutoApprove: () => false,
+      requestApproval,
+      shellService: { execute: vi.fn() },
+    });
+    const glob = toolkit.tools.find((tool) => tool.name === "glob")!;
+    const grep = toolkit.tools.find((tool) => tool.name === "grep")!;
+
+    await expect(glob.execute({ pattern: "**/*.ts", path: "." }))
+      .rejects.toThrow("Permission rejected for glob");
+    await expect(grep.execute({ pattern: "hello", path: "." }))
+      .rejects.toThrow("Permission rejected for grep");
+    expect(requestApproval).toHaveBeenCalledWith("glob", { pattern: "**/*.ts", path: "." });
+    expect(requestApproval).toHaveBeenCalledWith("grep", { pattern: "hello", path: "." });
   });
 
   it("records snapshots for write and edit tools", async () => {
