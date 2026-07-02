@@ -115,4 +115,24 @@ describe("runCommandList", () => {
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"commands\""));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints custom command load errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-command-list-"));
+    await writeCustomCommand(baseDir, "broken", [
+      "---",
+      "description: Broken",
+      "",
+      "No closing frontmatter",
+    ].join("\n"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runCommandList({
+      baseDir,
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Custom command frontmatter is not closed\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

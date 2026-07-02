@@ -1,4 +1,5 @@
 import { loadConfig, type CLIConfig, type LoadConfigOptions } from "./config.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
 export type ShowConfigOutput = "text" | "json";
@@ -6,10 +7,6 @@ export type ShowConfigOutput = "text" | "json";
 export interface ShowConfigRequest extends LoadConfigOptions {
   baseDir: string;
   output?: ShowConfigOutput;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function formatShowConfigJson(config: unknown): string {
@@ -29,12 +26,13 @@ export async function runShowConfig(
   request: ShowConfigRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const config = await loadConfigForDisplay(request);
     streams.stdout(formatShowConfigJson(config));
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

@@ -97,4 +97,24 @@ describe("runModelList", () => {
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"models\""));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints config load errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-list-models-"));
+    await mkdir(join(baseDir, ".cliagent"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "config.json"), "{", "utf-8");
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runModelList({
+      baseDir,
+      output: "json",
+      platform: "linux",
+      env: {},
+      homeDir: baseDir,
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"ok\": false"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"error\""));
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

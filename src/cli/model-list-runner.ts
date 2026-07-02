@@ -4,6 +4,7 @@ import {
   type CLIConfig,
   type LoadConfigOptions,
 } from "./config.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
 export type ModelListOutput = "text" | "json";
@@ -20,10 +21,6 @@ export interface ConfiguredModelInfo {
   name: string;
   displayName?: string;
   default: boolean;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function isDefaultModel(
@@ -88,17 +85,18 @@ export async function runModelList(
   request: ModelListRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const config = await loadConfigForModelList(request);
     const models = listConfiguredModels(config);
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatModelListJson(config.defaultModel, models)
         : formatModelList(models),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

@@ -1,4 +1,5 @@
 import { registerBuiltinCommands } from "./commands/builtin.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createCommandRegistry } from "./runtime/command-registry.js";
 import { loadCustomCommands } from "./runtime/custom-command-service.js";
@@ -18,10 +19,6 @@ export interface CommandListItem {
   description: string;
   usage: string;
   source: CommandListSource;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function toCommandListItem(command: CLICommand, source: CommandListSource): CommandListItem {
@@ -86,16 +83,17 @@ export async function runCommandList(
   request: CommandListRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const commands = await listAvailableCommands(request.baseDir);
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatCommandListJson(commands)
         : formatCommandList(commands),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }
