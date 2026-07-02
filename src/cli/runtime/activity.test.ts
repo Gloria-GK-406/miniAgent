@@ -74,4 +74,31 @@ describe("activity helpers", () => {
 
     expect(completed?.status).toBe("error");
   });
+
+  it("marks shell shortcut status suffixes as failed", () => {
+    const running = createActivityEntry(toolCall("shell"), "2026-07-02T00:00:00.000Z");
+
+    const [exitCode] = completeActivityEntry(
+      [running],
+      toolCall("shell"),
+      toolResult("[No output]\n[Exit code: 7]"),
+      "2026-07-02T00:00:01.000Z",
+    );
+    const [timedOut] = completeActivityEntry(
+      [running],
+      toolCall("shell"),
+      toolResult("[No output]\n[Timed out]"),
+      "2026-07-02T00:00:01.000Z",
+    );
+    const [aborted] = completeActivityEntry(
+      [running],
+      toolCall("shell"),
+      toolResult("[No output]\n[Aborted]"),
+      "2026-07-02T00:00:01.000Z",
+    );
+
+    expect(exitCode?.status).toBe("error");
+    expect(timedOut?.status).toBe("error");
+    expect(aborted?.status).toBe("error");
+  });
 });

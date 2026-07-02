@@ -31,7 +31,9 @@ function resultStatus(summary: string): CLIActivityEntry["status"] {
     normalized.startsWith("error") ||
     normalized.startsWith("failed") ||
     normalized.startsWith("tool not found") ||
-    normalized.includes("[exit code:")
+    normalized.includes("[exit code:") ||
+    normalized.includes("[timed out]") ||
+    normalized.includes("[aborted]")
   ) {
     return "error";
   }
@@ -58,8 +60,9 @@ export function completeActivityEntry(
   result: ToolResultMessage,
   endedAt: string,
 ): CLIActivityEntry[] {
-  const summary = compactText(contentToText(result.content), "(no output)");
-  const status = resultStatus(summary);
+  const resultText = contentToText(result.content);
+  const summary = compactText(resultText, "(no output)");
+  const status = resultStatus(resultText);
   let found = false;
   const nextEntries = entries.map((entry) => {
     if (entry.id !== toolCall.toolCallId) return entry;
