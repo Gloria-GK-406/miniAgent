@@ -206,6 +206,75 @@ describe("createCLIToolkit", () => {
     ]);
   });
 
+  it("moves workspace files with source and destination snapshots", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-move-"));
+    await writeFile(join(baseDir, "source.txt"), "move me", "utf-8");
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => session.id,
+      getActiveTurnId: () => "turn-move",
+    });
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      snapshotService,
+      onWorkspaceFilesChanged,
+    });
+    const move = toolkit.tools.find((tool) => tool.name === "move")!;
+
+    await expect(move.execute({ source: "source.txt", destination: "nested/dest.txt" }))
+      .resolves.toBe("Moved source.txt to nested/dest.txt");
+
+    await expect(readFile(join(baseDir, "source.txt"), "utf-8")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(join(baseDir, "nested", "dest.txt"), "utf-8")).resolves.toBe("move me");
+    expect(onWorkspaceFilesChanged).toHaveBeenCalledTimes(1);
+    expect(await snapshotService.listTurnSnapshots("turn-move")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayPath: "nested/dest.txt",
+          beforeExists: false,
+          afterExists: true,
+          afterContent: "move me",
+        }),
+        expect.objectContaining({
+          displayPath: "source.txt",
+          beforeExists: true,
+          beforeContent: "move me",
+          afterExists: false,
+        }),
+      ]),
+    );
+  });
+
+  it("refuses to move over an existing file", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-move-existing-"));
+    await writeFile(join(baseDir, "source.txt"), "source", "utf-8");
+    await writeFile(join(baseDir, "dest.txt"), "dest", "utf-8");
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      onWorkspaceFilesChanged,
+    });
+    const move = toolkit.tools.find((tool) => tool.name === "move")!;
+
+    await expect(move.execute({ source: "source.txt", destination: "dest.txt" }))
+      .rejects.toThrow("Destination already exists: dest.txt");
+    await expect(readFile(join(baseDir, "source.txt"), "utf-8")).resolves.toBe("source");
+    await expect(readFile(join(baseDir, "dest.txt"), "utf-8")).resolves.toBe("dest");
+    expect(onWorkspaceFilesChanged).not.toHaveBeenCalled();
+  });
+
   it("applies a simple single-file unified patch", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-patch-"));
     await writeFile(join(baseDir, "a.txt"), "alpha\nbeta\ngamma\n", "utf-8");

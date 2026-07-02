@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import type { Tool } from "../../tool/types.js";
@@ -18,6 +18,11 @@ const ReadParamsSchema = PathParamsSchema.extend({
 
 const WriteParamsSchema = PathParamsSchema.extend({
   content: z.string(),
+});
+
+const MoveParamsSchema = z.object({
+  source: z.string().min(1),
+  destination: z.string().min(1),
 });
 
 const EditParamsSchema = PathParamsSchema.extend({
@@ -74,14 +79,19 @@ async function mutateWithSnapshot(
   options: CLIToolkitOptions,
   path: string,
   mutate: () => Promise<void>,
+  notify = true,
 ): Promise<void> {
   if (options.snapshotService === undefined) {
     await mutate();
-    await options.onWorkspaceFilesChanged?.();
+    if (notify) {
+      await options.onWorkspaceFilesChanged?.();
+    }
     return;
   }
   await options.snapshotService.recordBeforeMutation(path, mutate);
-  await options.onWorkspaceFilesChanged?.();
+  if (notify) {
+    await options.onWorkspaceFilesChanged?.();
+  }
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -242,6 +252,36 @@ function createDeleteTool(options: CLIToolkitOptions): Tool {
   };
 }
 
+function createMoveTool(options: CLIToolkitOptions): Tool {
+  return {
+    name: "move",
+    description: "Move or rename a workspace file without overwriting the destination.",
+    parameters: MoveParamsSchema,
+    execute: async (args): Promise<string> => {
+      await assertPermission(options, "move", args);
+      const parsed = MoveParamsSchema.parse(args);
+      const source = resolveWorkspacePath(options.baseDir, parsed.source);
+      const destination = resolveWorkspacePath(options.baseDir, parsed.destination);
+      const info = await stat(source.absolutePath);
+      if (info.isDirectory()) {
+        throw new Error(`Cannot move directory ${source.displayPath}`);
+      }
+      if (await pathExists(destination.absolutePath)) {
+        throw new Error(`Destination already exists: ${destination.displayPath}`);
+      }
+
+      await mutateWithSnapshot(options, parsed.source, async () => {
+        await mutateWithSnapshot(options, parsed.destination, async () => {
+          await mkdir(dirname(destination.absolutePath), { recursive: true });
+          await rename(source.absolutePath, destination.absolutePath);
+        }, false);
+      }, false);
+      await options.onWorkspaceFilesChanged?.();
+      return `Moved ${source.displayPath} to ${destination.displayPath}`;
+    },
+  };
+}
+
 function createEditTool(options: CLIToolkitOptions): Tool {
   return {
     name: "edit",
@@ -389,6 +429,7 @@ export function createCLIToolkit(options: CLIToolkitOptions): CLIToolkit {
       createReadTool(options),
       createWriteTool(options),
       createDeleteTool(options),
+      createMoveTool(options),
       createEditTool(options),
       createMultiEditTool(options),
       createPatchTool(options),
