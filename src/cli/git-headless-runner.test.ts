@@ -119,4 +119,19 @@ describe("runGitHeadless", () => {
     expect(stdout).not.toHaveBeenCalled();
     expect(stderr).toHaveBeenCalledWith("Not a git repository\n");
   });
+
+  it("prints repository errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-git-headless-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runGitHeadless({
+      baseDir,
+      action: "status",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Not a git repository\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

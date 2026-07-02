@@ -1,4 +1,5 @@
 import { loadConfig } from "./config.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createDiagnosticsService, type DiagnosticResult, type DiagnosticsService } from "./runtime/diagnostics-service.js";
 import { createShellService } from "./runtime/shell-service.js";
@@ -11,10 +12,6 @@ export interface HeadlessDiagnosticsRequest {
 }
 
 export type HeadlessDiagnosticsDeps = Pick<DiagnosticsService, "runDiagnostics">;
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function diagnosticPassed(result: DiagnosticResult): boolean {
   return result.exitCode === 0 && !result.timedOut && !result.aborted;
@@ -61,17 +58,18 @@ export async function runHeadlessDiagnostics(
   streams: PrintStreams,
   deps?: HeadlessDiagnosticsDeps,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const service = deps ?? await createDefaultDiagnosticsService(request.baseDir);
     const results = await service.runDiagnostics();
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatDiagnosticsJson(results)
         : formatDiagnosticsText(results),
     );
     return results.every(diagnosticPassed) ? 0 : 1;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

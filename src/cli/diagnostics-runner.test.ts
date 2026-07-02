@@ -94,4 +94,21 @@ describe("runHeadlessDiagnostics", () => {
     expect(stdout).toHaveBeenCalledWith(formatDiagnosticsJson([passResult]));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints thrown diagnostics errors as json when requested", async () => {
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runHeadlessDiagnostics({
+      baseDir: process.cwd(),
+      output: "json",
+    }, { stdout, stderr }, {
+      runDiagnostics: async () => {
+        throw new Error("diagnostics unavailable");
+      },
+    })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"diagnostics unavailable\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

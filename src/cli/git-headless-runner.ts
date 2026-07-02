@@ -1,4 +1,5 @@
 import type { PrintStreams } from "./print-runner.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import { createGitService } from "./runtime/git-service.js";
 
 export type GitHeadlessAction = "status" | "log" | "diff";
@@ -17,10 +18,6 @@ export interface GitHeadlessResult {
   ok: boolean;
   action: GitHeadlessAction;
   content: string;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function ensureTrailingNewline(text: string): string {
@@ -52,10 +49,11 @@ export async function runGitHeadless(
   request: GitHeadlessRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const service = createGitService(request.baseDir);
     if (!(await service.isRepository())) {
-      streams.stderr("Not a git repository\n");
+      writeHeadlessError(streams, "Not a git repository", output);
       return 1;
     }
 
@@ -83,13 +81,13 @@ export async function runGitHeadless(
       content,
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatGitHeadlessResultJson(result)
         : formatGitHeadlessText(result),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }
