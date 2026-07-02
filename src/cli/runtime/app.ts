@@ -164,6 +164,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     baseDir,
     mode: () => activeMode,
     getConfig: () => config,
+    getActiveSessionId: () => state.sessionId,
     permissionService,
     getAutoApprove: () => state.autoApprove,
     requestApproval,

@@ -113,6 +113,7 @@ export interface CLIAgentFactoryOptions {
   baseDir: string;
   mode: CLIAgentMode | (() => CLIAgentMode);
   getConfig?: () => CLIConfig;
+  getActiveSessionId?: () => string;
   permissionService: PermissionService;
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
@@ -204,6 +205,20 @@ export function buildSubagentAgentConfig(
   });
 }
 
+export function resolveSubagentSessionId(
+  getActiveSessionId: (() => string | undefined) | undefined,
+  fallbackSessionId: string | undefined,
+): string {
+  const activeSessionId = getActiveSessionId?.()?.trim();
+  if (activeSessionId !== undefined && activeSessionId.length > 0) {
+    return activeSessionId;
+  }
+  if (fallbackSessionId !== undefined && fallbackSessionId.length > 0) {
+    return fallbackSessionId;
+  }
+  return "temp";
+}
+
 export async function createCLIAgentFactory(
   options: CLIAgentFactoryOptions,
 ): Promise<CLIAgentFactory> {
@@ -251,14 +266,17 @@ function createConfiguredSubagentFactory(
       throw new Error("Parent agent is not initialized for subagent creation.");
     }
 
-    const active = sessionManager.getActive();
-    const sessionId = active?.id ?? "temp";
+    const activeConfig = options.getConfig?.() ?? config;
+    const sessionId = resolveSubagentSessionId(
+      options.getActiveSessionId,
+      sessionManager.getActive()?.id,
+    );
     const persistDir = sessionManager.getSessionPersistDir(sessionId);
     const currentModel = request.entry.model !== undefined
       ? findResolvedModelForCLI(parentAgent.getModels(), request.entry.model)
       : parentAgent.getCurrentResolvedModel();
     const agentConfig = buildSubagentAgentConfig({
-      providers: toAgentProviders(config),
+      providers: toAgentProviders(activeConfig),
       currentModel,
       generation: parentAgent.getGenerationConfig(),
       paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
@@ -269,8 +287,8 @@ function createConfiguredSubagentFactory(
       subagentFactory: factory,
     });
     const blueprint = createCLIBlueprint({
-      config,
-      engines: uniqueEngines(config),
+      config: activeConfig,
+      engines: uniqueEngines(activeConfig),
       persistDir: agentConfig.paths.sessiondir,
       systemPrompt: {
         prompt: request.entry.prompt,

@@ -15,6 +15,7 @@ import {
   createCLIAgentFactory,
   formatResolvedModelPath,
   getResolvedModelPaths,
+  resolveSubagentSessionId,
   selectResolvedModelForCLI,
 } from "./agent-factory.js";
 import { createPermissionService } from "./permission-service.js";
@@ -279,6 +280,15 @@ describe("createCLIAgentFactory", () => {
       generation,
       paths: { sessiondir: "/tmp/subagent-session" },
     });
+  });
+
+  it("resolves subagent session ids from the runtime active session first", () => {
+    expect(resolveSubagentSessionId(() => "runtime-session", "factory-session"))
+      .toBe("runtime-session");
+    expect(resolveSubagentSessionId(undefined, "factory-session"))
+      .toBe("factory-session");
+    expect(resolveSubagentSessionId(undefined, undefined))
+      .toBe("temp");
   });
 
   it("rejects unknown provider engines while building the runtime agent", async () => {
