@@ -601,6 +601,33 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("keeps hidden project custom commands executable but out of help", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-hidden-custom-command-"));
+    await writeConfig(baseDir);
+    await mkdir(join(baseDir, ".cliagent", "commands"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "commands", "internal.md"), [
+      "---",
+      "description: Internal macro",
+      "usage: /internal",
+      "hidden: true",
+      "---",
+      "",
+      "/help",
+    ].join("\n"), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+
+    expect(runtime.getState().commandSuggestions).not.toContain("/internal");
+    expect(runtime.getState().commandHelp).not.toContainEqual(expect.objectContaining({
+      name: "internal",
+    }));
+
+    await runtime.submitInput("/internal");
+
+    expect(runtime.getState().panel).toEqual({ type: "help" });
+    await runtime.destroy();
+  });
+
   it("skips project custom commands whose aliases conflict with built-in commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-custom-command-alias-conflict-"));
     await writeConfig(baseDir);

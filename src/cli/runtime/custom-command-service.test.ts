@@ -112,6 +112,27 @@ describe("loadCustomCommands", () => {
     });
   });
 
+  it("loads usage and hidden metadata from frontmatter", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-custom-command-metadata-"));
+    await writeCommand(baseDir, "review", [
+      "---",
+      "description: Review changes",
+      "usage: /review <files>",
+      "hidden: true",
+      "---",
+      "",
+      "Review this: {{args}}",
+    ].join("\n"));
+
+    const [command] = await loadCustomCommands(baseDir);
+
+    expect(command).toMatchObject({
+      name: "review",
+      usage: "/review <files>",
+      hidden: true,
+    });
+  });
+
   it("passes agent and model frontmatter as scoped input overrides", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-custom-command-overrides-"));
     await writeCommand(baseDir, "review", [

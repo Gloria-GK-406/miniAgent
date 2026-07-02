@@ -105,6 +105,23 @@ describe("listAvailableCommands", () => {
 
     expect(commands.some((command) => command.name === "review")).toBe(false);
   });
+
+  it("excludes hidden custom commands from command discovery", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-command-list-hidden-"));
+    await writeCustomCommand(baseDir, "internal", [
+      "---",
+      "description: Internal macro",
+      "usage: /internal",
+      "hidden: true",
+      "---",
+      "",
+      "Internal workflow",
+    ].join("\n"));
+
+    const commands = await listAvailableCommands(baseDir);
+
+    expect(commands.some((command) => command.name === "internal")).toBe(false);
+  });
 });
 
 describe("runCommandList", () => {
