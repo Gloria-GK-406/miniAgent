@@ -32,6 +32,7 @@ import { createPermissionService } from "./permission-service.js";
 import { createPermissionConfigService } from "./permission-config-service.js";
 import { createProjectInstructionsService } from "./project-instructions-service.js";
 import { createReferenceService } from "./reference-service.js";
+import { createReferenceTurnContextAppender } from "./reference-turn-context.js";
 import { createShellService } from "./shell-service.js";
 import { createCLISessionService } from "./session-service.js";
 import { createSnapshotService } from "./snapshot-service.js";
@@ -91,6 +92,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   let activeTurnId: string | null = null;
   let activeMode = sessionRuntimeMetadata.mode ?? config.defaultAgent;
   const referenceService = createReferenceService(baseDir);
+  const referenceTurnContextAppender = createReferenceTurnContextAppender();
   const snapshotService = createSnapshotService({
     baseDir,
     sessionService,
@@ -129,6 +131,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     onWorkspaceFilesChanged: refreshReferencePaths,
   });
   let built = await factory.build(session.id);
+  built.agent.register(referenceTurnContextAppender);
 
   function applySessionModelPreference(meta: SessionMeta): void {
     if (meta.model === undefined) {
@@ -234,6 +237,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     const previous = built.agent;
     const active = sessionService.getActiveSession();
     built = await factory.build(state.sessionId);
+    built.agent.register(referenceTurnContextAppender);
     applySessionModelPreference(active);
     await previous.destroy();
     bindAgentEvents();
@@ -325,6 +329,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     const runtimeMetadata = await sessionService.readSessionRuntimeMetadata(active.id);
     activeMode = runtimeMetadata.mode ?? config.defaultAgent;
     built = await factory.build(active.id);
+    built.agent.register(referenceTurnContextAppender);
     applySessionModelPreference(active);
     await previous.destroy();
     bindAgentEvents();
@@ -368,10 +373,12 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
             content: result.content,
           };
           activeTurnId = message.id;
+          referenceTurnContextAppender.setReferences(result.references);
           try {
             await built.agent.run(message);
           } finally {
             activeTurnId = null;
+            referenceTurnContextAppender.clear();
           }
         }
         if (result.type === "shell") {

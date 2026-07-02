@@ -164,7 +164,7 @@ describe("InputRouter", () => {
     expect(shell.execute).not.toHaveBeenCalled();
   });
 
-  it("routes normal prompts with references", async () => {
+  it("routes normal prompts with turn-only references", async () => {
     const refs = [{
       token: "@a.ts",
       path: "/repo/a.ts",
@@ -181,15 +181,8 @@ describe("InputRouter", () => {
 
     expect(result).toEqual({
       type: "prompt",
-      content: [
-        "Explain @a.ts",
-        "",
-        "[Referenced files]",
-        "File: a.ts",
-        "```",
-        "const a = 1;",
-        "```",
-      ].join("\n"),
+      content: "Explain @a.ts",
+      references: refs,
     });
   });
 });

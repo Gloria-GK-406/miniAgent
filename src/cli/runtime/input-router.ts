@@ -7,7 +7,7 @@ import type { CLICommandContext } from "./types.js";
 export type RoutedInputResult =
   | { type: "command" }
   | { type: "shell"; content: string }
-  | { type: "prompt"; content: string };
+  | { type: "prompt"; content: string; references: ResolvedReference[] };
 
 export interface InputRouterDeps {
   commandRegistry: Pick<CommandRegistry, "execute">;
@@ -21,27 +21,6 @@ export interface InputRouterDeps {
 
 export interface InputRouter {
   route(ctx: CLICommandContext, input: string): Promise<RoutedInputResult>;
-}
-
-function formatReferenceRange(ref: ResolvedReference): string {
-  if (ref.startLine === undefined) {
-    return "";
-  }
-  const endLine = ref.endLine ?? ref.startLine;
-  return `:${ref.startLine}${endLine !== ref.startLine ? `-${endLine}` : ""}`;
-}
-
-function renderReferences(references: ResolvedReference[]): string {
-  if (references.length === 0) {
-    return "";
-  }
-  const blocks = references.flatMap((ref) => [
-    `File: ${ref.displayPath}${formatReferenceRange(ref)}`,
-    "```",
-    ref.content,
-    "```",
-  ]);
-  return ["", "", "[Referenced files]", ...blocks].join("\n");
 }
 
 async function assertShellPermission(deps: InputRouterDeps, command: string): Promise<void> {
@@ -99,7 +78,8 @@ export function createInputRouter(deps: InputRouterDeps): InputRouter {
       const references = await deps.referenceService.resolveReferences(input);
       return {
         type: "prompt",
-        content: `${input}${renderReferences(references)}`,
+        content: input,
+        references,
       };
     },
   };
