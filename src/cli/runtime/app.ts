@@ -1,6 +1,7 @@
 import {
   MessageType,
   type Message,
+  type MessageContent,
   type ToolCallMessage,
   type ToolResultMessage,
 } from "../../core/types.js";
@@ -58,9 +59,53 @@ import type {
   CLICommandHelpSource,
   CLIEvent,
   CLIInputOverrides,
+  CLISessionSearchHit,
   CLIRuntimeSubscriber,
   CLIState,
 } from "./types.js";
+
+function messageContentText(content: MessageContent): string {
+  if (typeof content === "string") return content;
+  if (content.type === "text") return content.text;
+  return "[image]";
+}
+
+function transcriptSearchText(message: Message): string {
+  if (message.type === MessageType.ToolCall) {
+    return `${message.toolName} ${JSON.stringify(message.arguments)}`;
+  }
+  return messageContentText(message.content);
+}
+
+function transcriptSearchRole(
+  message: Message,
+): CLISessionSearchHit["role"] {
+  switch (message.type) {
+    case MessageType.System:
+      return "system";
+    case MessageType.User:
+      return "user";
+    case MessageType.Assist:
+      return "assistant";
+    case MessageType.ToolCall:
+      return "tool-call";
+    case MessageType.ToolResult:
+      return "tool-result";
+  }
+}
+
+function transcriptSearchPreview(text: string, query: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const index = normalized.toLowerCase().indexOf(query.toLowerCase());
+  if (index === -1) {
+    return normalized.length > 120 ? `${normalized.slice(0, 117)}...` : normalized;
+  }
+
+  const start = Math.max(0, index - 40);
+  const end = Math.min(normalized.length, index + query.length + 80);
+  const preview = normalized.slice(start, end);
+  return `${start > 0 ? "..." : ""}${preview}${end < normalized.length ? "..." : ""}`;
+}
 
 function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
   const current = agent.getCurrentResolvedModel();
@@ -728,6 +773,28 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     },
     listTools: async () => await built.agent.getToolList(),
     listTodos: () => built.todoManager.listTodos(),
+    searchSessions: async (query) => {
+      const normalizedQuery = query.toLowerCase();
+      const hits: CLISessionSearchHit[] = [];
+      for (const sessionMeta of sessionService.listSessions()) {
+        const messages = await sessionService.readMessages(sessionMeta.id);
+        messages.forEach((message, index) => {
+          const text = transcriptSearchText(message);
+          if (!text.toLowerCase().includes(normalizedQuery)) {
+            return;
+          }
+          hits.push({
+            sessionId: sessionMeta.id,
+            sessionName: sessionMeta.name,
+            id: message.id,
+            index: index + 1,
+            role: transcriptSearchRole(message),
+            preview: transcriptSearchPreview(text, query),
+          });
+        });
+      }
+      return hits;
+    },
     showActivity: async () => {
       updateState({ panel: { type: "activity", entries: state.activity } });
     },

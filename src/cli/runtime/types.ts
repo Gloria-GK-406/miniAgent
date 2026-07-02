@@ -26,6 +26,7 @@ export type CLIViewPanel =
   | { type: "input-history"; query?: string; entries: CLIInputHistoryPanelEntry[] }
   | { type: "todos"; todos: TodoItemSnapshot[]; query?: string }
   | { type: "search"; query: string; hits: CLITranscriptSearchHit[] }
+  | { type: "search-all"; query: string; hits: CLISessionSearchHit[] }
   | { type: "references"; references: string[] }
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[]; query?: string }
@@ -91,6 +92,11 @@ export interface CLITranscriptSearchHit {
   index: number;
   role: "system" | "user" | "assistant" | "tool-call" | "tool-result";
   preview: string;
+}
+
+export interface CLISessionSearchHit extends CLITranscriptSearchHit {
+  sessionId: string;
+  sessionName: string;
 }
 
 export type CLICommandHelpSource = "builtin" | "custom";
@@ -181,6 +187,7 @@ export interface CLIAppRuntime {
   runDoctor(): Promise<void>;
   listTools(): Promise<Tool[]>;
   listTodos(): TodoItemSnapshot[];
+  searchSessions(query: string): Promise<CLISessionSearchHit[]>;
   showActivity(): Promise<void>;
   showAgents(): Promise<void>;
   initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;

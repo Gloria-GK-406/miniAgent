@@ -218,9 +218,9 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       {state.commandHelp.length === 0 ? (
         <>
           <Text>/about /help /commands /keybindings /status /config /history /input-history</Text>
-          <Text>/context /search /todos /references /tools /models /sessions /activity</Text>
-          <Text>/snapshots /permissions /system /agent build|plan /auto /details /thinking</Text>
-          <Text>/git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/context /search /search-all /todos /references /tools /models /sessions</Text>
+          <Text>/activity /snapshots /permissions /system /agent build|plan /auto</Text>
+          <Text>/details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -508,6 +508,37 @@ function SearchPanel({
         panel.hits.map((hit) => (
           <Box key={`${hit.id}:${hit.index}`} flexDirection="column">
             <Text>
+              <Text color="cyan">#{hit.index} {hit.role}</Text>
+              <Text> {hit.preview}</Text>
+            </Text>
+          </Box>
+        ))
+      )}
+    </StaticPanelFrame>
+  );
+}
+
+function SearchAllPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "search-all" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">
+        Search all sessions "{panel.query}"
+      </Text>
+      <Text dimColor>{pluralMatches(panel.hits.length)}</Text>
+      {panel.hits.length === 0 ? (
+        <Text dimColor>No session matches</Text>
+      ) : (
+        panel.hits.map((hit) => (
+          <Box key={`${hit.sessionId}:${hit.id}:${hit.index}`} flexDirection="column">
+            <Text>
+              <Text color="cyan">{hit.sessionName}</Text>
+              <Text dimColor> ({hit.sessionId.slice(0, 8)}) </Text>
               <Text color="cyan">#{hit.index} {hit.role}</Text>
               <Text> {hit.preview}</Text>
             </Text>
@@ -902,6 +933,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "search") {
     return <SearchPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "search-all") {
+    return <SearchAllPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "snapshots") {

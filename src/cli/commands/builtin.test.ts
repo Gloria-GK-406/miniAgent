@@ -79,6 +79,7 @@ describe("registerBuiltinCommands", () => {
       "input-history",
       "references",
       "search",
+      "search-all",
       "todos",
       "snapshots",
       "tools",
@@ -318,6 +319,53 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.getState().panel).toEqual({
       type: "error",
       message: "Usage: /search <query>",
+    });
+  });
+
+  it("opens cross-session search panel from alias", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.searchSessions = vi.fn(async () => [
+      {
+        sessionId: "session-1",
+        sessionName: "default",
+        id: "u1",
+        index: 2,
+        role: "user",
+        preview: "Debug cache issue",
+      },
+    ]);
+
+    await registry.execute(commandCtx, "/history-search cache");
+
+    expect(commandCtx.runtime.searchSessions).toHaveBeenCalledWith("cache");
+    expect(commandCtx.getState().panel).toEqual({
+      type: "search-all",
+      query: "cache",
+      hits: [
+        {
+          sessionId: "session-1",
+          sessionName: "default",
+          id: "u1",
+          index: 2,
+          role: "user",
+          preview: "Debug cache issue",
+        },
+      ],
+    });
+  });
+
+  it("shows an error panel for empty cross-session search", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/search-all");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /search-all <query>",
     });
   });
 

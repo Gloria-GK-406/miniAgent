@@ -132,6 +132,43 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("searches transcript content across sessions", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-session-search-"));
+    await writeConfig(baseDir);
+    const sessionService = await createCLISessionService(baseDir);
+    const first = await sessionService.ensureActiveSession();
+    await sessionService.writeMessages(first.id, [
+      { id: "u1", type: MessageType.User, content: "Debug weather cache" },
+    ]);
+    const second = await sessionService.createSession("investigation");
+    await sessionService.writeMessages(second.id, [
+      { id: "a1", type: MessageType.Assist, content: "The weather issue is fixed" },
+    ]);
+
+    const runtime = await createCLIRuntime(baseDir);
+    const hits = await runtime.searchSessions("WEATHER");
+
+    expect(hits).toEqual([
+      expect.objectContaining({
+        sessionId: second.id,
+        sessionName: "investigation",
+        id: "a1",
+        index: 1,
+        role: "assistant",
+        preview: "The weather issue is fixed",
+      }),
+      expect.objectContaining({
+        sessionId: first.id,
+        sessionName: "default",
+        id: "u1",
+        index: 1,
+        role: "user",
+        preview: "Debug weather cache",
+      }),
+    ]);
+    await runtime.destroy();
+  });
+
   it("selects a model from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-model-command-"));
     await writeConfig(baseDir, {

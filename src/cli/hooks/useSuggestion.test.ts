@@ -33,7 +33,7 @@ describe("matchSuggestions", () => {
 
   it("matches /h to help and history", () => {
     const result = matchSuggestions("/h");
-    expect(result).toEqual(["/help", "/history"]);
+    expect(result).toEqual(["/help", "/history", "/history-search"]);
   });
 
   it("matches about and version commands", () => {
@@ -169,8 +169,14 @@ describe("matchSuggestions", () => {
   });
 
   it("matches transcript search commands", () => {
-    expect(matchSuggestions("/sea")).toEqual(["/search"]);
+    expect(matchSuggestions("/sea")).toEqual(["/search", "/search-all"]);
     expect(matchSuggestions("/fi")).toEqual(["/find"]);
+  });
+
+  it("matches cross-session search commands", () => {
+    expect(matchSuggestions("/search-a")).toEqual(["/search-all"]);
+    expect(matchSuggestions("/history-s")).toEqual(["/history-search"]);
+    expect(matchSuggestions("/grep-s")).toEqual(["/grep-sessions"]);
   });
 
   it("matches input history commands", () => {
@@ -193,7 +199,7 @@ describe("matchSuggestions", () => {
   });
 
   it("matches Phase 3 commands", () => {
-    expect(matchSuggestions("/g")).toEqual(["/git"]);
+    expect(matchSuggestions("/g")).toEqual(["/git", "/grep-sessions"]);
     expect(matchSuggestions("/di")).toEqual(["/diff", "/diagnostics"]);
     expect(matchSuggestions("/ed")).toEqual(["/editor"]);
     expect(matchSuggestions("/ac")).toEqual(["/activity"]);
@@ -226,7 +232,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/h");
     });
-    expect(result.current.suggestions).toEqual(["/help", "/history"]);
+    expect(result.current.suggestions).toEqual(["/help", "/history", "/history-search"]);
     expect(result.current.selectedIndex).toBe(0);
   });
 
@@ -244,7 +250,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.selectNext();
     });
-    expect(result.current.selectedIndex).toBe(0);
+    expect(result.current.selectedIndex).toBe(2);
   });
 
   it("wraps around with selectNext", () => {
@@ -252,9 +258,10 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/h");
     });
-    expect(result.current.suggestions).toHaveLength(2);
+    expect(result.current.suggestions).toHaveLength(3);
 
     act(() => {
+      result.current.selectNext();
       result.current.selectNext();
       result.current.selectNext();
     });
@@ -270,7 +277,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.selectPrev();
     });
-    expect(result.current.selectedIndex).toBe(1);
+    expect(result.current.selectedIndex).toBe(2);
   });
 
   it("resets selection on new input", () => {
@@ -368,6 +375,11 @@ describe("useSuggestion", () => {
   it("adds a trailing space for transcript search completion", () => {
     expect(applySuggestion("/sea", "/search")).toBe("/search ");
     expect(applySuggestion("/fi", "/find")).toBe("/find ");
+  });
+
+  it("adds a trailing space for cross-session search completion", () => {
+    expect(applySuggestion("/search-a", "/search-all")).toBe("/search-all ");
+    expect(applySuggestion("/history-s", "/history-search")).toBe("/history-search ");
   });
 
   it("adds a trailing space for tools query completion", () => {

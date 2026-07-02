@@ -105,6 +105,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     runDoctor: vi.fn(async () => undefined),
     listTools: vi.fn(async () => []),
     listTodos: vi.fn(() => []),
+    searchSessions: vi.fn(async () => []),
     showActivity: vi.fn(async () => undefined),
     showAgents: vi.fn(async () => undefined),
     initializeProjectInstructions: vi.fn(async () => ({ written: true, path: "AGENTS.md" })),
@@ -791,6 +792,62 @@ describe("App", () => {
 
     expect(output).toContain('Search "missing"');
     expect(output).toContain("No transcript matches");
+  });
+
+  it("renders cross-session search panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "search-all",
+          query: "cache",
+          hits: [
+            {
+              sessionId: "session-1",
+              sessionName: "default",
+              id: "u1",
+              index: 2,
+              role: "user",
+              preview: "Debug cache issue",
+            },
+            {
+              sessionId: "session-2",
+              sessionName: "investigation",
+              id: "a1",
+              index: 1,
+              role: "assistant",
+              preview: "Cache is fixed",
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Search all sessions "cache"');
+    expect(output).toContain("2 matches");
+    expect(output).toContain("default");
+    expect(output).toContain("session-");
+    expect(output).toContain("#2 user");
+    expect(output).toContain("Debug cache issue");
+    expect(output).toContain("investigation");
+    expect(output).toContain("#1 assistant");
+    expect(output).toContain("Cache is fixed");
+  });
+
+  it("renders empty cross-session search state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "search-all",
+          query: "missing",
+          hits: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Search all sessions "missing"');
+    expect(output).toContain("No session matches");
   });
 
   it("renders empty references panel state", () => {

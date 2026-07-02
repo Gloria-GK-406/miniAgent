@@ -380,6 +380,26 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "search-all",
+    aliases: ["history-search", "grep-sessions"],
+    description: "Search all session transcripts",
+    usage: "/search-all <query>",
+    execute: async (ctx, args) => {
+      const query = args.trim();
+      if (query.length === 0) {
+        ctx.updateState({ panel: { type: "error", message: "Usage: /search-all <query>" } });
+        return;
+      }
+      ctx.updateState({
+        panel: {
+          type: "search-all",
+          query,
+          hits: await ctx.runtime.searchSessions(query),
+        },
+      });
+    },
+  });
+  registry.register({
     name: "todos",
     aliases: ["todo", "tasks"],
     description: "Show agent todo list",
