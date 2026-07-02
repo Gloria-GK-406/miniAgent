@@ -16,7 +16,7 @@ import { ActivityView } from "./ActivityView.js";
 import { ApprovalPrompt } from "./ApprovalPrompt.js";
 import { PermissionsView } from "./PermissionsView.js";
 import { SystemPromptView } from "./SystemPromptView.js";
-import { createPermissionService } from "../runtime/permission-service.js";
+import { createModeAwarePermissionService, createPermissionService } from "../runtime/permission-service.js";
 import type { CLIAgentMode, CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 
 export interface AppProps {
@@ -183,7 +183,10 @@ function ToolsPanel({
 }) {
   const state = runtime.getState();
   const permission = state.config.permission ?? ({ "*": "ask" } satisfies CLIPermissionConfig);
-  const permissionService = createPermissionService(permission);
+  const permissionService = createModeAwarePermissionService({
+    base: createPermissionService(permission),
+    getMode: () => state.mode,
+  });
 
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>

@@ -631,6 +631,42 @@ describe("App", () => {
     expect(output).toContain("ASK shell");
   });
 
+  it("renders plan-mode permission guards in the tools panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        mode: "plan",
+        autoApprove: true,
+        config: CLIConfigSchema.parse({
+          permission: {
+            "*": "allow",
+          },
+        }),
+        panel: {
+          type: "tools",
+          tools: [
+            {
+              name: "read",
+              description: "Read files",
+              parameters: z.object({}),
+              execute: vi.fn(async () => ""),
+            },
+            {
+              name: "write",
+              description: "Write files",
+              parameters: z.object({}),
+              execute: vi.fn(async () => ""),
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("ALLOW read");
+    expect(output).toContain("ASK write");
+    expect(output).toContain("plan mode default write");
+  });
+
   it("renders system prompt panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({
