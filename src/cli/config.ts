@@ -59,6 +59,16 @@ export const CLIShellConfigSchema = z
   });
 export type CLIShellConfig = z.infer<typeof CLIShellConfigSchema>;
 
+export const CLIEditorConfigSchema = z
+  .object({
+    executable: z.string().min(1).optional(),
+    args: z.array(z.string()).optional(),
+    wait: z.boolean().optional(),
+  })
+  .strict()
+  .default({});
+export type CLIEditorConfig = z.infer<typeof CLIEditorConfigSchema>;
+
 export const CLITUIConfigSchema = z
   .object({
     showReasoning: z.boolean().default(false),
@@ -78,6 +88,7 @@ export const CLIConfigSchema = z
     defaultAgent: CLIAgentModeSchema.default("build"),
     permission: CLIPermissionConfigSchema,
     shell: CLIShellConfigSchema,
+    editor: CLIEditorConfigSchema,
     tui: CLITUIConfigSchema,
     generation: GenerationConfigSchema.partial().optional(),
     systemPrompt: z.string().optional(),
@@ -148,6 +159,7 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
         windows: "powershell",
         timeoutMs: 120000,
       },
+      editor: {},
       tui: {
         showReasoning: false,
         showToolDetails: false,

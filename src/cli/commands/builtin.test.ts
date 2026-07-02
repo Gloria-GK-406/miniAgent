@@ -150,6 +150,32 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
   });
 
+  it("submits edited content from the external editor command", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.openEditor = vi.fn(async () => "edited prompt");
+    commandCtx.runtime.submitInput = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/editor initial prompt");
+
+    expect(commandCtx.runtime.openEditor).toHaveBeenCalledWith("initial prompt");
+    expect(commandCtx.runtime.submitInput).toHaveBeenCalledWith("edited prompt");
+  });
+
+  it("does not submit empty edited content", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.openEditor = vi.fn(async () => " \n");
+    commandCtx.runtime.submitInput = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/editor");
+
+    expect(commandCtx.runtime.submitInput).not.toHaveBeenCalled();
+    expect(commandCtx.notice).toHaveBeenCalledWith("info", "Editor returned empty content");
+  });
+
   it("opens sessions panel with session metadata", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);

@@ -232,6 +232,23 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "editor",
+    aliases: ["edit"],
+    description: "Compose input in an external editor",
+    usage: "/editor [initial text]",
+    execute: async (ctx, args) => {
+      await runSessionMutation(ctx, async () => {
+        const edited = await ctx.runtime.openEditor(args);
+        const content = edited.trim();
+        if (content.length === 0) {
+          ctx.notice("info", "Editor returned empty content");
+          return;
+        }
+        await ctx.runtime.submitInput(content);
+      });
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",

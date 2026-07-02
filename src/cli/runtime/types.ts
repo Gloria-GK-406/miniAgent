@@ -81,6 +81,7 @@ export interface CLIAppRuntime {
   showGitStatus(): Promise<void>;
   showGitLog(limit?: number): Promise<void>;
   showDiff(path?: string): Promise<void>;
+  openEditor(initialContent: string): Promise<string>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

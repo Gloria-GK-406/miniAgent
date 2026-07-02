@@ -62,6 +62,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showGitStatus: vi.fn(async () => undefined),
     showGitLog: vi.fn(async () => undefined),
     showDiff: vi.fn(async () => undefined),
+    openEditor: vi.fn(async () => ""),
     destroy: vi.fn(async () => undefined),
   };
 }

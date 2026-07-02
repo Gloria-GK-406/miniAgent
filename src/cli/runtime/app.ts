@@ -8,6 +8,7 @@ import {
   selectResolvedModelForCLI,
 } from "./agent-factory.js";
 import { createCommandRegistry } from "./command-registry.js";
+import { createEditorService } from "./editor-service.js";
 import { loadCustomCommands } from "./custom-command-service.js";
 import { createExportService } from "./export-service.js";
 import { createGitService } from "./git-service.js";
@@ -35,6 +36,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const sessionService = await createCLISessionService(baseDir);
   const session = await sessionService.ensureActiveSession();
   const exportService = createExportService({ baseDir, sessionService });
+  const editorService = createEditorService({ config: config.editor });
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
   const approvalResolvers = new Map<string, (decision: boolean) => void>();
@@ -336,6 +338,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     },
+    openEditor: async (initialContent) => editorService.openEditor(initialContent),
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);

@@ -59,6 +59,7 @@ describe("useRuntime", () => {
       showGitStatus: vi.fn(),
       showGitLog: vi.fn(),
       showDiff: vi.fn(),
+      openEditor: vi.fn(),
       destroy: vi.fn(),
     };
 

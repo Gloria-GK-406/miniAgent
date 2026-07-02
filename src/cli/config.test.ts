@@ -137,6 +137,22 @@ describe("CLI config provider mode", () => {
     });
   });
 
+  it("parses external editor config", () => {
+    const config = CLIConfigSchema.parse({
+      editor: {
+        executable: "code",
+        args: ["--wait"],
+        wait: true,
+      },
+    });
+
+    expect(config.editor).toEqual({
+      executable: "code",
+      args: ["--wait"],
+      wait: true,
+    });
+  });
+
   it("parses nested shell permission patterns", () => {
     const config = CLIConfigSchema.parse({
       permission: {
