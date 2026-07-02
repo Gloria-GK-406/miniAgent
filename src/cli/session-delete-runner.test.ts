@@ -64,4 +64,19 @@ describe("runSessionDelete", () => {
     }));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints delete errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-headless-delete-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runSessionDelete({
+      baseDir,
+      sessionId: "missing",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Session not found: missing\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

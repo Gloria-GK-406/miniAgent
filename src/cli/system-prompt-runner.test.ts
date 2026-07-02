@@ -81,4 +81,19 @@ describe("runSystemPromptUpdate", () => {
     expect(config).not.toContain("Temporary prompt.");
     expect(stdout).toHaveBeenLastCalledWith("Unset system prompt\n");
   });
+
+  it("prints system prompt update errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-system-prompt-headless-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runSystemPromptUpdate({
+      baseDir,
+      action: "set",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Missing system prompt\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

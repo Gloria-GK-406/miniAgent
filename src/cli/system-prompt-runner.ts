@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import type { PrintStreams } from "./print-runner.js";
 import { createSystemPromptConfigService } from "./runtime/system-prompt-config-service.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export type SystemPromptUpdateAction = "set" | "unset";
 export type SystemPromptUpdateOutput = "text" | "json";
@@ -18,10 +19,6 @@ export interface SystemPromptUpdateResult {
   ok: boolean;
   action: SystemPromptUpdateAction;
   systemPrompt?: string;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function resolvePromptFile(baseDir: string, path: string): string {
@@ -50,6 +47,7 @@ export async function runSystemPromptUpdate(
   request: SystemPromptUpdateRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const service = createSystemPromptConfigService(request.baseDir);
     let prompt: string | undefined;
@@ -66,13 +64,13 @@ export async function runSystemPromptUpdate(
       ...(prompt !== undefined && { systemPrompt: prompt }),
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatSystemPromptUpdateResultJson(result)
         : formatSystemPromptUpdateText(result),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

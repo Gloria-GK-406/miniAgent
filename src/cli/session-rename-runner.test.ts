@@ -68,4 +68,20 @@ describe("runSessionRename", () => {
     }));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints rename errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-headless-rename-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runSessionRename({
+      baseDir,
+      sessionId: "missing",
+      name: "Feature",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Session not found: missing\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

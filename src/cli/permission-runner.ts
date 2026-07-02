@@ -1,6 +1,7 @@
 import { loadConfig, type CLIPermissionDecision } from "./config.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createPermissionConfigService } from "./runtime/permission-config-service.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export type PermissionUpdateOutput = "text" | "json";
 export type PermissionUpdateAction = "set" | "unset";
@@ -20,10 +21,6 @@ export interface PermissionUpdateResult {
   decision?: CLIPermissionDecision;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function formatPermissionUpdateResultJson(result: PermissionUpdateResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
@@ -39,6 +36,7 @@ export async function runPermissionUpdate(
   request: PermissionUpdateRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const service = createPermissionConfigService(request.baseDir);
     if (request.action === "set") {
@@ -58,13 +56,13 @@ export async function runPermissionUpdate(
       ...(request.decision !== undefined && { decision: request.decision }),
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatPermissionUpdateResultJson(result)
         : formatPermissionUpdateText(result),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

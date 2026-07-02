@@ -1,5 +1,6 @@
 import type { PrintStreams } from "./print-runner.js";
 import { createCLISessionService } from "./runtime/session-service.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export type SessionForkOutput = "text" | "json";
 
@@ -18,10 +19,6 @@ export interface SessionForkResult {
   messageCount: number;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function formatSessionForkResultJson(result: SessionForkResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
@@ -30,6 +27,7 @@ export async function runSessionFork(
   request: SessionForkRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const sessionService = await createCLISessionService(request.baseDir);
     const session = await sessionService.forkSession(request.sessionId, request.name);
@@ -41,13 +39,13 @@ export async function runSessionFork(
       messageCount: session.messageCount,
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatSessionForkResultJson(result)
         : `${session.id}\n`,
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

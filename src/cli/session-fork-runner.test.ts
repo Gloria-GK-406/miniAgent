@@ -78,4 +78,19 @@ describe("runSessionFork", () => {
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining(`"sourceSessionId": "${sessionId}"`));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints fork errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-headless-fork-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runSessionFork({
+      baseDir,
+      sessionId: "missing",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Session not found: missing\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

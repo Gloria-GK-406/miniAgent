@@ -87,4 +87,20 @@ describe("runPermissionUpdate", () => {
     expect(config).not.toContain("\"write\": \"deny\"");
     expect(stdout).toHaveBeenLastCalledWith("Unset permission write\n");
   });
+
+  it("prints permission update errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-permission-headless-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runPermissionUpdate({
+      baseDir,
+      action: "set",
+      target: "write",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"Missing permission decision\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

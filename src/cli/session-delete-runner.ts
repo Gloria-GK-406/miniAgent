@@ -1,5 +1,6 @@
 import type { PrintStreams } from "./print-runner.js";
 import { createCLISessionService } from "./runtime/session-service.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export type SessionDeleteOutput = "text" | "json";
 
@@ -14,10 +15,6 @@ export interface SessionDeleteResult {
   sessionId: string;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function formatSessionDeleteResultJson(result: SessionDeleteResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
@@ -26,6 +23,7 @@ export async function runSessionDelete(
   request: SessionDeleteRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const sessionService = await createCLISessionService(request.baseDir);
     await sessionService.deleteSession(request.sessionId);
@@ -34,13 +32,13 @@ export async function runSessionDelete(
       sessionId: request.sessionId,
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatSessionDeleteResultJson(result)
         : `Deleted session ${request.sessionId}\n`,
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }
