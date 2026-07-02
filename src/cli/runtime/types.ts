@@ -17,6 +17,8 @@ export type CLIViewPanel =
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[] }
   | { type: "tools"; tools: Tool[] }
+  | { type: "git"; title: string; content: string }
+  | { type: "diff"; title: string; content: string }
   | { type: "error"; message: string };
 
 export interface CLIApprovalRequest {
@@ -76,6 +78,9 @@ export interface CLIAppRuntime {
   undo(): Promise<void>;
   redo(): Promise<void>;
   compactContext(): Promise<void>;
+  showGitStatus(): Promise<void>;
+  showGitLog(limit?: number): Promise<void>;
+  showDiff(path?: string): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

@@ -1,0 +1,88 @@
+import { z } from "zod";
+import type { Tool } from "../../tool/types.js";
+import type { GitService } from "../runtime/git-service.js";
+import type { PermissionService } from "../runtime/permission-service.js";
+
+const EmptyParamsSchema = z.object({}).strict();
+
+const GitDiffParamsSchema = z.object({
+  staged: z.boolean().optional(),
+  path: z.string().min(1).optional(),
+}).strict();
+
+const GitLogParamsSchema = z.object({
+  limit: z.number().int().positive().max(100).optional(),
+}).strict();
+
+const GitCommitParamsSchema = z.object({
+  message: z.string().min(1),
+}).strict();
+
+export interface GitToolkitOptions {
+  gitService: GitService;
+  permissionService: PermissionService;
+  getAutoApprove: () => boolean;
+  requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
+}
+
+export interface GitToolkit {
+  tools: Tool[];
+}
+
+async function assertPermission(
+  options: GitToolkitOptions,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<void> {
+  const result = options.permissionService.resolve({ toolName, args }, options.getAutoApprove());
+  if (result.decision === "deny") {
+    throw new Error(`Permission denied for ${toolName}: ${result.reason}`);
+  }
+  if (result.decision === "ask" && !(await options.requestApproval(toolName, args))) {
+    throw new Error(`Permission rejected for ${toolName}`);
+  }
+}
+
+export function createGitToolkit(options: GitToolkitOptions): GitToolkit {
+  return {
+    tools: [
+      {
+        name: "git_status",
+        description: "Show git status in short porcelain format.",
+        parameters: EmptyParamsSchema,
+        execute: async (args): Promise<string> => {
+          EmptyParamsSchema.parse(args);
+          return options.gitService.statusShort();
+        },
+      },
+      {
+        name: "git_diff",
+        description: "Show git diff for the workspace or a path.",
+        parameters: GitDiffParamsSchema,
+        execute: async (args): Promise<string> => {
+          const parsed = GitDiffParamsSchema.parse(args);
+          return options.gitService.diff(parsed);
+        },
+      },
+      {
+        name: "git_log",
+        description: "Show recent git commits.",
+        parameters: GitLogParamsSchema,
+        execute: async (args): Promise<string> => {
+          const parsed = GitLogParamsSchema.parse(args);
+          return options.gitService.log(parsed);
+        },
+      },
+      {
+        name: "git_commit",
+        description: "Create a git commit with the provided message.",
+        parameters: GitCommitParamsSchema,
+        execute: async (args): Promise<string> => {
+          const parsed = GitCommitParamsSchema.parse(args);
+          await assertPermission(options, "git_commit", parsed);
+          return options.gitService.commit(parsed.message);
+        },
+      },
+    ],
+  };
+}

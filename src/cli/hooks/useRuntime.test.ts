@@ -56,6 +56,9 @@ describe("useRuntime", () => {
       undo: vi.fn(),
       redo: vi.fn(),
       compactContext: vi.fn(),
+      showGitStatus: vi.fn(),
+      showGitLog: vi.fn(),
+      showDiff: vi.fn(),
       destroy: vi.fn(),
     };
 

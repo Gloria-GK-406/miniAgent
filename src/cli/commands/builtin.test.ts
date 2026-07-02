@@ -131,14 +131,23 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.undo = vi.fn(async () => undefined);
     commandCtx.runtime.redo = vi.fn(async () => undefined);
     commandCtx.runtime.compactContext = vi.fn(async () => undefined);
+    commandCtx.runtime.showGitStatus = vi.fn(async () => undefined);
+    commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
+    commandCtx.runtime.showDiff = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
     await registry.execute(commandCtx, "/compact");
+    await registry.execute(commandCtx, "/git status");
+    await registry.execute(commandCtx, "/git log 3");
+    await registry.execute(commandCtx, "/diff src/cli");
 
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
     expect(commandCtx.runtime.redo).toHaveBeenCalled();
     expect(commandCtx.runtime.compactContext).toHaveBeenCalled();
+    expect(commandCtx.runtime.showGitStatus).toHaveBeenCalled();
+    expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
+    expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
   });
 
   it("opens sessions panel with session metadata", async () => {

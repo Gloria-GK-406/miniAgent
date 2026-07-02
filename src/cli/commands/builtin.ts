@@ -194,6 +194,44 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "git",
+    description: "Show git status or log",
+    usage: "/git [status|log]",
+    execute: async (ctx, args) => {
+      const parts = splitArgs(args);
+      const action = parts[0] ?? "status";
+      await runSessionMutation(ctx, async () => {
+        switch (action) {
+          case "status":
+            await ctx.runtime.showGitStatus();
+            break;
+          case "log": {
+            const rawLimit = parts[1];
+            const limit = rawLimit === undefined ? undefined : Number.parseInt(rawLimit, 10);
+            if (rawLimit !== undefined && Number.isNaN(limit)) {
+              throw new Error("Usage: /git log [limit]");
+            }
+            await ctx.runtime.showGitLog(limit);
+            break;
+          }
+          default:
+            throw new Error(`Unknown git action: ${action}`);
+        }
+      });
+    },
+  });
+  registry.register({
+    name: "diff",
+    description: "Show git diff",
+    usage: "/diff [path]",
+    execute: async (ctx, args) => {
+      await runSessionMutation(ctx, async () => {
+        const path = args.trim();
+        await ctx.runtime.showDiff(path.length === 0 ? undefined : path);
+      });
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",

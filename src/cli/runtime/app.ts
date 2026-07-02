@@ -10,6 +10,7 @@ import {
 import { createCommandRegistry } from "./command-registry.js";
 import { loadCustomCommands } from "./custom-command-service.js";
 import { createExportService } from "./export-service.js";
+import { createGitService } from "./git-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createPermissionService } from "./permission-service.js";
 import { createReferenceService } from "./reference-service.js";
@@ -40,6 +41,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const redoStack: RedoEntry[] = [];
   const permissionService = createPermissionService(config.permission);
   const shellService = createShellService(config.shell);
+  const gitService = createGitService(baseDir);
   let activeTurnId: string | null = null;
   const snapshotService = createSnapshotService({
     baseDir,
@@ -305,6 +307,33 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         type: "notice",
         level: "info",
         message: `Compressed ${built.compressor.getCompressedCount()} messages`,
+      });
+    },
+    showGitStatus: async () => {
+      updateState({
+        panel: {
+          type: "git",
+          title: "Git Status",
+          content: await gitService.statusShort(),
+        },
+      });
+    },
+    showGitLog: async (limit) => {
+      updateState({
+        panel: {
+          type: "git",
+          title: "Git Log",
+          content: await gitService.log(limit === undefined ? undefined : { limit }),
+        },
+      });
+    },
+    showDiff: async (path) => {
+      updateState({
+        panel: {
+          type: "diff",
+          title: "Git Diff",
+          content: await gitService.diff(path === undefined ? undefined : { path }),
+        },
       });
     },
     answerApproval: (id, decision) => {

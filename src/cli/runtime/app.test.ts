@@ -2,11 +2,30 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { spawn } from "node:child_process";
 import { ThinkingLevel } from "../../core/config.js";
 import { MessageType, type Message } from "../../core/types.js";
 import { createCLIRuntime } from "./app.js";
 import { createCLISessionService } from "./session-service.js";
 import { createSnapshotService } from "./snapshot-service.js";
+
+function runGit(cwd: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", args, { cwd, stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf-8");
+    });
+    child.on("error", reject);
+    child.on("close", (exitCode) => {
+      if (exitCode !== 0) {
+        reject(new Error(stderr || `git ${args.join(" ")} failed`));
+        return;
+      }
+      resolve();
+    });
+  });
+}
 
 async function writeConfig(baseDir: string): Promise<void> {
   await mkdir(join(baseDir, ".cliagent"), { recursive: true });
@@ -142,6 +161,36 @@ describe("createCLIRuntime", () => {
 
     expect(runtime.getState().messages).toEqual(messages);
     await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("after");
+    await runtime.destroy();
+  });
+
+  it("opens git and diff panels", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-git-"));
+    await writeConfig(baseDir);
+    await runGit(baseDir, ["init"]);
+    await runGit(baseDir, ["config", "user.email", "test@example.com"]);
+    await runGit(baseDir, ["config", "user.name", "MiniAgent Test"]);
+    await writeFile(join(baseDir, "a.txt"), "one\n", "utf-8");
+    await runGit(baseDir, ["add", "a.txt"]);
+    await runGit(baseDir, ["commit", "-m", "initial"]);
+    await writeFile(join(baseDir, "a.txt"), "two\n", "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/git status");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "git",
+      title: "Git Status",
+      content: expect.stringContaining("a.txt"),
+    });
+
+    await runtime.submitInput("/diff a.txt");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "diff",
+      title: "Git Diff",
+      content: expect.stringContaining("+two"),
+    });
     await runtime.destroy();
   });
 });

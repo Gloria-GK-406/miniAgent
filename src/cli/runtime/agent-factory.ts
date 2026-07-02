@@ -30,6 +30,8 @@ import {
   type CLIConfig,
 } from "../config.js";
 import { createCLIToolkit } from "../tools/cli-toolkit.js";
+import { createGitToolkit } from "../tools/git-toolkit.js";
+import { createGitService } from "./git-service.js";
 import type { PermissionService } from "./permission-service.js";
 import type { ShellService } from "./shell-service.js";
 import type { SnapshotService } from "./snapshot-service.js";
@@ -312,7 +314,7 @@ async function buildAgentInner(
 }
 
 function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typeof createCLIToolkit>["tools"] {
-  return createCLIToolkit({
+  const cliTools = createCLIToolkit({
     baseDir: options.baseDir,
     permissionService: options.permissionService,
     getAutoApprove: options.getAutoApprove,
@@ -320,6 +322,13 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typ
     shellService: options.shellService,
     ...(options.snapshotService !== undefined && { snapshotService: options.snapshotService }),
   }).tools;
+  const gitTools = createGitToolkit({
+    gitService: createGitService(options.baseDir),
+    permissionService: options.permissionService,
+    getAutoApprove: options.getAutoApprove,
+    requestApproval: options.requestApproval,
+  }).tools;
+  return [...cliTools, ...gitTools];
 }
 
 function createBuiltinBlueprintManager(
