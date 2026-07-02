@@ -59,6 +59,20 @@ export type CLIEntryAction =
     sessionId: string;
     output?: CLIEntryOutput;
   }
+  | {
+    type: "rename-session";
+    cwd?: string;
+    sessionId: string;
+    name: string;
+    output?: CLIEntryOutput;
+  }
+  | {
+    type: "fork-session";
+    cwd?: string;
+    sessionId: string;
+    name?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -77,6 +91,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
+  let renameSessionMode = false;
+  let forkSessionMode = false;
   let exportFormat: CLIEntryExportFormat | undefined;
   let outputPath: string | undefined;
   let importInputPath: string | undefined;
@@ -134,6 +150,26 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
         return { type: "error", message: "Missing session id after --delete-session" };
       }
       deleteSessionMode = true;
+      sessionId = next;
+      index++;
+      continue;
+    }
+    if (arg === "--rename-session") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return { type: "error", message: "Missing session id after --rename-session" };
+      }
+      renameSessionMode = true;
+      sessionId = next;
+      index++;
+      continue;
+    }
+    if (arg === "--fork-session") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return { type: "error", message: "Missing session id after --fork-session" };
+      }
+      forkSessionMode = true;
       sessionId = next;
       index++;
       continue;
@@ -256,6 +292,12 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
   }
+  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
+    return { type: "error", message: "Cannot combine --rename-session with another headless mode" };
+  }
+  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
+    return { type: "error", message: "Cannot combine --fork-session with another headless mode" };
+  }
   if (listSessionsMode && printMode) {
     return { type: "error", message: "Cannot use --list-sessions with --print" };
   }
@@ -286,6 +328,33 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       type: "delete-session",
       sessionId: sessionId!,
       ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (renameSessionMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --rename-session" };
+    }
+    if (importName === undefined) {
+      return { type: "error", message: "Missing name for --rename-session" };
+    }
+    return {
+      type: "rename-session",
+      sessionId: sessionId!,
+      name: importName,
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (forkSessionMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --fork-session" };
+    }
+    return {
+      type: "fork-session",
+      sessionId: sessionId!,
+      ...(cwd !== undefined && { cwd }),
+      ...(importName !== undefined && { name: importName }),
       ...(output !== undefined && { output }),
     };
   }
@@ -360,7 +429,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, or --delete-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -397,6 +466,8 @@ export function formatCLIHelp(): string {
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",
+    "  --rename-session Rename a session headlessly",
+    "  --fork-session Fork a session headlessly",
     "  --name           Set imported session name",
     "  --format         Set export format: json or markdown",
     "  --output         Set export output path",

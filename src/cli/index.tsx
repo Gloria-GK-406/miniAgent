@@ -14,8 +14,10 @@ import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { runSessionDelete } from "./session-delete-runner.js";
 import { runSessionExport } from "./session-export-runner.js";
+import { runSessionFork } from "./session-fork-runner.js";
 import { runSessionImport } from "./session-import-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
+import { runSessionRename } from "./session-rename-runner.js";
 
 function readPackageVersion(): string {
   const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
@@ -88,6 +90,30 @@ async function main(): Promise<void> {
     process.exitCode = await runSessionDelete({
       baseDir: resolve(action.cwd ?? process.cwd()),
       sessionId: action.sessionId,
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "rename-session") {
+    process.exitCode = await runSessionRename({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      sessionId: action.sessionId,
+      name: action.name,
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "fork-session") {
+    process.exitCode = await runSessionFork({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      sessionId: action.sessionId,
+      ...(action.name !== undefined && { name: action.name }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

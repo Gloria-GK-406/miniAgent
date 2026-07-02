@@ -222,6 +222,36 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("renames a session without opening the TUI", () => {
+    expect(parseCLIEntryArgs([
+      "--rename-session",
+      "s1",
+      "--name",
+      "Feature",
+      "--json",
+    ])).toEqual({
+      type: "rename-session",
+      sessionId: "s1",
+      name: "Feature",
+      output: "json",
+    });
+  });
+
+  it("forks a session without opening the TUI", () => {
+    expect(parseCLIEntryArgs([
+      "--fork-session",
+      "s1",
+      "--name",
+      "Experiment",
+      "--json",
+    ])).toEqual({
+      type: "fork-session",
+      sessionId: "s1",
+      name: "Experiment",
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -400,10 +430,44 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed rename session options", () => {
+    expect(parseCLIEntryArgs(["--rename-session"])).toEqual({
+      type: "error",
+      message: "Missing session id after --rename-session",
+    });
+    expect(parseCLIEntryArgs(["--rename-session", "--json"])).toEqual({
+      type: "error",
+      message: "Missing session id after --rename-session",
+    });
+    expect(parseCLIEntryArgs(["--rename-session", "s1"])).toEqual({
+      type: "error",
+      message: "Missing name for --rename-session",
+    });
+    expect(parseCLIEntryArgs(["--rename-session", "s1", "--name", "Feature", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --rename-session",
+    });
+  });
+
+  it("rejects malformed fork session options", () => {
+    expect(parseCLIEntryArgs(["--fork-session"])).toEqual({
+      type: "error",
+      message: "Missing session id after --fork-session",
+    });
+    expect(parseCLIEntryArgs(["--fork-session", "--json"])).toEqual({
+      type: "error",
+      message: "Missing session id after --fork-session",
+    });
+    expect(parseCLIEntryArgs(["--fork-session", "s1", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --fork-session",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, or --delete-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -422,6 +486,8 @@ describe("CLI entry args", () => {
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");
     expect(help).toContain("--delete-session");
+    expect(help).toContain("--rename-session");
+    expect(help).toContain("--fork-session");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");
