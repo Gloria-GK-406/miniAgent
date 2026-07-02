@@ -32,6 +32,17 @@ function parsePermissionDecision(value: string | undefined): CLIPermissionDecisi
   return null;
 }
 
+function parsePositiveInteger(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed.toString() !== value) {
+    return undefined;
+  }
+  return parsed;
+}
+
 function showPermissionsPanel(ctx: CLICommandContext): void {
   const state = ctx.getState();
   ctx.updateState({
@@ -385,8 +396,8 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
             break;
           case "log": {
             const rawLimit = parts[1];
-            const limit = rawLimit === undefined ? undefined : Number.parseInt(rawLimit, 10);
-            if (rawLimit !== undefined && Number.isNaN(limit)) {
+            const limit = parsePositiveInteger(rawLimit);
+            if (rawLimit !== undefined && limit === undefined) {
               throw new Error("Usage: /git log [limit]");
             }
             await ctx.runtime.showGitLog(limit);

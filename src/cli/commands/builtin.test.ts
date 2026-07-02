@@ -274,6 +274,29 @@ describe("registerBuiltinCommands", () => {
     });
   });
 
+  it("rejects malformed interactive git log limits", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/git log 3abc");
+
+    expect(commandCtx.runtime.showGitLog).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /git log [limit]",
+    });
+
+    await registry.execute(commandCtx, "/git log 0");
+
+    expect(commandCtx.runtime.showGitLog).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /git log [limit]",
+    });
+  });
+
   it("submits edited content from the external editor command", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);
