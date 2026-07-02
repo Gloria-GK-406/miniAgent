@@ -192,7 +192,7 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
-  it("persists shell shortcut output in the active session", async () => {
+  it("persists shell shortcut output as a tool-style transcript", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-persist-"));
     await writeConfig(baseDir, {
       permission: {
@@ -209,19 +209,29 @@ describe("createCLIRuntime", () => {
 
     const runtime = await createCLIRuntime(baseDir);
     await runtime.submitInput("!console.log('shell-ok')");
-    const stateMessage = runtime.getState().messages.at(-1);
-    if (stateMessage === undefined) {
-      throw new Error("Expected shell shortcut to append a visible message");
-    }
+    const stateMessages = runtime.getState().messages;
+    const [userMessage, toolCall, toolResult] = stateMessages;
 
-    expect(stateMessage).toMatchObject({
+    expect(userMessage).toMatchObject({
       type: MessageType.User,
-      content: "Shell output:\nshell-ok\n",
+      content: "!console.log('shell-ok')",
     });
+    expect(toolCall).toMatchObject({
+      type: MessageType.ToolCall,
+      toolName: "shell",
+      arguments: { command: "console.log('shell-ok')" },
+      content: "",
+    });
+    expect(toolResult).toMatchObject({
+      type: MessageType.ToolResult,
+      toolCallId: expect.any(String),
+      content: "shell-ok\n",
+    });
+    expect(toolResult?.toolCallId).toBe(toolCall?.toolCallId);
 
     const sessionService = await createCLISessionService(baseDir);
     await expect(sessionService.readMessages(runtime.getState().sessionId))
-      .resolves.toEqual([stateMessage]);
+      .resolves.toEqual(stateMessages);
     await runtime.destroy();
   });
 

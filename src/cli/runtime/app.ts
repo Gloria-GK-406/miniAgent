@@ -333,14 +333,29 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
           }
         }
         if (result.type === "shell") {
-          const message: Message = {
+          const shellInput = input.trim();
+          const command = shellInput.startsWith("!") ? shellInput.slice(1).trim() : shellInput;
+          const toolCallId = crypto.randomUUID();
+          const messages: Message[] = [{
             id: crypto.randomUUID(),
             type: MessageType.User,
-            content: `Shell output:\n${result.content}`,
-          };
-          await sessionService.appendMessages(state.sessionId, [message]);
+            content: shellInput,
+          }, {
+            id: crypto.randomUUID(),
+            type: MessageType.ToolCall,
+            content: "",
+            toolCallId,
+            toolName: "shell",
+            arguments: { command },
+          }, {
+            id: crypto.randomUUID(),
+            type: MessageType.ToolResult,
+            content: result.content,
+            toolCallId,
+          }];
+          await sessionService.appendMessages(state.sessionId, messages);
           updateState({
-            messages: [...state.messages, message],
+            messages: [...state.messages, ...messages],
             sessions: sessionService.listSessions(),
           });
         }
