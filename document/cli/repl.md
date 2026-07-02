@@ -88,6 +88,7 @@ also accept `--json`.
 | `--init-instructions [--force]` | Yes | Create `AGENTS.md` project guidance from detected project metadata |
 | `--config-paths` | Yes | Print the resolved project and global config file paths without creating files |
 | `--show-config` | Yes | Print the merged effective CLI config without creating missing config files |
+| `--show-permissions` | Yes | Print the effective allow/ask/deny permission policy |
 | `--list-models` | Yes | List configured model selectors and mark the default model |
 | `--list-commands` | Yes | List built-in and project custom slash commands |
 | `--list-tools` | Yes | List runtime tools for the selected agent |
@@ -126,6 +127,7 @@ miniagent --list-agents --json
 miniagent --preview-context --json
 miniagent --show-history --json
 miniagent --git-status
+miniagent --show-permissions --json
 miniagent --set-permission "shell:npm *" allow
 miniagent --system-prompt-file .cliagent/system.md
 miniagent --print --prompt-file task.md --json

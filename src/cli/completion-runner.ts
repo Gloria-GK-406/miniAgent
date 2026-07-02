@@ -44,6 +44,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--init-instructions", description: "Create AGENTS.md project guidance" },
   { long: "--force", description: "Overwrite existing files for supported commands" },
   { long: "--json", description: "Emit JSON for supported headless modes" },
+  { long: "--show-permissions", description: "Show effective permission policy" },
   { long: "--set-permission", description: "Set a project permission rule" },
   { long: "--unset-permission", description: "Unset a project permission rule" },
   { long: "--set-system-prompt", description: "Set the project system prompt" },

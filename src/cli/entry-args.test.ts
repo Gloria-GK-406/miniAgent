@@ -520,6 +520,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("shows permissions without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--show-permissions"])).toEqual({
+      type: "show-permissions",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--show-permissions", "--json"])).toEqual({
+      type: "show-permissions",
+      cwd: "C:/repo",
+      output: "json",
+    });
+  });
+
   it("updates system prompt without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--set-system-prompt", "Custom prompt.", "--json"])).toEqual({
       type: "system-prompt-update",
@@ -893,6 +904,10 @@ describe("CLI entry args", () => {
       type: "error",
       message: "Unexpected prompt for --unset-permission",
     });
+    expect(parseCLIEntryArgs(["--show-permissions", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --show-permissions",
+    });
   });
 
   it("rejects malformed system prompt update options", () => {
@@ -917,7 +932,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
       output: "json",
     });
   });
@@ -973,6 +988,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--force");
     expect(help).toContain("--set-permission");
     expect(help).toContain("--unset-permission");
+    expect(help).toContain("--show-permissions");
     expect(help).toContain("--set-system-prompt");
     expect(help).toContain("--system-prompt-file");
     expect(help).toContain("Use - to read stdin for prompt files");

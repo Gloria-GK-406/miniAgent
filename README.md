@@ -446,6 +446,7 @@ and shell integration:
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |
 | `--doctor [--json]` | Run setup checks |
 | `--diagnostics [--json]` | Run configured diagnostics |
+| `--show-permissions [--json]` | Print the effective allow/ask/deny policy |
 | `--set-permission <target> <allow|ask|deny>` | Persist a project permission rule |
 | `--unset-permission <target>` | Remove a project permission rule |
 | `--set-system-prompt <prompt>` / `--system-prompt-file <path>` | Set project system prompt |

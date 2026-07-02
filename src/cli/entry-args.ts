@@ -97,6 +97,7 @@ export type CLIEntryAction =
   | { type: "show-config"; cwd?: string; output?: CLIEntryOutput }
   | { type: "init"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
   | { type: "init-instructions"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
+  | { type: "show-permissions"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-commands"; cwd?: string; output?: CLIEntryOutput }
   | {
@@ -213,6 +214,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let showConfigMode = false;
   let initMode = false;
   let initInstructionsMode = false;
+  let showPermissionsMode = false;
   let force = false;
   let completionShell: CLIEntryCompletionShell | undefined;
   let exportFormat: CLIEntryExportFormat | undefined;
@@ -267,6 +269,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--init-instructions") {
       initInstructionsMode = true;
+      continue;
+    }
+    if (arg === "--show-permissions") {
+      showPermissionsMode = true;
       continue;
     }
     if (arg === "--list-sessions") {
@@ -602,7 +608,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
-  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --status with another headless mode");
   }
   if (
@@ -616,6 +622,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || showConfigMode
       || initMode
       || initInstructionsMode
+      || showPermissionsMode
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
@@ -651,6 +658,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listAgentsMode
       || previewContextMode
       || showHistoryMode
+      || showPermissionsMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -681,6 +689,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listAgentsMode
       || previewContextMode
       || showHistoryMode
+      || showPermissionsMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -814,6 +823,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       : "--unset-system-prompt";
     return parseError(`Cannot combine ${flag} with another headless mode`);
   }
+  if (showPermissionsMode && (printMode || doctorMode || diagnosticsMode || statusMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+    return parseError("Cannot combine --show-permissions with another headless mode");
+  }
   if (completionShell !== undefined) {
     if (output !== undefined) {
       return parseError("Cannot use --json with --completion");
@@ -865,6 +877,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       type: "init-instructions",
       ...(cwd !== undefined && { cwd }),
       ...(force && { force: true }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (showPermissionsMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --show-permissions");
+    }
+    return {
+      type: "show-permissions",
+      ...(cwd !== undefined && { cwd }),
       ...(output !== undefined && { output }),
     };
   }
@@ -1146,7 +1168,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1208,6 +1230,7 @@ export function formatCLIHelp(): string {
     "  --init          Create a project config template",
     "  --init-instructions Create AGENTS.md project guidance",
     "  --force         Overwrite existing files for supported commands",
+    "  --show-permissions Show effective permission policy",
     "  --set-permission Set a project permission rule",
     "  --unset-permission Unset a project permission rule",
     "  --set-system-prompt Set the project system prompt",

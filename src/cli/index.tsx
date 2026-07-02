@@ -20,6 +20,7 @@ import { runGitHeadless } from "./git-headless-runner.js";
 import { runHistory } from "./history-runner.js";
 import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
+import { runPermissionShow } from "./permission-show-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { runProjectInstructionsInit } from "./project-instructions-runner.js";
@@ -122,6 +123,16 @@ async function main(): Promise<void> {
       action: action.action,
       target: action.target,
       ...(action.decision !== undefined && { decision: action.decision }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "show-permissions") {
+    process.exitCode = await runPermissionShow({
+      baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

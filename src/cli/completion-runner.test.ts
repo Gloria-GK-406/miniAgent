@@ -12,6 +12,7 @@ describe("formatCompletionScript", () => {
       "--force",
       "--staged",
       "--list-snapshots",
+      "--show-permissions",
       "--clear-session",
     ];
     const bash = formatCompletionScript("bash");
@@ -41,6 +42,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--git-status");
     expect(script).toContain("--git-log");
     expect(script).toContain("--git-diff");
+    expect(script).toContain("--show-permissions");
     expect(script).toContain("--set-permission");
     expect(script).toContain("--set-system-prompt");
     expect(script).toContain("--init-instructions");
