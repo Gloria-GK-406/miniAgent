@@ -122,6 +122,10 @@ describe("CLI entry args", () => {
       type: "print",
       promptFile: "task.md",
     });
+    expect(parseCLIEntryArgs(["--print", "--prompt-file", "-"])).toEqual({
+      type: "print",
+      promptFile: "-",
+    });
   });
 
   it("runs doctor checks without opening the TUI", () => {
@@ -885,6 +889,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--json");
     expect(help).toContain("--print");
     expect(help).toContain("--prompt-file");
+    expect(help).toContain("Use - to read stdin");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");
     expect(help).toContain("--version");

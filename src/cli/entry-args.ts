@@ -1110,7 +1110,7 @@ export function formatCLIHelp(): string {
     "  --completion     Generate shell completions: bash, zsh, fish, powershell",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
-    "  --prompt-file   Read the initial prompt from a file",
+    "  --prompt-file   Read the initial prompt from a file. Use - to read stdin",
     "  -h, --help      Show this help text",
     "  -v, --version   Show package version",
   ].join("\n");

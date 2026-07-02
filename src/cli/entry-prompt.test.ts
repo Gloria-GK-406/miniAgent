@@ -21,4 +21,13 @@ describe("loadEntryPrompt", () => {
       promptFile: "task.md",
     }, baseDir)).resolves.toBe("from file");
   });
+
+  it("loads a prompt from stdin when prompt file is dash", async () => {
+    await expect(loadEntryPrompt({
+      type: "print",
+      promptFile: "-",
+    }, process.cwd(), {
+      readStdin: async () => "from stdin\n",
+    })).resolves.toBe("from stdin");
+  });
 });
