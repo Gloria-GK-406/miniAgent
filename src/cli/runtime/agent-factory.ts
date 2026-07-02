@@ -91,7 +91,7 @@ export interface BuildSubagentAgentConfigOptions {
 
 export interface CLIAgentFactoryOptions {
   baseDir: string;
-  mode: CLIAgentMode;
+  mode: CLIAgentMode | (() => CLIAgentMode);
   permissionService: PermissionService;
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
@@ -124,6 +124,10 @@ export function getResolvedModelPaths(agent: ModelListAgent): string[] {
 
 function availableModelPaths(models: ResolvedModel[]): string {
   return models.map(formatResolvedModelPath).join(", ") || "(none)";
+}
+
+function resolveMode(mode: CLIAgentFactoryOptions["mode"]): CLIAgentMode {
+  return typeof mode === "function" ? mode() : mode;
 }
 
 export function findResolvedModelForCLI(models: ResolvedModel[], selector: string): ResolvedModel {
@@ -298,7 +302,7 @@ async function buildAgentInner(
       prompt: buildEffectiveSystemPrompt({
         baseDir: options.baseDir,
         userSystemPrompt,
-        mode: options.mode,
+        mode: resolveMode(options.mode),
       }),
     },
     baseDir: options.baseDir,

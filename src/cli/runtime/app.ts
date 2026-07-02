@@ -56,6 +56,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   });
   const gitService = createGitService(baseDir);
   let activeTurnId: string | null = null;
+  let activeMode = config.defaultAgent;
   const snapshotService = createSnapshotService({
     baseDir,
     sessionService,
@@ -66,7 +67,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   const factory = await createCLIAgentFactory({
     baseDir,
-    mode: config.defaultAgent,
+    mode: () => activeMode,
     permissionService,
     getAutoApprove: () => state.autoApprove,
     requestApproval: (toolName, args) => new Promise((resolve) => {
@@ -82,7 +83,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   state = {
     baseDir,
     config,
-    mode: config.defaultAgent,
+    mode: activeMode,
     modelName: formatCurrentModel(built.agent),
     modelPaths: getResolvedModelPaths(built.agent),
     sessionId: session.id,
@@ -135,6 +136,9 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   }
 
   function updateState(patch: Partial<CLIState>): void {
+    if (patch.mode !== undefined) {
+      activeMode = patch.mode;
+    }
     state = { ...state, ...patch };
     emit({ type: "state", state });
   }
