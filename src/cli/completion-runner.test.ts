@@ -5,6 +5,7 @@ describe("formatCompletionScript", () => {
   it("includes every public headless flag in shell completions", () => {
     const longFlags = [
       "--list-models",
+      "--status",
       "--config-paths",
       "--show-config",
       "--init",

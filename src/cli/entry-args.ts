@@ -40,6 +40,16 @@ export type CLIEntryAction =
     output?: CLIEntryOutput;
   }
   | { type: "diagnostics"; cwd?: string; output?: CLIEntryOutput }
+  | {
+    type: "status";
+    agent?: CLIEntryAgentMode;
+    autoApprove?: boolean;
+    cwd?: string;
+    model?: string;
+    sessionId?: string;
+    newSession?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "list-sessions"; cwd?: string; output?: CLIEntryOutput }
   | {
     type: "export-session";
@@ -168,6 +178,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let printMode = false;
   let doctorMode = false;
   let diagnosticsMode = false;
+  let statusMode = false;
   let listSessionsMode = false;
   let listModelsMode = false;
   let listCommandsMode = false;
@@ -229,6 +240,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--diagnostics") {
       diagnosticsMode = true;
+      continue;
+    }
+    if (arg === "--status") {
+      statusMode = true;
       continue;
     }
     if (arg === "--config-paths") {
@@ -576,12 +591,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+    return parseError("Cannot combine --status with another headless mode");
+  }
   if (
     completionShell !== undefined
     && (
       printMode
       || doctorMode
       || diagnosticsMode
+      || statusMode
       || configPathsMode
       || showConfigMode
       || initMode
@@ -612,6 +631,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       printMode
       || doctorMode
       || diagnosticsMode
+      || statusMode
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
@@ -640,6 +660,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       printMode
       || doctorMode
       || diagnosticsMode
+      || statusMode
       || configPathsMode
       || listSessionsMode
       || listModelsMode
@@ -669,6 +690,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       printMode
       || doctorMode
       || diagnosticsMode
+      || statusMode
       || configPathsMode
       || showConfigMode
       || initInstructionsMode
@@ -698,6 +720,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       printMode
       || doctorMode
       || diagnosticsMode
+      || statusMode
       || configPathsMode
       || showConfigMode
       || initMode
@@ -866,6 +889,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     return {
       type: "diagnostics",
       ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (statusMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --status");
+    }
+    return {
+      type: "status",
+      ...(agent !== undefined && { agent }),
+      ...(autoApprove && { autoApprove: true }),
+      ...(cwd !== undefined && { cwd }),
+      ...(model !== undefined && { model }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(newSession !== undefined && { newSession }),
       ...(output !== undefined && { output }),
     };
   }
@@ -1082,7 +1120,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1114,6 +1152,7 @@ export function formatCLIHelp(): string {
     "  --cwd <path>    Open the TUI for a specific project directory",
     "  -s, --session   Resume a session by id",
     "  --new-session   Create and start in a named session",
+    "  --status        Print runtime status headlessly",
     "  --list-sessions List sessions headlessly",
     "  --list-models   List configured models headlessly",
     "  --list-commands List slash commands headlessly",

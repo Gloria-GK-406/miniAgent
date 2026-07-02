@@ -8,6 +8,7 @@ import type { CLIAppRuntime } from "./runtime/types.js";
 type RuntimeBackedCLIEntryActionType =
   | "print"
   | "doctor"
+  | "status"
   | "list-tools"
   | "list-agents"
   | "preview-context"
