@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CLIPermissionConfig } from "../config.js";
+import { CLIConfigSchema, type CLIPermissionConfig } from "../config.js";
 import { createPermissionService, matchCommandPattern } from "./permission-service.js";
 
 describe("matchCommandPattern", () => {
@@ -38,6 +38,26 @@ describe("PermissionService", () => {
     }, true)).toEqual({
       decision: "deny",
       reason: "shell pattern rm *",
+    });
+  });
+
+  it("denies dangerous default shell patterns even when auto approve is on", () => {
+    const config = CLIConfigSchema.parse({});
+    const service = createPermissionService(config.permission);
+
+    expect(service.resolve({
+      toolName: "shell",
+      args: { command: "rm -rf dist" },
+    }, true)).toEqual({
+      decision: "deny",
+      reason: "shell pattern rm -rf *",
+    });
+    expect(service.resolve({
+      toolName: "shell",
+      args: { command: "Remove-Item -Recurse dist" },
+    }, true)).toEqual({
+      decision: "deny",
+      reason: "shell pattern Remove-Item -Recurse *",
     });
   });
 

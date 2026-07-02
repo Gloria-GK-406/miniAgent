@@ -143,6 +143,11 @@ describe("CLI config provider mode", () => {
         read: "allow",
         glob: "allow",
         grep: "allow",
+        shell: {
+          "*": "ask",
+          "rm -rf *": "deny",
+          "Remove-Item -Recurse *": "deny",
+        },
       },
       shell: {
         windows: "powershell",

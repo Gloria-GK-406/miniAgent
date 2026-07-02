@@ -31,7 +31,17 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
     "*": "ask",
     "read": "allow",
     "glob": "allow",
-    "grep": "allow"
+    "grep": "allow",
+    "shell": {
+      "*": "ask",
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "rm -r *": "deny",
+      "Remove-Item -Recurse *": "deny",
+      "Remove-Item -r *": "deny",
+      "rmdir /s *": "deny",
+      "del /s *": "deny"
+    }
   },
   "shell": {
     "windows": "powershell",

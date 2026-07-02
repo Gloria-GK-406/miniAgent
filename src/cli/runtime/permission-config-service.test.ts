@@ -97,6 +97,16 @@ describe("PermissionConfigService", () => {
       read: "allow",
       glob: "allow",
       grep: "allow",
+      shell: {
+        "*": "ask",
+        "rm -rf *": "deny",
+        "rm -fr *": "deny",
+        "rm -r *": "deny",
+        "Remove-Item -Recurse *": "deny",
+        "Remove-Item -r *": "deny",
+        "rmdir /s *": "deny",
+        "del /s *": "deny",
+      },
     });
     await expect(readProjectConfig(baseDir)).resolves.toEqual({});
   });

@@ -49,6 +49,16 @@ export const CLIPermissionConfigSchema = z
     read: "allow",
     glob: "allow",
     grep: "allow",
+    shell: {
+      "*": "ask",
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "rm -r *": "deny",
+      "Remove-Item -Recurse *": "deny",
+      "Remove-Item -r *": "deny",
+      "rmdir /s *": "deny",
+      "del /s *": "deny",
+    },
   });
 export type CLIPermissionConfig = z.infer<typeof CLIPermissionConfigSchema>;
 
@@ -235,6 +245,16 @@ export function createDefaultConfigTemplate(baseDir: string): CLIConfig {
       read: "allow",
       glob: "allow",
       grep: "allow",
+      shell: {
+        "*": "ask",
+        "rm -rf *": "deny",
+        "rm -fr *": "deny",
+        "rm -r *": "deny",
+        "Remove-Item -Recurse *": "deny",
+        "Remove-Item -r *": "deny",
+        "rmdir /s *": "deny",
+        "del /s *": "deny",
+      },
     },
     shell: {
       windows: "powershell",
