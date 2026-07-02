@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "ink";
+import { z } from "zod";
 import {
   App,
   EXIT_CONFIRM_TEXT,
@@ -10,6 +11,7 @@ import {
 } from "./App.js";
 import { buildRenderableLines } from "./MessageList.js";
 import { MessageType } from "../../core/types.js";
+import { CLIConfigSchema } from "../config.js";
 import type { CLIAppRuntime, CLIEvent, CLIRuntimeSubscriber, CLIState } from "../runtime/types.js";
 
 function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
@@ -413,6 +415,51 @@ describe("App", () => {
     expect(output).toContain("Auto approval: on");
     expect(output).toContain("ALLOW read");
     expect(output).toContain("DENY shell:rm *");
+  });
+
+  it("renders tool permission state in the tools panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        config: CLIConfigSchema.parse({
+          permission: {
+            "*": "ask",
+            read: "allow",
+            shell: {
+              "*": "ask",
+              "rm *": "deny",
+            },
+          },
+        }),
+        panel: {
+          type: "tools",
+          tools: [
+            {
+              name: "read",
+              description: "Read files",
+              parameters: z.object({}),
+              execute: vi.fn(async () => ""),
+            },
+            {
+              name: "write",
+              description: "Write files",
+              parameters: z.object({}),
+              execute: vi.fn(async () => ""),
+            },
+            {
+              name: "shell",
+              description: "Run shell commands",
+              parameters: z.object({}),
+              execute: vi.fn(async () => ""),
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("ALLOW read");
+    expect(output).toContain("ASK write");
+    expect(output).toContain("ASK shell");
   });
 
   it("renders system prompt panel from runtime state", () => {

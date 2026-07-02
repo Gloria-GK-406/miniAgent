@@ -16,6 +16,8 @@ import { ActivityView } from "./ActivityView.js";
 import { ApprovalPrompt } from "./ApprovalPrompt.js";
 import { PermissionsView } from "./PermissionsView.js";
 import { SystemPromptView } from "./SystemPromptView.js";
+import { createPermissionService } from "../runtime/permission-service.js";
+import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 
 export interface AppProps {
   runtime: CLIAppRuntime;
@@ -116,6 +118,12 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
   );
 }
 
+function decisionColor(decision: CLIPermissionDecision): string {
+  if (decision === "allow") return "green";
+  if (decision === "deny") return "red";
+  return "yellow";
+}
+
 function ToolsPanel({
   panel,
   runtime,
@@ -123,15 +131,28 @@ function ToolsPanel({
   panel: Extract<CLIViewPanel, { type: "tools" }>;
   runtime: CLIAppRuntime;
 }) {
+  const state = runtime.getState();
+  const permission = state.config.permission ?? ({ "*": "ask" } satisfies CLIPermissionConfig);
+  const permissionService = createPermissionService(permission);
+
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>
       <Text bold color="cyan">Tools ({panel.tools.length})</Text>
-      {panel.tools.map((tool) => (
-        <Text key={tool.name}>
-          <Text color="cyan">{tool.name}</Text>
-          <Text dimColor> {tool.description}</Text>
-        </Text>
-      ))}
+      {panel.tools.map((tool) => {
+        const result = permissionService.resolve({
+          toolName: tool.name,
+          args: {},
+        }, state.autoApprove);
+        return (
+          <Text key={tool.name}>
+            <Text color={decisionColor(result.decision)}>{result.decision.toUpperCase()}</Text>
+            <Text> </Text>
+            <Text color="cyan">{tool.name}</Text>
+            <Text dimColor> {tool.description}</Text>
+            <Text dimColor> ({result.reason})</Text>
+          </Text>
+        );
+      })}
     </StaticPanelFrame>
   );
 }
