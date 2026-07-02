@@ -1,4 +1,5 @@
 import type { CommandRegistry } from "./command-registry.js";
+import type { PermissionService } from "./permission-service.js";
 import type { ReferenceService, ResolvedReference } from "./reference-service.js";
 import type { ShellService } from "./shell-service.js";
 import type { CLICommandContext } from "./types.js";
@@ -10,6 +11,9 @@ export type RoutedInputResult =
 
 export interface InputRouterDeps {
   commandRegistry: Pick<CommandRegistry, "execute">;
+  permissionService?: Pick<PermissionService, "resolve">;
+  getAutoApprove?: () => boolean;
+  requestApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
   shellService: Pick<ShellService, "execute">;
   referenceService: Pick<ReferenceService, "resolveReferences">;
   cwd?: string;
@@ -40,6 +44,27 @@ function renderReferences(references: ResolvedReference[]): string {
   return ["", "", "[Referenced files]", ...blocks].join("\n");
 }
 
+async function assertShellPermission(deps: InputRouterDeps, command: string): Promise<void> {
+  if (deps.permissionService === undefined) {
+    return;
+  }
+
+  const args = { command };
+  const result = deps.permissionService.resolve(
+    { toolName: "shell", args },
+    deps.getAutoApprove?.() ?? false,
+  );
+  if (result.decision === "deny") {
+    throw new Error(`Permission denied for shell shortcut: ${result.reason}`);
+  }
+  if (result.decision === "ask") {
+    const approved = await deps.requestApproval?.("shell", args);
+    if (approved !== true) {
+      throw new Error("Permission rejected for shell shortcut");
+    }
+  }
+}
+
 export function createInputRouter(deps: InputRouterDeps): InputRouter {
   return {
     route: async (ctx, input): Promise<RoutedInputResult> => {
@@ -49,8 +74,10 @@ export function createInputRouter(deps: InputRouterDeps): InputRouter {
         return { type: "command" };
       }
       if (trimmed.startsWith("!")) {
+        const command = trimmed.slice(1).trim();
+        await assertShellPermission(deps, command);
         const result = await deps.shellService.execute({
-          command: trimmed.slice(1).trim(),
+          command,
           ...(deps.cwd !== undefined && { cwd: deps.cwd }),
         });
         const content = [result.stdout, result.stderr]

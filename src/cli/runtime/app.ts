@@ -30,6 +30,10 @@ function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICo
   return current ? formatResolvedModelPath(current) : "(none)";
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 interface RedoEntry {
   sessionId: string;
   turnId: string;
@@ -67,17 +71,21 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   });
   let state: CLIState;
 
+  function requestApproval(toolName: string, args: Record<string, unknown>): Promise<boolean> {
+    return new Promise((resolve) => {
+      const id = crypto.randomUUID();
+      approvalResolvers.set(id, resolve);
+      updateState({ approval: { id, toolName, args, decision: "pending" } });
+    });
+  }
+
   const factory = await createCLIAgentFactory({
     baseDir,
     mode: () => activeMode,
     getConfig: () => config,
     permissionService,
     getAutoApprove: () => state.autoApprove,
-    requestApproval: (toolName, args) => new Promise((resolve) => {
-      const id = crypto.randomUUID();
-      approvalResolvers.set(id, resolve);
-      updateState({ approval: { id, toolName, args, decision: "pending" } });
-    }),
+    requestApproval,
     shellService,
     snapshotService,
   });
@@ -127,6 +135,9 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   }
   const router = createInputRouter({
     commandRegistry: registry,
+    permissionService,
+    getAutoApprove: () => state.autoApprove,
+    requestApproval,
     shellService,
     referenceService: createReferenceService(baseDir),
     cwd: baseDir,
@@ -281,27 +292,31 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       };
     },
     submitInput: async (input) => {
-      const result = await router.route(createCommandContext(runtime), input);
-      if (result.type === "prompt") {
-        const message: Message = {
-          id: crypto.randomUUID(),
-          type: MessageType.User,
-          content: result.content,
-        };
-        activeTurnId = message.id;
-        try {
-          await built.agent.run(message);
-        } finally {
-          activeTurnId = null;
+      try {
+        const result = await router.route(createCommandContext(runtime), input);
+        if (result.type === "prompt") {
+          const message: Message = {
+            id: crypto.randomUUID(),
+            type: MessageType.User,
+            content: result.content,
+          };
+          activeTurnId = message.id;
+          try {
+            await built.agent.run(message);
+          } finally {
+            activeTurnId = null;
+          }
         }
-      }
-      if (result.type === "shell") {
-        const message: Message = {
-          id: crypto.randomUUID(),
-          type: MessageType.User,
-          content: `Shell output:\n${result.content}`,
-        };
-        updateState({ messages: [...state.messages, message] });
+        if (result.type === "shell") {
+          const message: Message = {
+            id: crypto.randomUUID(),
+            type: MessageType.User,
+            content: `Shell output:\n${result.content}`,
+          };
+          updateState({ messages: [...state.messages, message] });
+        }
+      } catch (error: unknown) {
+        updateState({ panel: { type: "error", message: errorMessage(error) } });
       }
     },
     runCommand: async (name, args) => {

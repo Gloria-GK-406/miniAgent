@@ -27,7 +27,7 @@ function runGit(cwd: string, args: string[]): Promise<void> {
   });
 }
 
-async function writeConfig(baseDir: string): Promise<void> {
+async function writeConfig(baseDir: string, extra: Record<string, unknown> = {}): Promise<void> {
   await mkdir(join(baseDir, ".cliagent"), { recursive: true });
   await writeFile(join(baseDir, ".cliagent", "config.json"), JSON.stringify({
     providers: [{
@@ -36,6 +36,7 @@ async function writeConfig(baseDir: string): Promise<void> {
       models: [{ id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] }],
     }],
     defaultModel: "fast",
+    ...extra,
   }), "utf-8");
 }
 
@@ -89,6 +90,28 @@ describe("createCLIRuntime", () => {
     await expect(readFile(join(baseDir, ".cliagent", "config.json"), "utf-8"))
       .resolves.toContain('"systemPrompt": "Custom project prompt"');
 
+    await runtime.destroy();
+  });
+
+  it("shows an error panel when a shell shortcut is denied", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-deny-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "ask",
+        shell: {
+          "*": "ask",
+          "rm *": "deny",
+        },
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("!rm -rf dist");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "error",
+      message: "Permission denied for shell shortcut: shell pattern rm *",
+    });
     await runtime.destroy();
   });
 
