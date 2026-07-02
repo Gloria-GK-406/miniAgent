@@ -122,8 +122,9 @@ export function createExportService(options: ExportServiceOptions): ExportServic
     },
     importJson: async (inputPath, name) => {
       const sourcePath = resolveWorkspacePath(options.baseDir, inputPath).absolutePath;
+      const content = await readFile(sourcePath, "utf-8");
       const parsed = CLISessionExportSchema.parse(
-        JSON.parse(await readFile(sourcePath, "utf-8")) as unknown,
+        JSON.parse(content.replace(/^\uFEFF/, "")) as unknown,
       );
       const session = await options.sessionService.createSession(name ?? parsed.session.name);
       await options.sessionService.writeMessages(session.id, parsed.messages);

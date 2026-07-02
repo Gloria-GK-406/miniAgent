@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -84,5 +84,18 @@ describe("ExportService", () => {
       mode: "plan",
       tokenUsage: { input: 10, output: 5, total: 15 },
     });
+  });
+
+  it("imports a json session export with a UTF-8 BOM", async () => {
+    const { baseDir, service, sessionId, messages } = await setupSession();
+    const exportService = createExportService({ baseDir, sessionService: service });
+    const outputPath = await exportService.exportJson(sessionId, "session.json");
+    const content = await readFile(outputPath, "utf-8");
+    await writeFile(outputPath, `\uFEFF${content}`, "utf-8");
+
+    const imported = await exportService.importJson(outputPath, "bom-imported");
+
+    expect(imported.name).toBe("bom-imported");
+    expect(await service.readMessages(imported.id)).toEqual(messages);
   });
 });
