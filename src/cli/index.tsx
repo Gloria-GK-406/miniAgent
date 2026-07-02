@@ -36,6 +36,7 @@ import { runSessionRename } from "./session-rename-runner.js";
 import { runShowConfig } from "./show-config-runner.js";
 import { runSnapshotList } from "./snapshot-list-runner.js";
 import { runRuntimeStatus } from "./status-runner.js";
+import { runSystemPromptShow } from "./system-prompt-show-runner.js";
 import { runSystemPromptUpdate } from "./system-prompt-runner.js";
 import { runToolList } from "./tool-list-runner.js";
 
@@ -146,6 +147,17 @@ async function main(): Promise<void> {
       action: action.action,
       ...(action.prompt !== undefined && { prompt: action.prompt }),
       ...(action.promptFile !== undefined && { promptFile: action.promptFile }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "show-system-prompt") {
+    process.exitCode = await runSystemPromptShow({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.agent !== undefined && { mode: action.agent }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

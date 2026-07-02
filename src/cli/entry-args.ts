@@ -171,6 +171,12 @@ export type CLIEntryAction =
     promptFile?: string;
     output?: CLIEntryOutput;
   }
+  | {
+    type: "show-system-prompt";
+    agent?: CLIEntryAgentMode;
+    cwd?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string; output?: CLIEntryOutput };
@@ -204,6 +210,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let systemPromptAction: "set" | "unset" | undefined;
   let systemPrompt: string | undefined;
   let systemPromptFile: string | undefined;
+  let showSystemPromptMode = false;
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
@@ -400,6 +407,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--unset-system-prompt") {
       systemPromptAction = "unset";
+      continue;
+    }
+    if (arg === "--show-system-prompt") {
+      showSystemPromptMode = true;
       continue;
     }
     if (arg === "--export-session") {
@@ -608,7 +619,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
-  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --status with another headless mode");
   }
   if (
@@ -623,6 +634,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || initMode
       || initInstructionsMode
       || showPermissionsMode
+      || showSystemPromptMode
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
@@ -659,6 +671,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || previewContextMode
       || showHistoryMode
       || showPermissionsMode
+      || showSystemPromptMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -690,6 +703,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || previewContextMode
       || showHistoryMode
       || showPermissionsMode
+      || showSystemPromptMode
       || gitAction !== undefined
       || permissionAction !== undefined
       || systemPromptAction !== undefined
@@ -823,8 +837,11 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       : "--unset-system-prompt";
     return parseError(`Cannot combine ${flag} with another headless mode`);
   }
-  if (showPermissionsMode && (printMode || doctorMode || diagnosticsMode || statusMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+  if (showPermissionsMode && (printMode || doctorMode || diagnosticsMode || statusMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
     return parseError("Cannot combine --show-permissions with another headless mode");
+  }
+  if (showSystemPromptMode && (printMode || doctorMode || diagnosticsMode || statusMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
+    return parseError("Cannot combine --show-system-prompt with another headless mode");
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
@@ -916,6 +933,17 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(cwd !== undefined && { cwd }),
       ...(systemPrompt !== undefined && { prompt: systemPrompt }),
       ...(systemPromptFile !== undefined && { promptFile: systemPromptFile }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (showSystemPromptMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --show-system-prompt");
+    }
+    return {
+      type: "show-system-prompt",
+      ...(agent !== undefined && { agent }),
+      ...(cwd !== undefined && { cwd }),
       ...(output !== undefined && { output }),
     };
   }
@@ -1168,7 +1196,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1233,6 +1261,7 @@ export function formatCLIHelp(): string {
     "  --show-permissions Show effective permission policy",
     "  --set-permission Set a project permission rule",
     "  --unset-permission Unset a project permission rule",
+    "  --show-system-prompt Show effective system prompt",
     "  --set-system-prompt Set the project system prompt",
     "  --system-prompt-file Read project system prompt from a file. Use - to read stdin for prompt files",
     "  --unset-system-prompt Unset the project system prompt",

@@ -47,6 +47,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--show-permissions", description: "Show effective permission policy" },
   { long: "--set-permission", description: "Set a project permission rule" },
   { long: "--unset-permission", description: "Unset a project permission rule" },
+  { long: "--show-system-prompt", description: "Show effective system prompt" },
   { long: "--set-system-prompt", description: "Set the project system prompt" },
   { long: "--system-prompt-file", description: "Read project system prompt from a file. Use - to read stdin" },
   { long: "--unset-system-prompt", description: "Unset the project system prompt" },

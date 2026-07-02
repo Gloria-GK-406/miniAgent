@@ -107,6 +107,7 @@ also accept `--json`.
 | `--diagnostics` | Yes | Run configured or discovered diagnostic commands |
 | `--set-permission <target> <allow|ask|deny>` | Yes | Persist a project permission rule such as `write` or `shell:npm *` |
 | `--unset-permission <target>` | Yes | Remove a project permission rule |
+| `--show-system-prompt` | Yes | Print the base system prompt and effective runtime prompt |
 | `--set-system-prompt <prompt>` | Yes | Persist the project system prompt |
 | `--system-prompt-file <path>` | Yes | Persist the project system prompt from a file |
 | `--unset-system-prompt` | Yes | Remove the project system prompt |
@@ -129,6 +130,7 @@ miniagent --show-history --json
 miniagent --git-status
 miniagent --show-permissions --json
 miniagent --set-permission "shell:npm *" allow
+miniagent --show-system-prompt --agent plan --json
 miniagent --system-prompt-file .cliagent/system.md
 miniagent --print --prompt-file task.md --json
 miniagent --diagnostics

@@ -449,6 +449,7 @@ and shell integration:
 | `--show-permissions [--json]` | Print the effective allow/ask/deny policy |
 | `--set-permission <target> <allow|ask|deny>` | Persist a project permission rule |
 | `--unset-permission <target>` | Remove a project permission rule |
+| `--show-system-prompt [--json]` | Print the base and effective system prompt |
 | `--set-system-prompt <prompt>` / `--system-prompt-file <path>` | Set project system prompt |
 | `--unset-system-prompt` | Remove project system prompt |
 | `--export-session`, `--import-session` | Move session transcripts in and out |
