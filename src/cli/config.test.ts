@@ -437,4 +437,26 @@ describe("CLI config provider mode", () => {
       error.mockRestore();
     }
   });
+
+  it("loads config files with a UTF-8 BOM", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-config-bom-"));
+    await mkdir(join(baseDir, ".cliagent"), { recursive: true });
+    await writeFile(
+      join(baseDir, ".cliagent", "config.json"),
+      `\uFEFF${JSON.stringify({
+        providers: [provider("bom")],
+        defaultModel: "bom",
+      })}`,
+      "utf-8",
+    );
+
+    await expect(loadConfig(baseDir, {
+      platform: "linux",
+      env: {},
+      homeDir: baseDir,
+    })).resolves.toMatchObject({
+      providers: [provider("bom")],
+      defaultModel: "bom",
+    });
+  });
 });

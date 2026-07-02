@@ -213,7 +213,8 @@ function mergeConfigObjects(base: unknown, override: unknown): unknown {
 
 async function readJsonIfExists(path: string): Promise<unknown | null> {
   try {
-    return JSON.parse(await readFile(path, "utf-8")) as unknown;
+    const content = await readFile(path, "utf-8");
+    return JSON.parse(content.replace(/^\uFEFF/, "")) as unknown;
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return null;
