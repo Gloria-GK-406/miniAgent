@@ -1,11 +1,13 @@
 export type CLIEntryAction =
   | { type: "tui"; cwd?: string; prompt?: string }
+  | { type: "print"; cwd?: string; prompt: string }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
 
 export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let cwd: string | undefined;
+  let printMode = false;
   const promptParts: string[] = [];
 
   for (let index = 0; index < args.length; index++) {
@@ -15,6 +17,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--version" || arg === "-v") {
       return { type: "version" };
+    }
+    if (arg === "--print" || arg === "-p") {
+      printMode = true;
+      continue;
     }
     if (arg === "--cwd") {
       const next = args[index + 1];
@@ -33,6 +39,17 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
 
   const prompt = promptParts.join(" ").trim();
+  if (printMode) {
+    if (prompt.length === 0) {
+      return { type: "error", message: "Missing prompt for --print" };
+    }
+    return {
+      type: "print",
+      ...(cwd !== undefined && { cwd }),
+      prompt,
+    };
+  }
+
   return {
     type: "tui",
     ...(cwd !== undefined && { cwd }),
@@ -51,6 +68,7 @@ export function formatCLIHelp(): string {
     "",
     "Options:",
     "  --cwd <path>    Open the TUI for a specific project directory",
+    "  -p, --print     Run one prompt headlessly and print the final response",
     "  -h, --help      Show this help text",
     "  -v, --version   Show package version",
   ].join("\n");

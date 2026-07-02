@@ -28,6 +28,25 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("prints a prompt without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--print", "explain", "the", "repo"])).toEqual({
+      type: "print",
+      prompt: "explain the repo",
+    });
+    expect(parseCLIEntryArgs(["-p", "hello"])).toEqual({
+      type: "print",
+      prompt: "hello",
+    });
+  });
+
+  it("prints from an explicit working directory", () => {
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--print", "fix", "tests"])).toEqual({
+      type: "print",
+      cwd: "C:/repo",
+      prompt: "fix tests",
+    });
+  });
+
   it("recognizes help flags", () => {
     expect(parseCLIEntryArgs(["--help"])).toEqual({ type: "help" });
     expect(parseCLIEntryArgs(["-h"])).toEqual({ type: "help" });
@@ -52,11 +71,19 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects print mode without a prompt", () => {
+    expect(parseCLIEntryArgs(["--print"])).toEqual({
+      type: "error",
+      message: "Missing prompt for --print",
+    });
+  });
+
   it("formats concise help text", () => {
     const help = formatCLIHelp();
 
     expect(help).toContain("Usage: miniagent");
     expect(help).toContain("--cwd");
+    expect(help).toContain("--print");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");
     expect(help).toContain("--version");
