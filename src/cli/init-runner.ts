@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { CLIAGENT_DIR, createDefaultConfigTemplate } from "./config.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
 export type InitConfigOutput = "text" | "json";
@@ -17,10 +18,6 @@ export interface InitConfigResult {
   overwritten: boolean;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function formatInitConfigResultJson(result: InitConfigResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
@@ -29,6 +26,7 @@ export async function runInitConfig(
   request: InitConfigRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   const configPath = join(request.baseDir, CLIAGENT_DIR, "config.json");
   try {
     await mkdir(dirname(configPath), { recursive: true });
@@ -43,17 +41,17 @@ export async function runInitConfig(
       overwritten: request.force === true,
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatInitConfigResultJson(result)
         : `${request.force === true ? "Reinitialized" : "Created"} config ${configPath}\n`,
     );
     return 0;
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-      streams.stderr(`Config already exists: ${configPath}\n`);
+      writeHeadlessError(streams, `Config already exists: ${configPath}`, output);
       return 1;
     }
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }

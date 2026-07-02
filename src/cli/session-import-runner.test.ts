@@ -77,4 +77,21 @@ describe("runSessionImport", () => {
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining('"sessionName": "Imported"'));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints import errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-headless-import-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runSessionImport({
+      baseDir,
+      inputPath: "missing.json",
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"ok\": false"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"error\":"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("missing.json"));
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

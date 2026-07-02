@@ -78,4 +78,20 @@ describe("runProjectInstructionsInit", () => {
     await expect(readFile(path, "utf-8")).resolves.not.toBe("existing");
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints project instruction errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-init-instructions-"));
+    await writeFile(join(baseDir, "package.json"), "not json", "utf-8");
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runProjectInstructionsInit({
+      baseDir,
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"ok\": false"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"error\":"));
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

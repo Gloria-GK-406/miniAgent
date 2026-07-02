@@ -49,6 +49,25 @@ describe("runInitConfig", () => {
     expect(stderr).toHaveBeenCalledWith(`Config already exists: ${configPath}\n`);
   });
 
+  it("prints init errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-init-"));
+    const configPath = join(baseDir, ".cliagent", "config.json");
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    await runInitConfig({ baseDir }, { stdout, stderr });
+
+    await expect(runInitConfig({
+      baseDir,
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenLastCalledWith(`${JSON.stringify({
+      ok: false,
+      error: `Config already exists: ${configPath}`,
+    }, null, 2)}\n`);
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
   it("overwrites existing config with force and prints json", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-init-"));
     const configPath = join(baseDir, ".cliagent", "config.json");

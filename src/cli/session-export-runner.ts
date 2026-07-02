@@ -1,5 +1,6 @@
 import { createExportService } from "./runtime/export-service.js";
 import { createCLISessionService } from "./runtime/session-service.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
 export type SessionExportFormat = "json" | "markdown";
@@ -20,10 +21,6 @@ export interface SessionExportResult {
   outputPath: string;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function formatSessionExportResultJson(result: SessionExportResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
@@ -32,6 +29,7 @@ export async function runSessionExport(
   request: SessionExportRequest,
   streams: PrintStreams,
 ): Promise<number> {
+  const output = request.output ?? "text";
   try {
     const sessionService = await createCLISessionService(request.baseDir);
     const session = request.sessionId === undefined
@@ -52,13 +50,13 @@ export async function runSessionExport(
       outputPath,
     };
     streams.stdout(
-      request.output === "json"
+      output === "json"
         ? formatSessionExportResultJson(result)
         : `${outputPath}\n`,
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
 }
