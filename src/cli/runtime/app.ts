@@ -1,4 +1,9 @@
-import { MessageType, type Message } from "../../core/types.js";
+import {
+  MessageType,
+  type Message,
+  type ToolCallMessage,
+  type ToolResultMessage,
+} from "../../core/types.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
 import { loadConfig, type CLIConfig, type CLIPermissionDecision } from "../config.js";
 import { completeActivityEntry, createActivityEntry } from "./activity.js";
@@ -336,28 +341,47 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
           const shellInput = input.trim();
           const command = shellInput.startsWith("!") ? shellInput.slice(1).trim() : shellInput;
           const toolCallId = crypto.randomUUID();
-          const messages: Message[] = [{
+          const userMessage: Message = {
             id: crypto.randomUUID(),
             type: MessageType.User,
             content: shellInput,
-          }, {
+          };
+          const toolCall: ToolCallMessage = {
             id: crypto.randomUUID(),
             type: MessageType.ToolCall,
             content: "",
             toolCallId,
             toolName: "shell",
             arguments: { command },
-          }, {
+          };
+          const toolResult: ToolResultMessage = {
             id: crypto.randomUUID(),
             type: MessageType.ToolResult,
             content: result.content,
             toolCallId,
-          }];
+          };
+          const messages: Message[] = [userMessage, toolCall, toolResult];
+          updateState({
+            currentTool: "shell",
+            activity: [
+              ...state.activity,
+              createActivityEntry(toolCall, new Date().toISOString()),
+            ].slice(-100),
+          });
+          emit({ type: "tool:start", toolCall });
           await sessionService.appendMessages(state.sessionId, messages);
           updateState({
+            currentTool: null,
             messages: [...state.messages, ...messages],
             sessions: sessionService.listSessions(),
+            activity: completeActivityEntry(
+              state.activity,
+              toolCall,
+              toolResult,
+              new Date().toISOString(),
+            ),
           });
+          emit({ type: "tool:result", toolCall, result: toolResult });
         }
       } catch (error: unknown) {
         updateState({ panel: { type: "error", message: errorMessage(error) } });

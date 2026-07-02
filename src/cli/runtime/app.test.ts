@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { spawn } from "node:child_process";
 import { ThinkingLevel } from "../../core/config.js";
 import { MessageType, type Message } from "../../core/types.js";
@@ -232,6 +232,53 @@ describe("createCLIRuntime", () => {
     const sessionService = await createCLISessionService(baseDir);
     await expect(sessionService.readMessages(runtime.getState().sessionId))
       .resolves.toEqual(stateMessages);
+    await runtime.destroy();
+  });
+
+  it("records shell shortcuts in activity and tool events", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-activity-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "allow",
+        shell: "allow",
+      },
+      shell: {
+        windows: "powershell",
+        executable: process.execPath,
+        args: ["-e"],
+        timeoutMs: 120000,
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    const listener = vi.fn();
+    runtime.subscribe(listener);
+
+    await runtime.submitInput("!console.log('activity-ok')");
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      type: "tool:start",
+      toolCall: expect.objectContaining({
+        type: MessageType.ToolCall,
+        toolName: "shell",
+        arguments: { command: "console.log('activity-ok')" },
+      }),
+    }));
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      type: "tool:result",
+      result: expect.objectContaining({
+        type: MessageType.ToolResult,
+        content: "activity-ok\n",
+      }),
+    }));
+    expect(runtime.getState().activity).toEqual([
+      expect.objectContaining({
+        kind: "tool",
+        name: "shell",
+        status: "done",
+        summary: "activity-ok",
+      }),
+    ]);
     await runtime.destroy();
   });
 
