@@ -1,7 +1,7 @@
 import type { CommandRegistry } from "./command-registry.js";
 import type { PermissionService } from "./permission-service.js";
 import type { ReferenceService, ResolvedReference } from "./reference-service.js";
-import type { ShellService } from "./shell-service.js";
+import type { ShellExecuteResult, ShellService } from "./shell-service.js";
 import type { CLICommandContext } from "./types.js";
 
 export type RoutedInputResult =
@@ -65,6 +65,20 @@ async function assertShellPermission(deps: InputRouterDeps, command: string): Pr
   }
 }
 
+function formatShellShortcutResult(result: ShellExecuteResult): string {
+  const output = [result.stdout, result.stderr]
+    .filter((part) => part.trim().length > 0)
+    .join("\n") || "[No output]";
+  const suffix = result.timedOut
+    ? "\n[Timed out]"
+    : result.aborted
+      ? "\n[Aborted]"
+      : result.exitCode !== 0
+        ? `\n[Exit code: ${result.exitCode ?? "unknown"}]`
+        : "";
+  return `${output}${suffix}`;
+}
+
 export function createInputRouter(deps: InputRouterDeps): InputRouter {
   return {
     route: async (ctx, input): Promise<RoutedInputResult> => {
@@ -80,10 +94,7 @@ export function createInputRouter(deps: InputRouterDeps): InputRouter {
           command,
           ...(deps.cwd !== undefined && { cwd: deps.cwd }),
         });
-        const content = [result.stdout, result.stderr]
-          .filter((part) => part.trim().length > 0)
-          .join("\n");
-        return { type: "shell", content: content || "[No output]" };
+        return { type: "shell", content: formatShellShortcutResult(result) };
       }
       const references = await deps.referenceService.resolveReferences(input);
       return {

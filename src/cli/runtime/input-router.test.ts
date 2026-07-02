@@ -36,6 +36,51 @@ describe("InputRouter", () => {
     expect(result).toEqual({ type: "shell", content: "ok" });
   });
 
+  it("includes shell shortcut status when command output is empty or unsuccessful", async () => {
+    const shell = {
+      execute: vi.fn()
+        .mockResolvedValueOnce({
+          stdout: "",
+          stderr: "",
+          exitCode: 7,
+          timedOut: false,
+          aborted: false,
+        })
+        .mockResolvedValueOnce({
+          stdout: "",
+          stderr: "",
+          exitCode: null,
+          timedOut: true,
+          aborted: false,
+        })
+        .mockResolvedValueOnce({
+          stdout: "",
+          stderr: "",
+          exitCode: null,
+          timedOut: false,
+          aborted: true,
+        }),
+    };
+    const router = createInputRouter({
+      commandRegistry: { execute: vi.fn() },
+      shellService: shell,
+      referenceService: { resolveReferences: vi.fn() },
+    });
+
+    await expect(router.route({} as never, "!exit 7")).resolves.toEqual({
+      type: "shell",
+      content: "[No output]\n[Exit code: 7]",
+    });
+    await expect(router.route({} as never, "!slow")).resolves.toEqual({
+      type: "shell",
+      content: "[No output]\n[Timed out]",
+    });
+    await expect(router.route({} as never, "!sleep")).resolves.toEqual({
+      type: "shell",
+      content: "[No output]\n[Aborted]",
+    });
+  });
+
   it("rejects denied shell shortcuts before execution", async () => {
     const shell = {
       execute: vi.fn(async () => ({
