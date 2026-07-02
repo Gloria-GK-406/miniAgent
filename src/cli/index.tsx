@@ -12,6 +12,7 @@ import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { runSessionExport } from "./session-export-runner.js";
+import { runSessionImport } from "./session-import-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
 
 function readPackageVersion(): string {
@@ -62,6 +63,18 @@ async function main(): Promise<void> {
       ...(action.sessionId !== undefined && { sessionId: action.sessionId }),
       ...(action.format !== undefined && { format: action.format }),
       ...(action.outputPath !== undefined && { outputPath: action.outputPath }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "import-session") {
+    process.exitCode = await runSessionImport({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      inputPath: action.inputPath,
+      ...(action.name !== undefined && { name: action.name }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

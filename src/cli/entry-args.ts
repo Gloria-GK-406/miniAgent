@@ -45,6 +45,13 @@ export type CLIEntryAction =
     outputPath?: string;
     output?: CLIEntryOutput;
   }
+  | {
+    type: "import-session";
+    cwd?: string;
+    inputPath: string;
+    name?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -60,8 +67,11 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let doctorMode = false;
   let listSessionsMode = false;
   let exportSessionMode = false;
+  let importSessionMode = false;
   let exportFormat: CLIEntryExportFormat | undefined;
   let outputPath: string | undefined;
+  let importInputPath: string | undefined;
+  let importName: string | undefined;
   let output: CLIEntryOutput | undefined;
   let promptFile: string | undefined;
   const promptParts: string[] = [];
@@ -93,6 +103,25 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
         sessionId = next;
         index++;
       }
+      continue;
+    }
+    if (arg === "--import-session") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing path after --import-session" };
+      }
+      importSessionMode = true;
+      importInputPath = next;
+      index++;
+      continue;
+    }
+    if (arg === "--name") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing name after --name" };
+      }
+      importName = next;
+      index++;
       continue;
     }
     if (arg === "--json") {
@@ -207,6 +236,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (exportSessionMode && (printMode || doctorMode || listSessionsMode)) {
     return { type: "error", message: "Cannot combine --export-session with another headless mode" };
   }
+  if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
+    return { type: "error", message: "Cannot combine --import-session with another headless mode" };
+  }
+  if (importSessionMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --import-session" };
+    }
+    return {
+      type: "import-session",
+      inputPath: importInputPath!,
+      ...(cwd !== undefined && { cwd }),
+      ...(importName !== undefined && { name: importName }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (exportSessionMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --export-session" };
@@ -266,7 +310,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --list-sessions, or --export-session",
+      message: "Cannot use --json without --print, --doctor, --list-sessions, --export-session, or --import-session",
     };
   }
 
@@ -301,6 +345,8 @@ export function formatCLIHelp(): string {
     "  --new-session   Create and start in a named session",
     "  --list-sessions List sessions headlessly",
     "  --export-session Export a session headlessly",
+    "  --import-session Import a session export headlessly",
+    "  --name           Set imported session name",
     "  --format         Set export format: json or markdown",
     "  --output         Set export output path",
     "  -m, --model     Select a configured model by id or provider/id",
