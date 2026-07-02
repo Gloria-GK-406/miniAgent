@@ -210,6 +210,18 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("deletes a session without opening the TUI", () => {
+    expect(parseCLIEntryArgs([
+      "--delete-session",
+      "s1",
+      "--json",
+    ])).toEqual({
+      type: "delete-session",
+      sessionId: "s1",
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -373,10 +385,25 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed delete session options", () => {
+    expect(parseCLIEntryArgs(["--delete-session"])).toEqual({
+      type: "error",
+      message: "Missing session id after --delete-session",
+    });
+    expect(parseCLIEntryArgs(["--delete-session", "--json"])).toEqual({
+      type: "error",
+      message: "Missing session id after --delete-session",
+    });
+    expect(parseCLIEntryArgs(["--delete-session", "s1", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --delete-session",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, or --import-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, or --delete-session",
     });
   });
 
@@ -394,6 +421,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--diagnostics");
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");
+    expect(help).toContain("--delete-session");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");

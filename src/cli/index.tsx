@@ -12,6 +12,7 @@ import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
+import { runSessionDelete } from "./session-delete-runner.js";
 import { runSessionExport } from "./session-export-runner.js";
 import { runSessionImport } from "./session-import-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
@@ -76,6 +77,17 @@ async function main(): Promise<void> {
       baseDir: resolve(action.cwd ?? process.cwd()),
       inputPath: action.inputPath,
       ...(action.name !== undefined && { name: action.name }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "delete-session") {
+    process.exitCode = await runSessionDelete({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      sessionId: action.sessionId,
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

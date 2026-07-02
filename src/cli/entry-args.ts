@@ -53,6 +53,12 @@ export type CLIEntryAction =
     name?: string;
     output?: CLIEntryOutput;
   }
+  | {
+    type: "delete-session";
+    cwd?: string;
+    sessionId: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -70,6 +76,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let listSessionsMode = false;
   let exportSessionMode = false;
   let importSessionMode = false;
+  let deleteSessionMode = false;
   let exportFormat: CLIEntryExportFormat | undefined;
   let outputPath: string | undefined;
   let importInputPath: string | undefined;
@@ -118,6 +125,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       }
       importSessionMode = true;
       importInputPath = next;
+      index++;
+      continue;
+    }
+    if (arg === "--delete-session") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return { type: "error", message: "Missing session id after --delete-session" };
+      }
+      deleteSessionMode = true;
+      sessionId = next;
       index++;
       continue;
     }
@@ -236,6 +253,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --diagnostics with another headless mode" };
   }
+  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode)) {
+    return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
+  }
   if (listSessionsMode && printMode) {
     return { type: "error", message: "Cannot use --list-sessions with --print" };
   }
@@ -254,6 +274,17 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     return {
       type: "diagnostics",
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (deleteSessionMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --delete-session" };
+    }
+    return {
+      type: "delete-session",
+      sessionId: sessionId!,
       ...(cwd !== undefined && { cwd }),
       ...(output !== undefined && { output }),
     };
@@ -329,7 +360,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, or --import-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, or --delete-session",
     };
   }
 
@@ -365,6 +396,7 @@ export function formatCLIHelp(): string {
     "  --list-sessions List sessions headlessly",
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
+    "  --delete-session Delete a session headlessly",
     "  --name           Set imported session name",
     "  --format         Set export format: json or markdown",
     "  --output         Set export output path",
