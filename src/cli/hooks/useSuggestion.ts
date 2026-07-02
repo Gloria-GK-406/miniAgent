@@ -9,6 +9,7 @@ const COMMANDS = [
   "/details",
   "/diff",
   "/diagnostics",
+  "/doctor",
   "/editor",
   "/exit",
   "/export",
@@ -20,6 +21,7 @@ const COMMANDS = [
   "/model",
   "/models",
   "/new",
+  "/permission",
   "/permissions",
   "/quit",
   "/redo",
@@ -32,6 +34,7 @@ const COMMANDS = [
 ];
 
 const AGENT_SUBS = ["list", "build", "plan"];
+const PERMISSION_SUBS = ["set", "unset"];
 const SESSION_SUBS = ["search", "new", "switch", "fork", "rename", "delete"];
 const SYSTEM_SUBS = ["set", "unset"];
 const COMMANDS_WITH_ARGS = new Set([
@@ -44,6 +47,7 @@ const COMMANDS_WITH_ARGS = new Set([
   "/init",
   "/model",
   "/new",
+  "/permission",
   "/permissions",
   "/sessions",
   "/system",
@@ -76,6 +80,9 @@ export function matchSuggestions(
     if (cmd === "/agent") {
       return AGENT_SUBS.filter((s) => s.startsWith(partial));
     }
+    if (cmd === "/permissions" || cmd === "/permission") {
+      return PERMISSION_SUBS.filter((s) => s.startsWith(partial));
+    }
     if (cmd === "/sessions" || cmd === "/session") {
       return SESSION_SUBS.filter((s) => s.startsWith(partial));
     }
@@ -89,6 +96,7 @@ export function matchSuggestions(
 
   if (matches.length === 1 && matches[0] === cmd) {
     if (cmd === "/agent") return AGENT_SUBS;
+    if (cmd === "/permissions" || cmd === "/permission") return PERMISSION_SUBS;
     if (cmd === "/sessions" || cmd === "/session") return SESSION_SUBS;
     if (cmd === "/system") return SYSTEM_SUBS;
     return [];

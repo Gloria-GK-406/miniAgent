@@ -58,6 +58,11 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/sessions sw")).toEqual(["switch"]);
   });
 
+  it("matches /permissions subcommands and alias", () => {
+    expect(matchSuggestions("/permissions")).toEqual(["set", "unset"]);
+    expect(matchSuggestions("/permission se")).toEqual(["set"]);
+  });
+
   it("matches /system subcommands", () => {
     expect(matchSuggestions("/system")).toEqual(["set", "unset"]);
     expect(matchSuggestions("/system un")).toEqual(["unset"]);
@@ -120,9 +125,14 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/di")).toEqual(["/diff", "/diagnostics"]);
     expect(matchSuggestions("/ed")).toEqual(["/editor"]);
     expect(matchSuggestions("/ac")).toEqual(["/activity"]);
-    expect(matchSuggestions("/pe")).toEqual(["/permissions"]);
+    expect(matchSuggestions("/pe")).toEqual(["/permission", "/permissions"]);
     expect(matchSuggestions("/sy")).toEqual(["/system"]);
     expect(matchSuggestions("/in")).toEqual(["/init"]);
+  });
+
+  it("matches command aliases", () => {
+    expect(matchSuggestions("/do")).toEqual(["/doctor"]);
+    expect(matchSuggestions("/perm")).toEqual(["/permission", "/permissions"]);
   });
 });
 
