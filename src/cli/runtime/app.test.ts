@@ -145,6 +145,21 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("persists the selected agent mode for the session", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-session-mode-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/agent plan");
+
+    expect(runtime.getState().mode).toBe("plan");
+    await runtime.destroy();
+
+    const reloaded = await createCLIRuntime(baseDir);
+    expect(reloaded.getState().mode).toBe("plan");
+    await reloaded.destroy();
+  });
+
   it("edits permission policy from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-permissions-"));
     await writeConfig(baseDir);

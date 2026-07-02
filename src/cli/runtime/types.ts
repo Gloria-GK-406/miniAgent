@@ -92,6 +92,7 @@ export interface CLIAppRuntime {
   submitInput(input: string): Promise<void>;
   runCommand(name: string, args: string): Promise<void>;
   selectModel(path: string): Promise<void>;
+  setAgentMode(mode: CLIAgentMode): Promise<void>;
   rememberInputHistory(input: string): Promise<void>;
   createSession(name?: string): Promise<void>;
   switchSession(id: string): Promise<void>;

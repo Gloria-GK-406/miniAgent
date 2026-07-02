@@ -468,8 +468,7 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
         ctx.notice("info", `Current agent: ${ctx.getState().mode}`);
         return;
       }
-      ctx.updateState({ mode });
-      await ctx.runtime.rebuildAgent(`switch agent ${mode}`);
+      await ctx.runtime.setAgentMode(mode);
     },
   });
   registry.register({

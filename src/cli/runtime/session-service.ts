@@ -1,10 +1,22 @@
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { z } from "zod";
 import { SessionManager, SessionMetaSchema, type SessionMeta } from "../../core/session.js";
-import { MessageSchema, type Message } from "../../core/types.js";
-import { CLIAGENT_DIR } from "../config.js";
+import { MessageSchema, TokenCountSchema, type Message, type TokenCount } from "../../core/types.js";
+import { CLIAGENT_DIR, CLIAgentModeSchema, type CLIAgentMode } from "../config.js";
 
 const MESSAGE_FILE = "messages.jsonl";
+const CLI_META_FILE = "cli-meta.json";
+
+const EMPTY_TOKEN_USAGE: TokenCount = { input: 0, output: 0, total: 0 };
+
+export const CLISessionRuntimeMetadataSchema = z.object({
+  version: z.literal(1),
+  mode: CLIAgentModeSchema.optional(),
+  tokenUsage: TokenCountSchema.default(EMPTY_TOKEN_USAGE),
+}).strict();
+
+export type CLISessionRuntimeMetadata = z.infer<typeof CLISessionRuntimeMetadataSchema>;
 
 export interface CLISessionService {
   ensureActiveSession(): Promise<SessionMeta>;
@@ -17,6 +29,9 @@ export interface CLISessionService {
   deleteSession(id: string): Promise<void>;
   forkSession(id: string, name?: string): Promise<SessionMeta>;
   updateSessionModel(id: string, model: string): Promise<SessionMeta>;
+  readSessionRuntimeMetadata(id: string): Promise<CLISessionRuntimeMetadata>;
+  updateSessionMode(id: string, mode: CLIAgentMode): Promise<CLISessionRuntimeMetadata>;
+  updateSessionTokenUsage(id: string, tokenUsage: TokenCount): Promise<CLISessionRuntimeMetadata>;
   getSessionPersistDir(id: string): string;
   readMessages(id: string): Promise<Message[]>;
   writeMessages(id: string, messages: Message[]): Promise<void>;
@@ -119,6 +134,15 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     return manager.getSessionPersistDir(id);
   }
 
+  function getSessionRuntimeMetadataPath(id: string): string {
+    getSession(id);
+    return join(manager.getSessionDir(id), CLI_META_FILE);
+  }
+
+  async function touchSession(id: string): Promise<void> {
+    await manager.updateMeta(id, optionalMetaUpdates(getSession(id)));
+  }
+
   async function readMessages(id: string): Promise<Message[]> {
     const filePath = join(getSessionPersistDir(id), MESSAGE_FILE);
     try {
@@ -136,6 +160,51 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     await mkdir(persistDir, { recursive: true });
     await writeFile(join(persistDir, MESSAGE_FILE), serializeMessagesJsonl(messages), "utf-8");
     await manager.updateMeta(id, { messageCount: messages.length });
+  }
+
+  async function readSessionRuntimeMetadata(id: string): Promise<CLISessionRuntimeMetadata> {
+    try {
+      return CLISessionRuntimeMetadataSchema.parse(
+        JSON.parse(await readFile(getSessionRuntimeMetadataPath(id), "utf-8")) as unknown,
+      );
+    } catch (error: unknown) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return CLISessionRuntimeMetadataSchema.parse({ version: 1 });
+      }
+      throw error;
+    }
+  }
+
+  async function writeSessionRuntimeMetadata(
+    id: string,
+    metadata: CLISessionRuntimeMetadata,
+  ): Promise<CLISessionRuntimeMetadata> {
+    const parsed = CLISessionRuntimeMetadataSchema.parse(metadata);
+    await mkdir(manager.getSessionDir(id), { recursive: true });
+    await writeFile(
+      getSessionRuntimeMetadataPath(id),
+      `${JSON.stringify(parsed, null, 2)}\n`,
+      "utf-8",
+    );
+    await touchSession(id);
+    return parsed;
+  }
+
+  async function updateSessionMode(id: string, mode: CLIAgentMode): Promise<CLISessionRuntimeMetadata> {
+    return writeSessionRuntimeMetadata(id, {
+      ...await readSessionRuntimeMetadata(id),
+      mode,
+    });
+  }
+
+  async function updateSessionTokenUsage(
+    id: string,
+    tokenUsage: TokenCount,
+  ): Promise<CLISessionRuntimeMetadata> {
+    return writeSessionRuntimeMetadata(id, {
+      ...await readSessionRuntimeMetadata(id),
+      tokenUsage,
+    });
   }
 
   async function removeLastUserTurn(id: string): Promise<{ turnId: string; messages: Message[] }> {
@@ -208,6 +277,7 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     const forkPersistDir = manager.getSessionPersistDir(fork.id);
     await cp(sourcePersistDir, forkPersistDir, { recursive: true, force: true });
     await manager.updateMeta(fork.id, optionalMetaUpdates(source));
+    await writeSessionRuntimeMetadata(fork.id, await readSessionRuntimeMetadata(source.id));
     return getSession(fork.id);
   }
 
@@ -222,6 +292,9 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     deleteSession,
     forkSession,
     updateSessionModel,
+    readSessionRuntimeMetadata,
+    updateSessionMode,
+    updateSessionTokenUsage,
     getSessionPersistDir,
     readMessages,
     writeMessages,

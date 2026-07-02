@@ -65,6 +65,27 @@ describe("CLISessionService", () => {
     expect(service.getSession(session.id).model).toBe("openai/slow");
   });
 
+  it("persists CLI-local session metadata", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-session-cli-meta-"));
+    const service = await createCLISessionService(baseDir);
+    const session = await service.ensureActiveSession();
+
+    expect(await service.readSessionRuntimeMetadata(session.id)).toEqual({
+      version: 1,
+      tokenUsage: { input: 0, output: 0, total: 0 },
+    });
+
+    await service.updateSessionMode(session.id, "plan");
+    await service.updateSessionTokenUsage(session.id, { input: 10, output: 5, total: 15 });
+
+    const reloaded = await createCLISessionService(baseDir);
+    expect(await reloaded.readSessionRuntimeMetadata(session.id)).toEqual({
+      version: 1,
+      mode: "plan",
+      tokenUsage: { input: 10, output: 5, total: 15 },
+    });
+  });
+
   it("forks session data files", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-session-fork-"));
     const service = await createCLISessionService(baseDir);

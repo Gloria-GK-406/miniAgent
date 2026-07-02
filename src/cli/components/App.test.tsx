@@ -74,6 +74,10 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
       current = { ...current, modelName: path };
       emit({ type: "state", state: current });
     }),
+    setAgentMode: vi.fn(async (mode) => {
+      current = { ...current, mode };
+      emit({ type: "state", state: current });
+    }),
     rememberInputHistory: vi.fn(async () => undefined),
     answerApproval: vi.fn(),
     stop: vi.fn(),

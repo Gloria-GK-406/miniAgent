@@ -62,6 +62,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   let config = await loadConfig(baseDir);
   const sessionService = await createCLISessionService(baseDir);
   const session = await sessionService.ensureActiveSession();
+  const sessionRuntimeMetadata = await sessionService.readSessionRuntimeMetadata(session.id);
   const exportService = createExportService({ baseDir, sessionService });
   const projectInstructionsService = createProjectInstructionsService(baseDir);
   const permissionConfigService = createPermissionConfigService(baseDir);
@@ -83,7 +84,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const gitService = createGitService(baseDir);
   const doctorService = createDoctorService({ gitService, diagnosticsService });
   let activeTurnId: string | null = null;
-  let activeMode = config.defaultAgent;
+  let activeMode = sessionRuntimeMetadata.mode ?? config.defaultAgent;
   const referenceService = createReferenceService(baseDir);
   const snapshotService = createSnapshotService({
     baseDir,
@@ -148,7 +149,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     streamingText: "",
     reasoningText: "",
     turnCount: 0,
-    tokenUsage: { input: 0, output: 0, total: 0 },
+    tokenUsage: sessionRuntimeMetadata.tokenUsage,
     activity: [],
     panel: { type: "none" },
     approval: null,
@@ -269,7 +270,15 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         updateState({ reasoningText: state.reasoningText + payload.chunk.text });
       }
     });
-    built.agent.on("llm:response", (payload) => updateState({ tokenUsage: payload.response.tokenCount }));
+    built.agent.on("llm:response", (payload) => {
+      const tokenUsage = payload.response.tokenCount;
+      updateState({ tokenUsage });
+      void sessionService.updateSessionTokenUsage(state.sessionId, tokenUsage)
+        .then(() => updateState({ sessions: sessionService.listSessions() }))
+        .catch((error: unknown) => {
+          updateState({ panel: { type: "error", message: errorMessage(error) } });
+        });
+    });
     built.agent.on("tool:execute", (payload) => {
       updateState({
         currentTool: payload.toolCall.toolName,
@@ -302,6 +311,8 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   async function replaceAgentForActiveSession(): Promise<void> {
     const previous = built.agent;
     const active = sessionService.getActiveSession();
+    const runtimeMetadata = await sessionService.readSessionRuntimeMetadata(active.id);
+    activeMode = runtimeMetadata.mode ?? config.defaultAgent;
     built = await factory.build(active.id);
     applySessionModelPreference(active);
     await previous.destroy();
@@ -310,9 +321,11 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       sessionId: active.id,
       sessionName: active.name,
       sessions: sessionService.listSessions(),
+      mode: activeMode,
       modelName: formatCurrentModel(built.agent),
       modelPaths: getResolvedModelPaths(built.agent),
       messages: await built.agent.getMessages(),
+      tokenUsage: runtimeMetadata.tokenUsage,
       panel: { type: "none" },
     });
   }
@@ -411,6 +424,14 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         modelName,
         sessions: sessionService.listSessions(),
       });
+    },
+    setAgentMode: async (mode) => {
+      await sessionService.updateSessionMode(state.sessionId, mode);
+      updateState({
+        mode,
+        sessions: sessionService.listSessions(),
+      });
+      await rebuildCurrentAgent();
     },
     rememberInputHistory: async (input) => {
       updateState({ inputHistory: await inputHistoryService.append(input) });

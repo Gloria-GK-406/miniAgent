@@ -44,6 +44,7 @@ function runtime(current: CLIState): CLIAppRuntime {
     submitInput: vi.fn(async () => undefined),
     runCommand: vi.fn(async () => undefined),
     selectModel: vi.fn(async () => undefined),
+    setAgentMode: vi.fn(async () => undefined),
     rememberInputHistory: vi.fn(async () => undefined),
     createSession: vi.fn(async () => undefined),
     switchSession: vi.fn(async () => undefined),

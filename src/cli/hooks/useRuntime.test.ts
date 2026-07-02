@@ -47,6 +47,7 @@ describe("useRuntime", () => {
       submitInput: vi.fn(),
       runCommand: vi.fn(),
       selectModel: vi.fn(),
+      setAgentMode: vi.fn(),
       rememberInputHistory: vi.fn(),
       answerApproval: vi.fn(),
       stop: vi.fn(),

@@ -38,6 +38,9 @@ function ctx(): CLICommandContext {
   let current = state();
   return {
     runtime: {
+      setAgentMode: vi.fn(async (mode) => {
+        current = { ...current, mode };
+      }),
       rebuildAgent: vi.fn(async () => undefined),
       destroy: vi.fn(async () => undefined),
     } as unknown as CLICommandContext["runtime"],
@@ -99,7 +102,7 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.selectModel).toHaveBeenCalledWith("openai/fast");
   });
 
-  it("switches agent mode and rebuilds the runtime agent", async () => {
+  it("switches agent mode through the runtime", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);
     const commandCtx = ctx();
@@ -107,7 +110,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/agent plan");
 
     expect(commandCtx.getState().mode).toBe("plan");
-    expect(commandCtx.runtime.rebuildAgent).toHaveBeenCalledWith("switch agent plan");
+    expect(commandCtx.runtime.setAgentMode).toHaveBeenCalledWith("plan");
   });
 
   it("opens the agent list when /agent has no mode", async () => {

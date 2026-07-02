@@ -50,6 +50,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     submitInput: vi.fn(async () => undefined),
     runCommand: vi.fn(async () => undefined),
     selectModel: vi.fn(async () => undefined),
+    setAgentMode: vi.fn(async () => undefined),
     rememberInputHistory: vi.fn(async () => undefined),
     answerApproval: vi.fn(),
     stop: vi.fn(),
