@@ -7,8 +7,10 @@ import { CLIAGENT_DIR, CLIAgentModeSchema, type CLIAgentMode } from "../config.j
 
 const MESSAGE_FILE = "messages.jsonl";
 const CLI_META_FILE = "cli-meta.json";
+const ACTIVE_SESSION_FILE = "active-session.json";
 
 const EMPTY_TOKEN_USAGE: TokenCount = { input: 0, output: 0, total: 0 };
+const ActiveSessionSchema = z.object({ id: z.string() }).strict();
 
 export const CLISessionRuntimeMetadataSchema = z.object({
   version: z.literal(1),
@@ -89,7 +91,8 @@ function optionalMetaUpdates(meta: SessionMeta): Partial<Pick<SessionMeta, "mess
 }
 
 export async function createCLISessionService(baseDir: string): Promise<CLISessionService> {
-  const manager = new SessionManager(join(baseDir, CLIAGENT_DIR));
+  const cliAgentDir = join(baseDir, CLIAGENT_DIR);
+  const manager = new SessionManager(cliAgentDir);
   await manager.load();
 
   function parseMeta(meta: SessionMeta): SessionMeta {
@@ -112,20 +115,50 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     return parseMeta(active);
   }
 
+  async function readPersistedActiveSessionId(): Promise<string | null> {
+    try {
+      return ActiveSessionSchema.parse(
+        JSON.parse(await readFile(join(cliAgentDir, ACTIVE_SESSION_FILE), "utf-8")) as unknown,
+      ).id;
+    } catch (error: unknown) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async function persistActiveSession(id: string): Promise<void> {
+    getSession(id);
+    await mkdir(cliAgentDir, { recursive: true });
+    await writeFile(
+      join(cliAgentDir, ACTIVE_SESSION_FILE),
+      `${JSON.stringify({ id }, null, 2)}\n`,
+      "utf-8",
+    );
+  }
+
   async function ensureActiveSession(): Promise<SessionMeta> {
     const active = manager.getActive();
     if (active !== undefined) {
       return parseMeta(active);
     }
 
+    const persistedActiveId = await readPersistedActiveSessionId();
+    if (persistedActiveId !== null && manager.setActive(persistedActiveId)) {
+      return getActiveSession();
+    }
+
     const existing = manager.list()[0];
     if (existing !== undefined) {
       manager.setActive(existing.id);
+      await persistActiveSession(existing.id);
       return parseMeta(existing);
     }
 
     const created = await manager.create("default");
     manager.setActive(created.id);
+    await persistActiveSession(created.id);
     return parseMeta(created);
   }
 
@@ -232,6 +265,7 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
   async function createSession(name?: string): Promise<SessionMeta> {
     const created = await manager.create(name === undefined ? undefined : requireNonEmptyName(name));
     manager.setActive(created.id);
+    await persistActiveSession(created.id);
     return parseMeta(created);
   }
 
@@ -239,6 +273,7 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     if (!manager.setActive(id)) {
       throw new Error(`Session not found: ${id}`);
     }
+    await persistActiveSession(id);
     return getActiveSession();
   }
 
@@ -265,6 +300,7 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
       const next = manager.list()[0];
       if (next !== undefined) {
         manager.setActive(next.id);
+        await persistActiveSession(next.id);
       }
     }
   }

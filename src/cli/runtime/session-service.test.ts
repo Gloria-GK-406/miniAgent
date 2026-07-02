@@ -32,6 +32,18 @@ describe("CLISessionService", () => {
     );
   });
 
+  it("persists the active session selection", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-session-active-"));
+    const service = await createCLISessionService(baseDir);
+    const first = await service.ensureActiveSession();
+    await service.createSession("feature");
+
+    await service.switchSession(first.id);
+
+    const reloaded = await createCLISessionService(baseDir);
+    expect((await reloaded.ensureActiveSession()).id).toBe(first.id);
+  });
+
   it("reads and rewrites session messages", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-session-messages-"));
     const service = await createCLISessionService(baseDir);

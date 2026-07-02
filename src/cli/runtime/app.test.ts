@@ -391,6 +391,23 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("restores the active session after restart", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-active-session-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    const firstSessionId = runtime.getState().sessionId;
+    await runtime.submitInput("/new feature");
+    await runtime.submitInput(`/sessions switch ${firstSessionId}`);
+    await runtime.destroy();
+
+    const reloaded = await createCLIRuntime(baseDir);
+
+    expect(reloaded.getState().sessionId).toBe(firstSessionId);
+    expect(reloaded.getState().sessionName).toBe("default");
+    await reloaded.destroy();
+  });
+
   it("shows an error panel when deleting the last session", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-delete-last-"));
     await writeConfig(baseDir);
