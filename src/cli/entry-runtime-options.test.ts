@@ -31,6 +31,41 @@ describe("applyCLIEntryRuntimeOptions", () => {
     expect(runtime.runCommand).toHaveBeenCalledBefore(runtime.selectModel);
   });
 
+  it("switches the requested startup session before selecting a model", async () => {
+    const runtime = {
+      runCommand: vi.fn(async () => undefined),
+      selectModel: vi.fn(async () => undefined),
+      switchSession: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "tui",
+      sessionId: "s2",
+      model: "openai/fast",
+    });
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("s2");
+    expect(runtime.switchSession).toHaveBeenCalledBefore(runtime.selectModel);
+  });
+
+  it("creates the requested startup session before selecting a model", async () => {
+    const runtime = {
+      runCommand: vi.fn(async () => undefined),
+      selectModel: vi.fn(async () => undefined),
+      createSession: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "print",
+      newSession: "scratch",
+      model: "openai/fast",
+      prompt: "think",
+    });
+
+    expect(runtime.createSession).toHaveBeenCalledWith("scratch");
+    expect(runtime.createSession).toHaveBeenCalledBefore(runtime.selectModel);
+  });
+
   it("enables startup auto approval before selecting a model", async () => {
     const runtime = {
       runCommand: vi.fn(async () => undefined),

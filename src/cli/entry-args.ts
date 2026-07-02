@@ -1,8 +1,26 @@
 export type CLIEntryAgentMode = "build" | "plan";
 
 export type CLIEntryAction =
-  | { type: "tui"; agent?: CLIEntryAgentMode; autoApprove?: boolean; cwd?: string; model?: string; prompt?: string }
-  | { type: "print"; agent?: CLIEntryAgentMode; autoApprove?: boolean; cwd?: string; model?: string; prompt: string }
+  | {
+    type: "tui";
+    agent?: CLIEntryAgentMode;
+    autoApprove?: boolean;
+    cwd?: string;
+    model?: string;
+    sessionId?: string;
+    newSession?: string;
+    prompt?: string;
+  }
+  | {
+    type: "print";
+    agent?: CLIEntryAgentMode;
+    autoApprove?: boolean;
+    cwd?: string;
+    model?: string;
+    sessionId?: string;
+    newSession?: string;
+    prompt: string;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -12,6 +30,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let autoApprove = false;
   let cwd: string | undefined;
   let model: string | undefined;
+  let sessionId: string | undefined;
+  let newSession: string | undefined;
   let printMode = false;
   const promptParts: string[] = [];
 
@@ -52,6 +72,24 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       index++;
       continue;
     }
+    if (arg === "--session" || arg === "-s") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing session id after --session" };
+      }
+      sessionId = next;
+      index++;
+      continue;
+    }
+    if (arg === "--new-session") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing name after --new-session" };
+      }
+      newSession = next;
+      index++;
+      continue;
+    }
     if (arg === "--model" || arg === "-m") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
@@ -69,6 +107,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
 
   const prompt = promptParts.join(" ").trim();
+  if (sessionId !== undefined && newSession !== undefined) {
+    return { type: "error", message: "Cannot use --session with --new-session" };
+  }
+
   if (printMode) {
     if (prompt.length === 0) {
       return { type: "error", message: "Missing prompt for --print" };
@@ -79,6 +121,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(autoApprove && { autoApprove: true }),
       ...(cwd !== undefined && { cwd }),
       ...(model !== undefined && { model }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(newSession !== undefined && { newSession }),
       prompt,
     };
   }
@@ -89,6 +133,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     ...(autoApprove && { autoApprove: true }),
     ...(cwd !== undefined && { cwd }),
     ...(model !== undefined && { model }),
+    ...(sessionId !== undefined && { sessionId }),
+    ...(newSession !== undefined && { newSession }),
     ...(prompt.length > 0 && { prompt }),
   };
 }
@@ -107,6 +153,8 @@ export function formatCLIHelp(): string {
     "  -y, --auto-approve",
     "                  Auto-approve CLI tool calls for this run",
     "  --cwd <path>    Open the TUI for a specific project directory",
+    "  -s, --session   Resume a session by id",
+    "  --new-session   Create and start in a named session",
     "  -m, --model     Select a configured model by id or provider/id",
     "  -p, --print     Run one prompt headlessly and print the final response",
     "  -h, --help      Show this help text",

@@ -5,6 +5,12 @@ export async function applyCLIEntryRuntimeOptions(
   runtime: CLIAppRuntime,
   action: Extract<CLIEntryAction, { type: "tui" | "print" }>,
 ): Promise<void> {
+  if (action.sessionId !== undefined) {
+    await runtime.switchSession(action.sessionId);
+  }
+  if (action.newSession !== undefined) {
+    await runtime.createSession(action.newSession);
+  }
   if (action.autoApprove === true) {
     await runtime.runCommand("auto", "");
   }

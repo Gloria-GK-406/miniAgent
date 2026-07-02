@@ -24,6 +24,24 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("opens the TUI for a requested existing session", () => {
+    expect(parseCLIEntryArgs(["--session", "s2"])).toEqual({
+      type: "tui",
+      sessionId: "s2",
+    });
+    expect(parseCLIEntryArgs(["-s", "s2"])).toEqual({
+      type: "tui",
+      sessionId: "s2",
+    });
+  });
+
+  it("opens the TUI with a new named session", () => {
+    expect(parseCLIEntryArgs(["--new-session", "feature"])).toEqual({
+      type: "tui",
+      newSession: "feature",
+    });
+  });
+
   it("opens the TUI with an explicit agent mode", () => {
     expect(parseCLIEntryArgs(["--agent", "plan"])).toEqual({
       type: "tui",
@@ -50,12 +68,25 @@ describe("CLI entry args", () => {
   });
 
   it("opens an explicit working directory with an initial prompt", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--auto-approve", "--agent", "plan", "--model", "openai/fast", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs([
+      "--cwd",
+      "C:/repo",
+      "--session",
+      "s2",
+      "--auto-approve",
+      "--agent",
+      "plan",
+      "--model",
+      "openai/fast",
+      "fix",
+      "tests",
+    ])).toEqual({
       type: "tui",
       agent: "plan",
       autoApprove: true,
       cwd: "C:/repo",
       model: "openai/fast",
+      sessionId: "s2",
       prompt: "fix tests",
     });
   });
@@ -72,12 +103,26 @@ describe("CLI entry args", () => {
   });
 
   it("prints from an explicit working directory", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--auto-approve", "--agent", "plan", "--model", "openai/fast", "--print", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs([
+      "--cwd",
+      "C:/repo",
+      "--new-session",
+      "scratch",
+      "--auto-approve",
+      "--agent",
+      "plan",
+      "--model",
+      "openai/fast",
+      "--print",
+      "fix",
+      "tests",
+    ])).toEqual({
       type: "print",
       agent: "plan",
       autoApprove: true,
       cwd: "C:/repo",
       model: "openai/fast",
+      newSession: "scratch",
       prompt: "fix tests",
     });
   });
@@ -113,6 +158,21 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects missing or conflicting session startup options", () => {
+    expect(parseCLIEntryArgs(["--session"])).toEqual({
+      type: "error",
+      message: "Missing session id after --session",
+    });
+    expect(parseCLIEntryArgs(["--new-session"])).toEqual({
+      type: "error",
+      message: "Missing name after --new-session",
+    });
+    expect(parseCLIEntryArgs(["--session", "s1", "--new-session", "feature"])).toEqual({
+      type: "error",
+      message: "Cannot use --session with --new-session",
+    });
+  });
+
   it("rejects invalid startup agent modes before starting the TUI", () => {
     expect(parseCLIEntryArgs(["--agent"])).toEqual({
       type: "error",
@@ -139,6 +199,8 @@ describe("CLI entry args", () => {
     expect(help).toContain("--auto-approve");
     expect(help).toContain("--cwd");
     expect(help).toContain("--model");
+    expect(help).toContain("--session");
+    expect(help).toContain("--new-session");
     expect(help).toContain("--print");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");
