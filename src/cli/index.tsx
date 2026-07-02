@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render } from "ink";
 import { App } from "./components/App.js";
@@ -38,7 +38,7 @@ async function main(): Promise<void> {
   process.on("exit", cleanup);
 
   try {
-    const runtime = await createCLIRuntime(process.cwd());
+    const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
     render(<App runtime={runtime} />, { exitOnCtrlC: false });
   } catch (e: unknown) {
     process.stdout.write("\x1b[?1049l");
