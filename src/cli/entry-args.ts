@@ -4,6 +4,7 @@ export type CLIEntryExportFormat = "json" | "markdown";
 export type CLIEntryCompletionShell = "bash" | "zsh" | "fish" | "powershell";
 export type CLIEntryPermissionDecision = "allow" | "ask" | "deny";
 export type CLIEntryGitAction = "status" | "log" | "diff";
+export type CLIEntrySnapshotAction = "restore" | "reapply";
 
 export type CLIEntryAction =
   | {
@@ -157,6 +158,14 @@ export type CLIEntryAction =
     output?: CLIEntryOutput;
   }
   | {
+    type: "snapshot-action";
+    action: CLIEntrySnapshotAction;
+    cwd?: string;
+    sessionId?: string;
+    turnId: string;
+    output?: CLIEntryOutput;
+  }
+  | {
     type: "permission-update";
     action: "set" | "unset";
     cwd?: string;
@@ -202,6 +211,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let showHistoryMode = false;
   let listReferencesMode = false;
   let listSnapshotsMode = false;
+  let snapshotAction: CLIEntrySnapshotAction | undefined;
+  let snapshotTurnId: string | undefined;
   let gitAction: CLIEntryGitAction | undefined;
   let gitLogLimit: number | undefined;
   let gitDiffPath: string | undefined;
@@ -318,6 +329,19 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-snapshots") {
       listSnapshotsMode = true;
+      continue;
+    }
+    if (arg === "--restore-snapshot" || arg === "--reapply-snapshot") {
+      if (snapshotAction !== undefined) {
+        return parseError("Cannot combine snapshot action modes");
+      }
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return parseError(`Missing turn id after ${arg}`);
+      }
+      snapshotAction = arg === "--restore-snapshot" ? "restore" : "reapply";
+      snapshotTurnId = next;
+      index++;
       continue;
     }
     if (arg === "--git-status") {
@@ -625,7 +649,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --diagnostics with another headless mode");
   }
-  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
+  if (statusMode && (printMode || doctorMode || diagnosticsMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || showSystemPromptMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listReferencesMode || listSnapshotsMode || snapshotAction !== undefined || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --status with another headless mode");
   }
   if (
@@ -854,6 +878,43 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (showSystemPromptMode && (printMode || doctorMode || diagnosticsMode || statusMode || configPathsMode || showConfigMode || initMode || initInstructionsMode || showPermissionsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || listSnapshotsMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || clearSessionMode || renameSessionMode || forkSessionMode || completionShell !== undefined)) {
     return parseError("Cannot combine --show-system-prompt with another headless mode");
+  }
+  if (
+    snapshotAction !== undefined
+    && (
+      printMode
+      || doctorMode
+      || diagnosticsMode
+      || statusMode
+      || configPathsMode
+      || showConfigMode
+      || initMode
+      || initInstructionsMode
+      || showPermissionsMode
+      || showSystemPromptMode
+      || listSessionsMode
+      || listModelsMode
+      || listCommandsMode
+      || listToolsMode
+      || listAgentsMode
+      || previewContextMode
+      || showHistoryMode
+      || listReferencesMode
+      || listSnapshotsMode
+      || gitAction !== undefined
+      || permissionAction !== undefined
+      || systemPromptAction !== undefined
+      || exportSessionMode
+      || importSessionMode
+      || deleteSessionMode
+      || clearSessionMode
+      || renameSessionMode
+      || forkSessionMode
+      || completionShell !== undefined
+    )
+  ) {
+    const flag = snapshotAction === "restore" ? "--restore-snapshot" : "--reapply-snapshot";
+    return parseError(`Cannot combine ${flag} with another headless mode`);
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
@@ -1169,6 +1230,20 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (snapshotAction !== undefined) {
+    const flag = snapshotAction === "restore" ? "--restore-snapshot" : "--reapply-snapshot";
+    if (prompt.length > 0) {
+      return parseError(`Unexpected prompt for ${flag}`);
+    }
+    return {
+      type: "snapshot-action",
+      action: snapshotAction,
+      turnId: snapshotTurnId!,
+      ...(cwd !== undefined && { cwd }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (gitAction !== undefined) {
     const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
     if (prompt.length > 0) {
@@ -1218,7 +1293,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1260,6 +1335,8 @@ export function formatCLIHelp(): string {
     "  --show-history  Show session history headlessly",
     "  --list-references List file reference candidates headlessly",
     "  --list-snapshots Show workspace snapshots headlessly",
+    "  --restore-snapshot <turnId> Restore workspace files from a turn snapshot",
+    "  --reapply-snapshot <turnId> Reapply workspace files from a turn snapshot",
     "  --git-status    Print git status headlessly",
     "  --git-log       Print recent git commits headlessly",
     "  --git-diff      Print git diff headlessly",

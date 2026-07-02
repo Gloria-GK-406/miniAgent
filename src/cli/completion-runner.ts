@@ -23,6 +23,8 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--show-history", description: "Show session history headlessly" },
   { long: "--list-references", description: "List file reference candidates headlessly" },
   { long: "--list-snapshots", description: "Show workspace snapshots headlessly" },
+  { long: "--restore-snapshot", description: "Restore workspace files from a turn snapshot" },
+  { long: "--reapply-snapshot", description: "Reapply workspace files from a turn snapshot" },
   { long: "--git-status", description: "Print git status headlessly" },
   { long: "--git-log", description: "Print recent git commits headlessly" },
   { long: "--git-diff", description: "Print git diff headlessly" },

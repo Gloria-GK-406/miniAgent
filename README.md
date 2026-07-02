@@ -442,6 +442,9 @@ and shell integration:
 | `--preview-context [--json]` | Preview the assembled runtime context |
 | `--show-history [--json]` | Show current session messages |
 | `--list-references [--json]` | List files available to `@file` references |
+| `--list-snapshots [--json]` | List workspace file snapshots by turn |
+| `--restore-snapshot <turnId> [--json]` | Restore workspace files from a turn snapshot |
+| `--reapply-snapshot <turnId> [--json]` | Reapply workspace files from a turn snapshot |
 | `--git-status`, `--git-log [limit]`, `--git-diff [path] [--staged]` | Inspect git state headlessly |
 | `--list-sessions [--json]` | List project sessions |
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |

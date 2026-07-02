@@ -10,6 +10,9 @@
 - `/permissions`：查看当前 allow/ask/deny 权限策略。
 - `/references`：查看可用于 `@file` 引用补全的文件。
 - `--list-references [--json]`：以 headless 方式查看可用于 `@file` 引用补全的文件。
+- `--list-snapshots [--json]`：以 headless 方式查看 turn 文件快照。
+- `--restore-snapshot <turnId> [--json]`：以 headless 方式恢复指定 turn 的文件快照。
+- `--reapply-snapshot <turnId> [--json]`：以 headless 方式重新应用指定 turn 的文件快照。
 - `--show-permissions [--json]`：以 headless 方式查看当前 allow/ask/deny 权限策略。
 - `--show-system-prompt [--json]`：以 headless 方式查看基础和实际生效的系统提示词。
 - `/system`：查看基础系统提示词和实际生效的系统提示词。

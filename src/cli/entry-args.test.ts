@@ -322,6 +322,22 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("restores and reapplies snapshots without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--restore-snapshot", "turn-1"])).toEqual({
+      type: "snapshot-action",
+      action: "restore",
+      turnId: "turn-1",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--session", "s2", "--reapply-snapshot", "turn-1", "--json"])).toEqual({
+      type: "snapshot-action",
+      action: "reapply",
+      cwd: "C:/repo",
+      sessionId: "s2",
+      turnId: "turn-1",
+      output: "json",
+    });
+  });
+
   it("runs read-only git commands without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--git-status"])).toEqual({
       type: "git-headless",
@@ -735,6 +751,26 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed snapshot restore modes", () => {
+    expect(parseCLIEntryArgs(["--restore-snapshot"])).toEqual({
+      type: "error",
+      message: "Missing turn id after --restore-snapshot",
+    });
+    expect(parseCLIEntryArgs(["--reapply-snapshot", "--json"])).toEqual({
+      type: "error",
+      message: "Missing turn id after --reapply-snapshot",
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--restore-snapshot", "turn-1", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --restore-snapshot",
+    });
+    expect(parseCLIEntryArgs(["--status", "--restore-snapshot", "turn-1"])).toEqual({
+      type: "error",
+      message: "Cannot combine --status with another headless mode",
+    });
+  });
+
   it("rejects prompted reference listing mode", () => {
     expect(parseCLIEntryArgs(["--list-references", "prompt"])).toEqual({
       type: "error",
@@ -966,7 +1002,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
       output: "json",
     });
   });
@@ -1004,6 +1040,8 @@ describe("CLI entry args", () => {
     expect(help).toContain("--show-history");
     expect(help).toContain("--list-references");
     expect(help).toContain("--list-snapshots");
+    expect(help).toContain("--restore-snapshot");
+    expect(help).toContain("--reapply-snapshot");
     expect(help).toContain("--git-status");
     expect(help).toContain("--git-log");
     expect(help).toContain("--git-diff");

@@ -13,6 +13,8 @@ describe("formatCompletionScript", () => {
       "--staged",
       "--list-references",
       "--list-snapshots",
+      "--restore-snapshot",
+      "--reapply-snapshot",
       "--show-permissions",
       "--show-system-prompt",
       "--clear-session",
@@ -42,6 +44,8 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--show-history");
     expect(script).toContain("--list-references");
     expect(script).toContain("--list-snapshots");
+    expect(script).toContain("--restore-snapshot");
+    expect(script).toContain("--reapply-snapshot");
     expect(script).toContain("--git-status");
     expect(script).toContain("--git-log");
     expect(script).toContain("--git-diff");

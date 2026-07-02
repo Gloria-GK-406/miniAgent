@@ -96,6 +96,9 @@ also accept `--json`.
 | `--preview-context` | Yes | Preview the assembled runtime context for the selected session and agent |
 | `--show-history` | Yes | Show current session messages |
 | `--list-references` | Yes | List files available to `@file` reference autocomplete |
+| `--list-snapshots` | Yes | List workspace file snapshots by turn |
+| `--restore-snapshot <turnId>` | Yes | Restore workspace files from a turn snapshot |
+| `--reapply-snapshot <turnId>` | Yes | Reapply workspace files from a turn snapshot |
 | `--git-status` | Yes | Print short git status |
 | `--git-log [limit]` | Yes | Print recent git commits |
 | `--git-diff [path] [--staged]` | Yes | Print workspace or staged git diff |
@@ -129,6 +132,9 @@ miniagent --list-agents --json
 miniagent --preview-context --json
 miniagent --show-history --json
 miniagent --list-references --json
+miniagent --list-snapshots --json
+miniagent --restore-snapshot turn-1
+miniagent --reapply-snapshot turn-1 --json
 miniagent --git-status
 miniagent --show-permissions --json
 miniagent --set-permission "shell:npm *" allow

@@ -52,6 +52,21 @@ describe("applyCLIEntryRuntimeOptions", () => {
     expect(runtime.switchSession).toHaveBeenCalledWith("s2");
   });
 
+  it("accepts snapshot restore actions with a startup session", async () => {
+    const runtime = {
+      switchSession: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "snapshot-action",
+      action: "restore",
+      sessionId: "s2",
+      turnId: "turn-1",
+    });
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("s2");
+  });
+
   it("selects the requested startup model when present", async () => {
     const runtime = {
       runCommand: vi.fn(async () => undefined),
