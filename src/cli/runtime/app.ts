@@ -4,6 +4,7 @@ import {
   type ToolCallMessage,
   type ToolResultMessage,
 } from "../../core/types.js";
+import { type SessionMeta } from "../../core/session.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
 import { loadConfig, type CLIConfig, type CLIPermissionDecision } from "../config.js";
 import { completeActivityEntry, createActivityEntry } from "./activity.js";
@@ -117,6 +118,15 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   });
   let built = await factory.build(session.id);
 
+  function applySessionModelPreference(meta: SessionMeta): void {
+    if (meta.model === undefined) {
+      return;
+    }
+    selectResolvedModelForCLI(built.agent, meta.model);
+  }
+
+  applySessionModelPreference(session);
+
   state = {
     baseDir,
     config,
@@ -210,7 +220,9 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   async function rebuildCurrentAgent(): Promise<void> {
     const previous = built.agent;
+    const active = sessionService.getActiveSession();
     built = await factory.build(state.sessionId);
+    applySessionModelPreference(active);
     await previous.destroy();
     bindAgentEvents();
     updateState({
@@ -291,6 +303,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     const previous = built.agent;
     const active = sessionService.getActiveSession();
     built = await factory.build(active.id);
+    applySessionModelPreference(active);
     await previous.destroy();
     bindAgentEvents();
     updateState({
@@ -391,8 +404,13 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       await registry.execute(createCommandContext(runtime), `/${name} ${args}`.trim());
     },
     selectModel: async (path) => {
-      selectResolvedModelForCLI(built.agent, path);
-      updateState({ modelName: formatCurrentModel(built.agent) });
+      const selected = selectResolvedModelForCLI(built.agent, path);
+      const modelName = formatResolvedModelPath(selected);
+      await sessionService.updateSessionModel(state.sessionId, modelName);
+      updateState({
+        modelName,
+        sessions: sessionService.listSessions(),
+      });
     },
     rememberInputHistory: async (input) => {
       updateState({ inputHistory: await inputHistoryService.append(input) });

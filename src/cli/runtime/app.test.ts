@@ -112,6 +112,39 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("persists selected models per session", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-session-model-"));
+    await writeConfig(baseDir, {
+      providers: [{
+        engine: "openai",
+        key: "sk-test",
+        models: [
+          { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+          { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
+        ],
+      }],
+      defaultModel: "fast",
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    const firstSessionId = runtime.getState().sessionId;
+    await runtime.submitInput("/new feature");
+    const secondSessionId = runtime.getState().sessionId;
+
+    await runtime.submitInput("/model openai/slow");
+
+    const sessionService = await createCLISessionService(baseDir);
+    expect(sessionService.getSession(secondSessionId).model).toBe("openai/slow");
+
+    await runtime.submitInput(`/sessions switch ${firstSessionId}`);
+    expect(runtime.getState().modelName).toBe("openai/fast");
+
+    await runtime.submitInput(`/sessions switch ${secondSessionId}`);
+    expect(runtime.getState().modelName).toBe("openai/slow");
+
+    await runtime.destroy();
+  });
+
   it("edits permission policy from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-permissions-"));
     await writeConfig(baseDir);

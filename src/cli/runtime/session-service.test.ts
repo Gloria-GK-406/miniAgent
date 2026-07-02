@@ -55,6 +55,16 @@ describe("CLISessionService", () => {
     expect(service.getSession(session.id).messageCount).toBe(2);
   });
 
+  it("updates the session model metadata", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-session-model-"));
+    const service = await createCLISessionService(baseDir);
+    const session = await service.ensureActiveSession();
+
+    await service.updateSessionModel(session.id, "openai/slow");
+
+    expect(service.getSession(session.id).model).toBe("openai/slow");
+  });
+
   it("forks session data files", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-session-fork-"));
     const service = await createCLISessionService(baseDir);

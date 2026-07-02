@@ -16,6 +16,7 @@ export interface CLISessionService {
   renameSession(id: string, name: string): Promise<SessionMeta>;
   deleteSession(id: string): Promise<void>;
   forkSession(id: string, name?: string): Promise<SessionMeta>;
+  updateSessionModel(id: string, model: string): Promise<SessionMeta>;
   getSessionPersistDir(id: string): string;
   readMessages(id: string): Promise<Message[]>;
   writeMessages(id: string, messages: Message[]): Promise<void>;
@@ -44,6 +45,14 @@ function requireNonEmptyName(name: string): string {
   const trimmed = name.trim();
   if (trimmed.length === 0) {
     throw new Error("Session name cannot be empty");
+  }
+  return trimmed;
+}
+
+function requireNonEmptyModel(model: string): string {
+  const trimmed = model.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Session model cannot be empty");
   }
   return trimmed;
 }
@@ -170,6 +179,12 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     return getSession(id);
   }
 
+  async function updateSessionModel(id: string, model: string): Promise<SessionMeta> {
+    getSession(id);
+    await manager.updateMeta(id, { model: requireNonEmptyModel(model) });
+    return getSession(id);
+  }
+
   async function deleteSession(id: string): Promise<void> {
     getSession(id);
     if (manager.list().length <= 1) {
@@ -206,6 +221,7 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     renameSession,
     deleteSession,
     forkSession,
+    updateSessionModel,
     getSessionPersistDir,
     readMessages,
     writeMessages,
