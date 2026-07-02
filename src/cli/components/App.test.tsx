@@ -269,6 +269,7 @@ describe("App", () => {
     );
 
     expect(output).toContain("/shortcut");
+    expect(output).toContain("/commands");
   });
 
   it("renders command usage and descriptions in the help panel", () => {

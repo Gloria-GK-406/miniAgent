@@ -122,6 +122,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/undo` | 撤销最后一个用户 turn 并恢复文件快照 |
 | `/redo` | 在可行时重新应用上一次撤销的 turn |
 | `/help` | 显示帮助 |
+| `/commands [query]` | 显示可搜索的 slash command 帮助 |
 | `/quit` | 退出 |
 
 ## 快捷键

@@ -45,6 +45,15 @@ function parsePositiveInteger(value: string | undefined): number | undefined {
   return parsed;
 }
 
+function showHelpPanel(ctx: CLICommandContext, args: string): void {
+  const query = args.trim();
+  ctx.updateState({
+    panel: query.length === 0
+      ? { type: "help" }
+      : { type: "help", query },
+  });
+}
+
 function showPermissionsPanel(ctx: CLICommandContext): void {
   const state = ctx.getState();
   ctx.updateState({
@@ -90,12 +99,16 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     description: "Show help",
     usage: "/help [query]",
     execute: async (ctx, args) => {
-      const query = args.trim();
-      ctx.updateState({
-        panel: query.length === 0
-          ? { type: "help" }
-          : { type: "help", query },
-      });
+      showHelpPanel(ctx, args);
+    },
+  });
+  registry.register({
+    name: "commands",
+    aliases: ["cmds"],
+    description: "Show slash commands",
+    usage: "/commands [query]",
+    execute: async (ctx, args) => {
+      showHelpPanel(ctx, args);
     },
   });
   registry.register({

@@ -170,6 +170,7 @@ miniagent --completion powershell
 | `/undo` | Undo the last user turn and restore file snapshots |
 | `/redo` | Reapply the last undone turn when possible |
 | `/help` | Show help |
+| `/commands [query]` | Show searchable slash command help |
 | `/quit` | Exit |
 
 ## Keybindings

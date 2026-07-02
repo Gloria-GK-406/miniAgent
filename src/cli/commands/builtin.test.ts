@@ -69,6 +69,7 @@ describe("registerBuiltinCommands", () => {
       "help",
       "status",
       "config",
+      "commands",
       "compact",
       "context",
       "history",
@@ -107,6 +108,16 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/help diff");
 
     expect(commandCtx.getState().panel).toEqual({ type: "help", query: "diff" });
+  });
+
+  it("opens filtered help from /commands aliases", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/cmds staged");
+
+    expect(commandCtx.getState().panel).toEqual({ type: "help", query: "staged" });
   });
 
   it("opens status panel", async () => {

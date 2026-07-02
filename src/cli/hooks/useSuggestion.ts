@@ -4,6 +4,7 @@ const COMMANDS = [
   "/activity",
   "/agent",
   "/auto",
+  "/commands",
   "/compact",
   "/context",
   "/details",

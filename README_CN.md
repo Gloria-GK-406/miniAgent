@@ -436,6 +436,7 @@ npm run chat
 | `/undo` | 撤销最后一个用户 turn 并恢复文件快照 |
 | `/redo` | 在可行时重新应用上一次撤销的 turn |
 | `/help` | 显示帮助 |
+| `/commands [query]` | 显示可搜索的 slash command 帮助 |
 | `/quit` | 退出 |
 
 快捷键：`Tab` 会完成当前建议；没有建议时在 build/plan 之间切换。

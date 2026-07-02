@@ -202,8 +202,8 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/help /status /config /history /context /references /tools /models /sessions</Text>
-          <Text>/activity /snapshots /permissions /system /agent build|plan /auto</Text>
+          <Text>/help /commands /status /config /history /context /references /tools</Text>
+          <Text>/models /sessions /activity /snapshots /permissions /system /agent build|plan /auto</Text>
           <Text>/details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (

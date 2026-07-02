@@ -131,7 +131,12 @@ describe("matchSuggestions", () => {
 
   it("matches /co to context", () => {
     const result = matchSuggestions("/co");
-    expect(result).toEqual(["/compact", "/context"]);
+    expect(result).toEqual(["/commands", "/compact", "/context"]);
+  });
+
+  it("matches /comm to commands", () => {
+    const result = matchSuggestions("/comm");
+    expect(result).toEqual(["/commands"]);
   });
 
   it("matches /ref to references", () => {
