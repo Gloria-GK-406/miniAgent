@@ -40,6 +40,7 @@ export interface SnapshotService {
   restoreTurn(turnId: string): Promise<void>;
   reapplyTurn(turnId: string): Promise<void>;
   captureRedo(turnId: string): Promise<SnapshotRecord[]>;
+  listSnapshots(): Promise<SnapshotRecord[]>;
   listTurnSnapshots(turnId: string): Promise<SnapshotRecord[]>;
 }
 
@@ -171,6 +172,7 @@ export function createSnapshotService(options: SnapshotServiceOptions): Snapshot
       await applyRecords(turnId, beforeState, afterState);
     },
     captureRedo: async (turnId) => listTurnSnapshots(turnId),
+    listSnapshots: readJournal,
     listTurnSnapshots,
   };
 }

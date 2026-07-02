@@ -11,6 +11,7 @@ import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.j
 import type { DiagnosticResult } from "./diagnostics-service.js";
 import type { CLIDoctorCheck } from "./doctor-service.js";
 import type { ProjectInstructionsResult } from "./project-instructions-service.js";
+import type { SnapshotRecord } from "./snapshot-service.js";
 import type { CLISubagentSummary } from "./subagent-service.js";
 
 export type CLIViewPanel =
@@ -28,6 +29,7 @@ export type CLIViewPanel =
   | { type: "config"; title: string; content: string }
   | { type: "git"; title: string; content: string }
   | { type: "diff"; title: string; content: string }
+  | { type: "snapshots"; records: SnapshotRecord[] }
   | { type: "diagnostics"; results: DiagnosticResult[] }
   | { type: "doctor"; checks: CLIDoctorCheck[] }
   | { type: "activity"; entries: CLIActivityEntry[] }
@@ -140,6 +142,7 @@ export interface CLIAppRuntime {
   showGitStatus(): Promise<void>;
   showGitLog(limit?: number): Promise<void>;
   showDiff(path?: string, options?: CLIDiffOptions): Promise<void>;
+  showSnapshots(): Promise<void>;
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
   runDoctor(): Promise<void>;

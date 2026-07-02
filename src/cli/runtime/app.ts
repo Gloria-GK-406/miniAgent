@@ -700,6 +700,14 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     },
+    showSnapshots: async () => {
+      updateState({
+        panel: {
+          type: "snapshots",
+          records: await snapshotService.listSnapshots(),
+        },
+      });
+    },
     openEditor: async (initialContent) => editorService.openEditor(initialContent),
     runDiagnostics: async () => {
       updateState({

@@ -489,6 +489,16 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "snapshots",
+    description: "Show workspace file snapshots",
+    usage: "/snapshots",
+    execute: async (ctx) => {
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.showSnapshots();
+      });
+    },
+  });
+  registry.register({
     name: "editor",
     aliases: ["edit"],
     description: "Compose input in an external editor",

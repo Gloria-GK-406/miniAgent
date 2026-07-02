@@ -771,6 +771,39 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("opens a snapshots panel for the active session journal", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-snapshots-panel-"));
+    await writeConfig(baseDir);
+    const runtime = await createCLIRuntime(baseDir);
+    const sessionId = runtime.getState().sessionId;
+    const sessionService = await createCLISessionService(baseDir);
+    await writeFile(join(baseDir, "a.txt"), "before", "utf-8");
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => sessionId,
+      getActiveTurnId: () => "turn-1",
+    });
+    await snapshotService.recordBeforeMutation("a.txt", async () => {
+      await writeFile(join(baseDir, "a.txt"), "after", "utf-8");
+    });
+
+    await runtime.submitInput("/snapshots");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "snapshots",
+      records: [
+        expect.objectContaining({
+          turnId: "turn-1",
+          displayPath: "a.txt",
+          beforeExists: true,
+          afterExists: true,
+        }),
+      ],
+    });
+    await runtime.destroy();
+  });
+
   it("clears the active session transcript from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-clear-"));
     await writeConfig(baseDir);

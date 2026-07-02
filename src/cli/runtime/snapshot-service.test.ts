@@ -55,6 +55,34 @@ describe("SnapshotService", () => {
     ]);
   });
 
+  it("lists all snapshot records for the active session", async () => {
+    const { baseDir, service, setTurnId } = await setupSnapshotService();
+    await writeFile(join(baseDir, "a.txt"), "one", "utf-8");
+
+    await service.recordBeforeMutation("a.txt", async () => {
+      await writeFile(join(baseDir, "a.txt"), "two", "utf-8");
+    });
+    setTurnId("turn-2");
+    await service.recordBeforeMutation("created.txt", async () => {
+      await writeFile(join(baseDir, "created.txt"), "created", "utf-8");
+    });
+
+    expect(await service.listSnapshots()).toMatchObject([
+      {
+        turnId: "turn-1",
+        displayPath: "a.txt",
+        beforeExists: true,
+        afterExists: true,
+      },
+      {
+        turnId: "turn-2",
+        displayPath: "created.txt",
+        beforeExists: false,
+        afterExists: true,
+      },
+    ]);
+  });
+
   it("restores changed and newly created files", async () => {
     const { baseDir, service } = await setupSnapshotService();
     await writeFile(join(baseDir, "existing.txt"), "before", "utf-8");

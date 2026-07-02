@@ -72,6 +72,7 @@ describe("registerBuiltinCommands", () => {
       "compact",
       "context",
       "history",
+      "snapshots",
       "tools",
       "models",
       "new",
@@ -272,6 +273,7 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.showGitStatus = vi.fn(async () => undefined);
     commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
     commandCtx.runtime.showDiff = vi.fn(async () => undefined);
+    commandCtx.runtime.showSnapshots = vi.fn(async () => undefined);
     commandCtx.runtime.runDiagnostics = vi.fn(async () => undefined);
     commandCtx.runtime.runDoctor = vi.fn(async () => undefined);
     commandCtx.runtime.showActivity = vi.fn(async () => undefined);
@@ -306,6 +308,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/git log 3");
     await registry.execute(commandCtx, "/diff src/cli");
     await registry.execute(commandCtx, "/diff --staged src/cli");
+    await registry.execute(commandCtx, "/snapshots");
     await registry.execute(commandCtx, "/diagnostics");
     await registry.execute(commandCtx, "/doctor");
     await registry.execute(commandCtx, "/activity");
@@ -318,6 +321,7 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli", { staged: true });
+    expect(commandCtx.runtime.showSnapshots).toHaveBeenCalled();
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
     expect(commandCtx.runtime.runDoctor).toHaveBeenCalled();
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();

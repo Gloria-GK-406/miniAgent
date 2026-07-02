@@ -9,6 +9,7 @@ import type {
   CLICommandHelpItem,
   CLIViewPanel,
 } from "../runtime/types.js";
+import type { SnapshotRecord } from "../runtime/snapshot-service.js";
 import { buildRenderableLines } from "./MessageList.js";
 import type { RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
@@ -202,8 +203,8 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       {state.commandHelp.length === 0 ? (
         <>
           <Text>/help /status /config /history /context /tools /models /sessions</Text>
-          <Text>/activity /permissions /system /agent build|plan /auto /details</Text>
-          <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/activity /snapshots /permissions /system /agent build|plan /auto</Text>
+          <Text>/details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -332,6 +333,85 @@ function AgentsPanel({
         </Text>
       ))}
       {panel.subagents.length === 0 && <Text dimColor>No configured subagents</Text>}
+    </StaticPanelFrame>
+  );
+}
+
+interface SnapshotGroup {
+  turnId: string;
+  updatedAt: string;
+  records: SnapshotRecord[];
+}
+
+function snapshotChangeLabel(record: SnapshotRecord): "created" | "deleted" | "modified" | "unchanged" {
+  if (!record.beforeExists && record.afterExists) return "created";
+  if (record.beforeExists && !record.afterExists) return "deleted";
+  if (record.beforeExists && record.afterExists) return "modified";
+  return "unchanged";
+}
+
+function snapshotChangeColor(change: ReturnType<typeof snapshotChangeLabel>): string {
+  if (change === "created") return "green";
+  if (change === "deleted") return "red";
+  if (change === "modified") return "yellow";
+  return "gray";
+}
+
+function groupSnapshotRecords(records: SnapshotRecord[]): SnapshotGroup[] {
+  const groups = new Map<string, SnapshotGroup>();
+  for (const record of records) {
+    const existing = groups.get(record.turnId);
+    if (existing === undefined) {
+      groups.set(record.turnId, {
+        turnId: record.turnId,
+        updatedAt: record.updatedAt,
+        records: [record],
+      });
+      continue;
+    }
+    existing.records.push(record);
+    if (record.updatedAt > existing.updatedAt) {
+      existing.updatedAt = record.updatedAt;
+    }
+  }
+  return [...groups.values()];
+}
+
+function SnapshotsPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "snapshots" }>;
+  runtime: CLIAppRuntime;
+}) {
+  const groups = groupSnapshotRecords(panel.records);
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">
+        Snapshots ({plural(groups.length, "turn")}, {plural(panel.records.length, "file")})
+      </Text>
+      {groups.length === 0 ? (
+        <Text dimColor>No snapshots recorded</Text>
+      ) : (
+        groups.map((group) => (
+          <Box key={group.turnId} flexDirection="column">
+            <Text>
+              <Text color="cyan">{group.turnId}</Text>
+              <Text dimColor> {plural(group.records.length, "file")} {group.updatedAt}</Text>
+            </Text>
+            {group.records.map((record) => {
+              const change = snapshotChangeLabel(record);
+              return (
+                <Text key={`${record.turnId}:${record.displayPath}`}>
+                  <Text>  </Text>
+                  <Text color={snapshotChangeColor(change)}>{change}</Text>
+                  <Text> {record.displayPath}</Text>
+                </Text>
+              );
+            })}
+          </Box>
+        ))
+      )}
     </StaticPanelFrame>
   );
 }
@@ -617,6 +697,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "agents") {
     return <AgentsPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "snapshots") {
+    return <SnapshotsPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "error") {

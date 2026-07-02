@@ -99,6 +99,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showGitStatus: vi.fn(async () => undefined),
     showGitLog: vi.fn(async () => undefined),
     showDiff: vi.fn(async () => undefined),
+    showSnapshots: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => ""),
     runDiagnostics: vi.fn(async () => undefined),
     runDoctor: vi.fn(async () => undefined),
@@ -563,6 +564,43 @@ describe("App", () => {
 
     expect(output).toContain("Config");
     expect(output).toContain("<redacted>");
+  });
+
+  it("renders snapshots panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "snapshots",
+          records: [
+            {
+              turnId: "turn-1",
+              absolutePath: "C:/repo/src/a.ts",
+              displayPath: "src/a.ts",
+              beforeExists: true,
+              beforeContent: "old",
+              afterExists: true,
+              afterContent: "new",
+              updatedAt: "2026-07-02T00:00:00.000Z",
+            },
+            {
+              turnId: "turn-1",
+              absolutePath: "C:/repo/generated.txt",
+              displayPath: "generated.txt",
+              beforeExists: false,
+              afterExists: true,
+              afterContent: "created",
+              updatedAt: "2026-07-02T00:00:01.000Z",
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Snapshots");
+    expect(output).toContain("turn-1");
+    expect(output).toContain("modified src/a.ts");
+    expect(output).toContain("created generated.txt");
   });
 
   it("renders diagnostics panel from runtime state", () => {
