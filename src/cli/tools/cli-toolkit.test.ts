@@ -147,6 +147,28 @@ describe("createCLIToolkit", () => {
     await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("ONE two THREE");
   });
 
+  it("validates multi_edit replacements against sequential content", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-multiedit-sequential-"));
+    await writeFile(join(baseDir, "a.txt"), "abc", "utf-8");
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+    });
+    const multiEdit = toolkit.tools.find((tool) => tool.name === "multi_edit")!;
+
+    await expect(multiEdit.execute({
+      path: "a.txt",
+      edits: [
+        { oldString: "a", newString: "x" },
+        { oldString: "abc", newString: "done" },
+      ],
+    })).rejects.toThrow("oldString not found");
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("abc");
+  });
+
   it("deletes workspace files with snapshots and refresh notification", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-delete-"));
     await writeFile(join(baseDir, "a.txt"), "remove me", "utf-8");

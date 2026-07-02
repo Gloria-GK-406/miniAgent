@@ -280,19 +280,17 @@ function createMultiEditTool(options: CLIToolkitOptions): Tool {
       const parsed = MultiEditParamsSchema.parse(args);
       const target = resolveWorkspacePath(options.baseDir, parsed.path);
       const content = await readFile(target.absolutePath, "utf-8");
+      let next = content;
       for (const edit of parsed.edits) {
-        const count = countOccurrences(content, edit.oldString);
+        const count = countOccurrences(next, edit.oldString);
         if (count === 0) {
           throw new Error(`oldString not found in ${target.displayPath}`);
         }
         if (count > 1) {
           throw new Error(`oldString found ${count} times in ${target.displayPath}`);
         }
+        next = next.replace(edit.oldString, edit.newString);
       }
-      const next = parsed.edits.reduce(
-        (current, edit) => current.replace(edit.oldString, edit.newString),
-        content,
-      );
       await mutateWithSnapshot(options, parsed.path, async () => {
         await writeFile(target.absolutePath, next, "utf-8");
       });
