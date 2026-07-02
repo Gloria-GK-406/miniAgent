@@ -347,6 +347,10 @@ export function App({ runtime }: AppProps) {
     state.streamingText,
     state.reasoningText,
     messageAreaWidth,
+    {
+      showReasoning: state.showReasoning,
+      showToolDetails: state.showToolDetails,
+    },
   );
   const {
     visibleLines,

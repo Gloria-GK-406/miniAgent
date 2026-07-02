@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderToString } from "ink";
-import { MessageList, buildRenderableMessages } from "./MessageList.js";
+import { MessageList, buildRenderableLines, buildRenderableMessages } from "./MessageList.js";
 import { MessageType } from "../../core/types.js";
 import type { Message } from "../../core/types.js";
 
@@ -118,5 +118,72 @@ describe("MessageList", () => {
     expect(output).toContain("first line");
     expect(output).not.toContain("second line");
     expect(output).not.toContain("third line");
+  });
+
+  it("hides reasoning unless reasoning visibility is enabled", () => {
+    const messages: Message[] = [
+      {
+        id: "1",
+        type: MessageType.Assist,
+        content: "Answer",
+        reasoningContent: "private reasoning",
+      },
+    ];
+
+    expect(buildRenderableLines(
+      messages,
+      undefined,
+      "streaming reasoning",
+      80,
+      { showReasoning: false },
+    ).map((line) => line.text).join("\n")).not.toContain("private reasoning");
+    expect(buildRenderableLines(
+      messages,
+      undefined,
+      "streaming reasoning",
+      80,
+      { showReasoning: true },
+    ).map((line) => line.text).join("\n")).toContain("streaming reasoning");
+  });
+
+  it("hides tool details until detail visibility is enabled", () => {
+    const messages: Message[] = [
+      {
+        id: "1",
+        type: MessageType.ToolCall,
+        content: "",
+        toolCallId: "tc1",
+        toolName: "read",
+        arguments: { path: "secret.txt" },
+      },
+      {
+        id: "2",
+        type: MessageType.ToolResult,
+        content: "first line\nsecond line",
+        toolCallId: "tc1",
+      },
+    ];
+
+    const compact = buildRenderableLines(
+      messages,
+      undefined,
+      undefined,
+      80,
+      { showToolDetails: false },
+    ).map((line) => line.text).join("\n");
+    const detailed = buildRenderableLines(
+      messages,
+      undefined,
+      undefined,
+      80,
+      { showToolDetails: true },
+    ).map((line) => line.text).join("\n");
+
+    expect(compact).toContain("read");
+    expect(compact).not.toContain("secret.txt");
+    expect(compact).toContain("first line");
+    expect(compact).not.toContain("second line");
+    expect(detailed).toContain("secret.txt");
+    expect(detailed).toContain("second line");
   });
 });

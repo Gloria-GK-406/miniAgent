@@ -147,6 +147,7 @@ describe("MessageList + MessageItem integration", () => {
         messages={messages}
         streamingText="stream"
         reasoningText="thinking"
+        showReasoning={true}
       />,
     );
     expect(output).toContain("Tell me something");

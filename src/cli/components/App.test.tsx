@@ -11,7 +11,7 @@ import {
   resolveMessageScrollAction,
 } from "./App.js";
 import { buildRenderableLines } from "./MessageList.js";
-import { MessageType } from "../../core/types.js";
+import { MessageType, type Message } from "../../core/types.js";
 import { CLIConfigSchema } from "../config.js";
 import type { CLIAppRuntime, CLIEvent, CLIRuntimeSubscriber, CLIState } from "../runtime/types.js";
 
@@ -187,6 +187,50 @@ describe("App", () => {
       <App runtime={createMockRuntime()} />,
     );
     expect(output).toContain("/help for commands");
+  });
+
+  it("uses runtime visibility toggles for reasoning and tool details", () => {
+    const messages: Message[] = [
+      {
+        id: "1",
+        type: MessageType.Assist,
+        content: "Answer",
+        reasoningContent: "private reasoning",
+      },
+      {
+        id: "2",
+        type: MessageType.ToolCall,
+        content: "",
+        toolCallId: "tc1",
+        toolName: "read",
+        arguments: { path: "secret.txt" },
+      },
+      {
+        id: "3",
+        type: MessageType.ToolResult,
+        content: "first line\nsecond line",
+        toolCallId: "tc1",
+      },
+    ];
+
+    const compact = renderToString(
+      <App runtime={createMockRuntime({ messages })} />,
+    );
+    const detailed = renderToString(
+      <App runtime={createMockRuntime({
+        messages,
+        showReasoning: true,
+        showToolDetails: true,
+      })}
+      />,
+    );
+
+    expect(compact).not.toContain("private reasoning");
+    expect(compact).not.toContain("secret.txt");
+    expect(compact).not.toContain("second line");
+    expect(detailed).toContain("private reasoning");
+    expect(detailed).toContain("secret.txt");
+    expect(detailed).toContain("second line");
   });
 
   it("renders registered command names in the help panel", () => {

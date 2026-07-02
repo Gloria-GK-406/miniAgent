@@ -14,6 +14,13 @@ interface MessageListProps {
   streamingText?: string;
   reasoningText?: string;
   width?: number;
+  showReasoning?: boolean;
+  showToolDetails?: boolean;
+}
+
+export interface MessageRenderOptions {
+  showReasoning?: boolean;
+  showToolDetails?: boolean;
 }
 
 function getContentText(content: MessageContent): string {
@@ -121,10 +128,15 @@ export function buildRenderableMessages(
   messages: Message[],
   streamingText?: string,
   reasoningText?: string,
+  options: MessageRenderOptions = {},
 ): Message[] {
   const lastMessage = messages[messages.length - 1];
+  const showReasoning = options.showReasoning ?? false;
   const shouldRenderStreamingTail = lastMessage?.type !== MessageType.Assist
-    && ((streamingText?.length ?? 0) > 0 || (reasoningText?.length ?? 0) > 0);
+    && (
+      (streamingText?.length ?? 0) > 0
+      || (showReasoning && (reasoningText?.length ?? 0) > 0)
+    );
 
   if (!shouldRenderStreamingTail) {
     return messages;
@@ -146,6 +158,8 @@ function messageToLines(
   options: {
     streamingText?: string;
     reasoningText?: string;
+    showReasoning?: boolean;
+    showToolDetails?: boolean;
   } = {},
 ): RenderLine[] {
   switch (message.type) {
@@ -167,7 +181,7 @@ function messageToLines(
         color: "cyan",
       }));
 
-      const reasoning = [
+      const reasoning = (options.showReasoning ?? false) ? [
         ...(message.reasoningContent ? wrapBlock(message.reasoningContent, width, {
           firstPrefix: "· ",
           restPrefix: "  ",
@@ -176,7 +190,7 @@ function messageToLines(
           firstPrefix: "· ",
           restPrefix: "  ",
         }) : []),
-      ];
+      ] : [];
 
       return [
         ...lines,
@@ -200,9 +214,11 @@ function messageToLines(
           })),
         );
       }
-      const argText = JSON.stringify(message.arguments);
+      const argText = options.showToolDetails === true
+        ? ` ${JSON.stringify(message.arguments)}`
+        : "";
       lines.push(
-        ...wrapBlock(`${message.toolName} ${argText}`, width, {
+        ...wrapBlock(`${message.toolName}${argText}`, width, {
           firstPrefix: "⟳ ",
           restPrefix: "  ",
         }).map((text, index) => ({
@@ -214,8 +230,12 @@ function messageToLines(
       return lines;
     }
 
-    case MessageType.ToolResult:
-      return wrapBlock(summarizeToolResult(getContentText(message.content)), width, {
+    case MessageType.ToolResult: {
+      const resultText = getContentText(message.content);
+      const renderedText = options.showToolDetails === true
+        ? resultText
+        : summarizeToolResult(resultText);
+      return wrapBlock(renderedText, width, {
         firstPrefix: "→ ",
         restPrefix: "  ",
       }).map((text, index) => ({
@@ -223,6 +243,7 @@ function messageToLines(
         text,
         dimColor: true,
       }));
+    }
 
     case MessageType.System:
       return wrapBlock(getContentText(message.content), width).map((text, index) => ({
@@ -238,11 +259,13 @@ export function buildRenderableLines(
   streamingText: string | undefined,
   reasoningText: string | undefined,
   width: number,
+  options: MessageRenderOptions = {},
 ): RenderLine[] {
   const renderableMessages = buildRenderableMessages(
     messages,
     streamingText,
     reasoningText,
+    options,
   );
 
   return renderableMessages.flatMap((message, index) => {
@@ -251,6 +274,8 @@ export function buildRenderableLines(
     return messageToLines(message, width, {
       ...(isLast && isAssist && streamingText !== undefined && { streamingText }),
       ...(isLast && isAssist && reasoningText !== undefined && { reasoningText }),
+      showReasoning: options.showReasoning ?? false,
+      showToolDetails: options.showToolDetails ?? false,
     });
   });
 }
@@ -260,8 +285,16 @@ export function MessageList({
   streamingText,
   reasoningText,
   width = 80,
+  showReasoning = false,
+  showToolDetails = false,
 }: MessageListProps) {
-  const lines = buildRenderableLines(messages, streamingText, reasoningText, width);
+  const lines = buildRenderableLines(
+    messages,
+    streamingText,
+    reasoningText,
+    width,
+    { showReasoning, showToolDetails },
+  );
 
   return (
     <Box flexDirection="column">
