@@ -84,6 +84,18 @@ async function mutateWithSnapshot(
   await options.onWorkspaceFilesChanged?.();
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error: unknown) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
 function countOccurrences(content: string, needle: string): number {
   return content.split(needle).length - 1;
 }
@@ -97,6 +109,7 @@ function stripPatchPath(path: string): string {
 }
 
 interface ParsedPatch {
+  operation: "modify" | "create" | "delete";
   path: string;
   hunks: Array<{
     oldText: string;
@@ -113,11 +126,20 @@ function parseUnifiedPatch(patch: string): ParsedPatch {
   }
   const oldPath = stripPatchPath(oldPathLine.slice(4));
   const newPath = stripPatchPath(newPathLine.slice(4));
-  if (oldPath === "/dev/null" || newPath === "/dev/null") {
-    throw new Error("Patch tool does not support file create/delete yet");
-  }
-  if (oldPath !== newPath) {
+  let operation: ParsedPatch["operation"] = "modify";
+  let path = newPath;
+  if (oldPath === "/dev/null") {
+    operation = "create";
+  } else if (newPath === "/dev/null") {
+    operation = "delete";
+    path = oldPath;
+  } else if (oldPath !== newPath) {
     throw new Error("Patch tool only supports single-file patches");
+  } else {
+    path = newPath;
+  }
+  if (path === "/dev/null") {
+    throw new Error("Patch target is missing");
   }
 
   const hunks: ParsedPatch["hunks"] = [];
@@ -153,7 +175,7 @@ function parseUnifiedPatch(patch: string): ParsedPatch {
   if (hunks.length === 0) {
     throw new Error("Patch must include at least one hunk");
   }
-  return { path: newPath, hunks };
+  return { operation, path, hunks };
 }
 
 function createReadTool(options: CLIToolkitOptions): Tool {
@@ -289,7 +311,33 @@ function createPatchTool(options: CLIToolkitOptions): Tool {
       const parsed = PatchParamsSchema.parse(args);
       const patch = parseUnifiedPatch(parsed.patch);
       const target = resolveWorkspacePath(options.baseDir, patch.path);
+      if (patch.operation === "create") {
+        if (await pathExists(target.absolutePath)) {
+          throw new Error(`Patch target already exists: ${target.displayPath}`);
+        }
+        const content = patch.hunks.map((hunk) => hunk.newText).join("\n");
+        await mutateWithSnapshot(options, patch.path, async () => {
+          await mkdir(dirname(target.absolutePath), { recursive: true });
+          await writeFile(target.absolutePath, content, "utf-8");
+        });
+        return `Created ${target.displayPath}`;
+      }
       let content = await readFile(target.absolutePath, "utf-8");
+      if (patch.operation === "delete") {
+        for (const hunk of patch.hunks) {
+          const count = countOccurrences(content, hunk.oldText);
+          if (count === 0) {
+            throw new Error(`Patch hunk not found in ${target.displayPath}`);
+          }
+          if (count > 1) {
+            throw new Error(`Patch hunk is ambiguous in ${target.displayPath}`);
+          }
+        }
+        await mutateWithSnapshot(options, patch.path, async () => {
+          await unlink(target.absolutePath);
+        });
+        return `Deleted ${target.displayPath}`;
+      }
       for (const hunk of patch.hunks) {
         const count = countOccurrences(content, hunk.oldText);
         if (count === 0) {

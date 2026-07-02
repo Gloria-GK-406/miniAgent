@@ -210,4 +210,120 @@ describe("createCLIToolkit", () => {
 
     await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("alpha\nBETA\ngamma\n");
   });
+
+  it("creates files from unified patches with snapshots and refresh notification", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-patch-create-"));
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => session.id,
+      getActiveTurnId: () => "turn-patch-create",
+    });
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      snapshotService,
+      onWorkspaceFilesChanged,
+    });
+    const patch = toolkit.tools.find((tool) => tool.name === "patch")!;
+
+    await expect(patch.execute({
+      patch: [
+        "--- /dev/null",
+        "+++ b/new.txt",
+        "@@ -0,0 +1,2 @@",
+        "+alpha",
+        "+beta",
+      ].join("\n"),
+    })).resolves.toBe("Created new.txt");
+
+    await expect(readFile(join(baseDir, "new.txt"), "utf-8")).resolves.toBe("alpha\nbeta");
+    expect(onWorkspaceFilesChanged).toHaveBeenCalledTimes(1);
+    expect(await snapshotService.listTurnSnapshots("turn-patch-create")).toEqual([
+      expect.objectContaining({
+        displayPath: "new.txt",
+        beforeExists: false,
+        afterExists: true,
+        afterContent: "alpha\nbeta",
+      }),
+    ]);
+  });
+
+  it("refuses to create an existing file from a unified patch", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-patch-create-existing-"));
+    await writeFile(join(baseDir, "new.txt"), "existing", "utf-8");
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      onWorkspaceFilesChanged,
+    });
+    const patch = toolkit.tools.find((tool) => tool.name === "patch")!;
+
+    await expect(patch.execute({
+      patch: [
+        "--- /dev/null",
+        "+++ b/new.txt",
+        "@@ -0,0 +1,1 @@",
+        "+replacement",
+      ].join("\n"),
+    })).rejects.toThrow("Patch target already exists: new.txt");
+
+    await expect(readFile(join(baseDir, "new.txt"), "utf-8")).resolves.toBe("existing");
+    expect(onWorkspaceFilesChanged).not.toHaveBeenCalled();
+  });
+
+  it("deletes files from unified patches with snapshots and refresh notification", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-patch-delete-"));
+    await writeFile(join(baseDir, "old.txt"), "alpha\nbeta", "utf-8");
+    const sessionService = await createCLISessionService(baseDir);
+    const session = await sessionService.ensureActiveSession();
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => session.id,
+      getActiveTurnId: () => "turn-patch-delete",
+    });
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      snapshotService,
+      onWorkspaceFilesChanged,
+    });
+    const patch = toolkit.tools.find((tool) => tool.name === "patch")!;
+
+    await expect(patch.execute({
+      patch: [
+        "--- a/old.txt",
+        "+++ /dev/null",
+        "@@ -1,2 +0,0 @@",
+        "-alpha",
+        "-beta",
+      ].join("\n"),
+    })).resolves.toBe("Deleted old.txt");
+
+    await expect(readFile(join(baseDir, "old.txt"), "utf-8")).rejects.toMatchObject({ code: "ENOENT" });
+    expect(onWorkspaceFilesChanged).toHaveBeenCalledTimes(1);
+    expect(await snapshotService.listTurnSnapshots("turn-patch-delete")).toEqual([
+      expect.objectContaining({
+        displayPath: "old.txt",
+        beforeExists: true,
+        beforeContent: "alpha\nbeta",
+        afterExists: false,
+      }),
+    ]);
+  });
 });
