@@ -69,6 +69,17 @@ export const CLIEditorConfigSchema = z
   .default({});
 export type CLIEditorConfig = z.infer<typeof CLIEditorConfigSchema>;
 
+export const CLIDiagnosticsConfigSchema = z
+  .object({
+    commands: z.array(z.string().min(1)).optional(),
+    timeoutMs: z.number().int().positive().max(600000).default(120000),
+  })
+  .strict()
+  .default({
+    timeoutMs: 120000,
+  });
+export type CLIDiagnosticsConfig = z.infer<typeof CLIDiagnosticsConfigSchema>;
+
 export const CLITUIConfigSchema = z
   .object({
     showReasoning: z.boolean().default(false),
@@ -89,6 +100,7 @@ export const CLIConfigSchema = z
     permission: CLIPermissionConfigSchema,
     shell: CLIShellConfigSchema,
     editor: CLIEditorConfigSchema,
+    diagnostics: CLIDiagnosticsConfigSchema,
     tui: CLITUIConfigSchema,
     generation: GenerationConfigSchema.partial().optional(),
     systemPrompt: z.string().optional(),
@@ -160,6 +172,9 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
         timeoutMs: 120000,
       },
       editor: {},
+      diagnostics: {
+        timeoutMs: 120000,
+      },
       tui: {
         showReasoning: false,
         showToolDetails: false,

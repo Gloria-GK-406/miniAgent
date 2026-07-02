@@ -249,6 +249,17 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "diagnostics",
+    aliases: ["doctor"],
+    description: "Run configured project diagnostics",
+    usage: "/diagnostics",
+    execute: async (ctx) => {
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.runDiagnostics();
+      });
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",

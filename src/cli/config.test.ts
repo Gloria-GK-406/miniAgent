@@ -153,6 +153,20 @@ describe("CLI config provider mode", () => {
     });
   });
 
+  it("parses diagnostics config", () => {
+    const config = CLIConfigSchema.parse({
+      diagnostics: {
+        commands: ["npm run typecheck", "npm run lint"],
+        timeoutMs: 30000,
+      },
+    });
+
+    expect(config.diagnostics).toEqual({
+      commands: ["npm run typecheck", "npm run lint"],
+      timeoutMs: 30000,
+    });
+  });
+
   it("parses nested shell permission patterns", () => {
     const config = CLIConfigSchema.parse({
       permission: {

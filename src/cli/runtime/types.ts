@@ -8,6 +8,7 @@ import type {
 } from "../../core/types.js";
 import type { Tool } from "../../tool/types.js";
 import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
+import type { DiagnosticResult } from "./diagnostics-service.js";
 
 export type CLIViewPanel =
   | { type: "none" }
@@ -19,6 +20,7 @@ export type CLIViewPanel =
   | { type: "tools"; tools: Tool[] }
   | { type: "git"; title: string; content: string }
   | { type: "diff"; title: string; content: string }
+  | { type: "diagnostics"; results: DiagnosticResult[] }
   | { type: "error"; message: string };
 
 export interface CLIApprovalRequest {
@@ -82,6 +84,7 @@ export interface CLIAppRuntime {
   showGitLog(limit?: number): Promise<void>;
   showDiff(path?: string): Promise<void>;
   openEditor(initialContent: string): Promise<string>;
+  runDiagnostics(): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

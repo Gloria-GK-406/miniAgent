@@ -76,6 +76,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     showGitLog: vi.fn(async () => undefined),
     showDiff: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => ""),
+    runDiagnostics: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   };
 }
@@ -246,5 +247,40 @@ describe("App", () => {
     expect(output).toContain("Working Tree Diff");
     expect(output).toContain("-old");
     expect(output).toContain("+new");
+  });
+
+  it("renders diagnostics panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "diagnostics",
+          results: [
+            {
+              command: "npm run lint",
+              stdout: "lint ok",
+              stderr: "",
+              exitCode: 0,
+              timedOut: false,
+              aborted: false,
+            },
+            {
+              command: "npm test",
+              stdout: "",
+              stderr: "failed test",
+              exitCode: 1,
+              timedOut: false,
+              aborted: false,
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Diagnostics");
+    expect(output).toContain("PASS npm run lint");
+    expect(output).toContain("FAIL npm test");
+    expect(output).toContain("lint ok");
+    expect(output).toContain("failed test");
   });
 });

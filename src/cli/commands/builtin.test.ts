@@ -134,6 +134,7 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.showGitStatus = vi.fn(async () => undefined);
     commandCtx.runtime.showGitLog = vi.fn(async () => undefined);
     commandCtx.runtime.showDiff = vi.fn(async () => undefined);
+    commandCtx.runtime.runDiagnostics = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
@@ -141,6 +142,7 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/git status");
     await registry.execute(commandCtx, "/git log 3");
     await registry.execute(commandCtx, "/diff src/cli");
+    await registry.execute(commandCtx, "/diagnostics");
 
     expect(commandCtx.runtime.undo).toHaveBeenCalled();
     expect(commandCtx.runtime.redo).toHaveBeenCalled();
@@ -148,6 +150,7 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.showGitStatus).toHaveBeenCalled();
     expect(commandCtx.runtime.showGitLog).toHaveBeenCalledWith(3);
     expect(commandCtx.runtime.showDiff).toHaveBeenCalledWith("src/cli");
+    expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
   });
 
   it("submits edited content from the external editor command", async () => {

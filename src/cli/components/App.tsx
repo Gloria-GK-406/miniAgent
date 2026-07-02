@@ -119,6 +119,40 @@ function ErrorPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "error" }>
   );
 }
 
+function summarizeDiagnosticOutput(stdout: string, stderr: string): string {
+  const text = stdout.trim().length > 0 ? stdout : stderr;
+  const firstLine = text.trim().split(/\r?\n/)[0];
+  if (firstLine === undefined || firstLine.length === 0) return "(no output)";
+  return firstLine.length > 120 ? `${firstLine.slice(0, 117)}...` : firstLine;
+}
+
+function DiagnosticsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "diagnostics" }> }) {
+  return (
+    <Box flexDirection="column">
+      <Text bold color="cyan">Diagnostics</Text>
+      {panel.results.length === 0 ? (
+        <Text dimColor>No diagnostics configured</Text>
+      ) : (
+        panel.results.map((result) => {
+          const passed = result.exitCode === 0 && !result.timedOut && !result.aborted;
+          const label = passed ? "PASS" : "FAIL";
+          return (
+            <Box key={result.command} flexDirection="column">
+              <Text>
+                <Text color={passed ? "green" : "red"}>{label}</Text>
+                <Text> {result.command}</Text>
+              </Text>
+              <Text dimColor>
+                {summarizeDiagnosticOutput(result.stdout, result.stderr)}
+              </Text>
+            </Box>
+          );
+        })
+      )}
+    </Box>
+  );
+}
+
 export function App({ runtime }: AppProps) {
   const { state } = useRuntime(runtime);
   const {
@@ -237,6 +271,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "error") {
     return <ErrorPanel panel={state.panel} />;
+  }
+
+  if (state.panel.type === "diagnostics") {
+    return <DiagnosticsPanel panel={state.panel} />;
   }
 
   if (state.panel.type === "git" || state.panel.type === "diff") {

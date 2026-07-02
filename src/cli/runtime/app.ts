@@ -8,6 +8,7 @@ import {
   selectResolvedModelForCLI,
 } from "./agent-factory.js";
 import { createCommandRegistry } from "./command-registry.js";
+import { createDiagnosticsService } from "./diagnostics-service.js";
 import { createEditorService } from "./editor-service.js";
 import { loadCustomCommands } from "./custom-command-service.js";
 import { createExportService } from "./export-service.js";
@@ -43,6 +44,11 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const redoStack: RedoEntry[] = [];
   const permissionService = createPermissionService(config.permission);
   const shellService = createShellService(config.shell);
+  const diagnosticsService = createDiagnosticsService({
+    baseDir,
+    config: config.diagnostics,
+    shellService,
+  });
   const gitService = createGitService(baseDir);
   let activeTurnId: string | null = null;
   const snapshotService = createSnapshotService({
@@ -339,6 +345,14 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       });
     },
     openEditor: async (initialContent) => editorService.openEditor(initialContent),
+    runDiagnostics: async () => {
+      updateState({
+        panel: {
+          type: "diagnostics",
+          results: await diagnosticsService.runDiagnostics(),
+        },
+      });
+    },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);

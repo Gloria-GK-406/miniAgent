@@ -60,6 +60,7 @@ describe("useRuntime", () => {
       showGitLog: vi.fn(),
       showDiff: vi.fn(),
       openEditor: vi.fn(),
+      runDiagnostics: vi.fn(),
       destroy: vi.fn(),
     };
 
