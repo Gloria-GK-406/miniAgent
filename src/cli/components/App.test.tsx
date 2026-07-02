@@ -470,6 +470,47 @@ describe("App", () => {
     expect(output).toContain("No sessions found");
   });
 
+  it("renders status panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        baseDir: "C:/repo/project",
+        mode: "plan",
+        modelName: "openai/slow",
+        autoApprove: true,
+        showReasoning: true,
+        showToolDetails: true,
+        sessionId: "session-123456",
+        sessionName: "feature work",
+        messages: [
+          { id: "u1", type: MessageType.User, content: "hello" },
+          { id: "a1", type: MessageType.Assist, content: "hi" },
+        ],
+        tokenUsage: { input: 1234, output: 5678, total: 6912 },
+        config: CLIConfigSchema.parse({
+          permission: {
+            "*": "ask",
+            read: "allow",
+          },
+        }),
+        panel: { type: "status" },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Status");
+    expect(output).toContain("C:/repo/project");
+    expect(output).toContain("feature work");
+    expect(output).toContain("session-123456");
+    expect(output).toContain("plan");
+    expect(output).toContain("openai/slow");
+    expect(output).toContain("2 messages");
+    expect(output).toContain("1.2k in / 5.7k out / 6.9k total");
+    expect(output).toContain("Auto approval: on");
+    expect(output).toContain("Reasoning: on");
+    expect(output).toContain("Tool details: on");
+    expect(output).toContain("Default permission: ask");
+  });
+
   it("renders git panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

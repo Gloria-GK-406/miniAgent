@@ -67,6 +67,7 @@ describe("registerBuiltinCommands", () => {
 
     expect(registry.list().map((command) => command.name)).toEqual(expect.arrayContaining([
       "help",
+      "status",
       "compact",
       "context",
       "history",
@@ -103,6 +104,16 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/help diff");
 
     expect(commandCtx.getState().panel).toEqual({ type: "help", query: "diff" });
+  });
+
+  it("opens status panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/status");
+
+    expect(commandCtx.getState().panel).toEqual({ type: "status" });
   });
 
   it("requests quit through the runtime without exiting directly", async () => {

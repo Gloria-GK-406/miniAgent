@@ -97,6 +97,15 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "status",
+    aliases: ["st"],
+    description: "Show runtime status",
+    usage: "/status",
+    execute: async (ctx) => {
+      ctx.updateState({ panel: { type: "status" } });
+    },
+  });
+  registry.register({
     name: "init",
     description: "Create project AGENTS.md guidance",
     usage: "/init [--force]",

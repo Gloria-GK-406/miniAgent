@@ -176,6 +176,17 @@ function commandMatchesHelpQuery(command: CLICommandHelpItem, query: string): bo
   ].some((value) => value.toLowerCase().includes(normalized));
 }
 
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function defaultPermissionLabel(permission: CLIPermissionConfig): CLIPermissionDecision {
+  const fallback = permission["*"];
+  return fallback === "allow" || fallback === "deny" || fallback === "ask"
+    ? fallback
+    : "ask";
+}
+
 function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
   const state = runtime.getState();
   const panel = state.panel.type === "help" ? state.panel : { type: "help" as const };
@@ -190,7 +201,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/help /history /context /tools /models /sessions /activity</Text>
+          <Text>/help /status /history /context /tools /models /sessions /activity</Text>
           <Text>/permissions /system /agent build|plan /auto /details</Text>
           <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
@@ -210,6 +221,28 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       <Text dimColor>Tab build/plan · Ctrl+C stop/exit · PgUp/PgDn scroll</Text>
       {state.commandHelp.length === 0 && <Text dimColor>{state.commandSuggestions.join(" ")}</Text>}
       <Text dimColor>{state.mode} mode</Text>
+    </StaticPanelFrame>
+  );
+}
+
+function StatusPanel({ runtime }: { runtime: CLIAppRuntime }) {
+  const state = runtime.getState();
+  const permission = state.config.permission ?? ({ "*": "ask" } satisfies CLIPermissionConfig);
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">Status</Text>
+      <Text>Workspace: {state.baseDir}</Text>
+      <Text>
+        Session: {state.sessionName} ({state.sessionId})
+      </Text>
+      <Text>Agent: {state.mode}</Text>
+      <Text>Model: {state.modelName}</Text>
+      <Text>Transcript: {plural(state.messages.length, "message")}</Text>
+      <Text>Tokens: {formatTokenUsage(state.tokenUsage)}</Text>
+      <Text>Auto approval: {state.autoApprove ? "on" : "off"}</Text>
+      <Text>Reasoning: {state.showReasoning ? "on" : "off"}</Text>
+      <Text>Tool details: {state.showToolDetails ? "on" : "off"}</Text>
+      <Text>Default permission: {defaultPermissionLabel(permission)}</Text>
     </StaticPanelFrame>
   );
 }
@@ -548,6 +581,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "help") {
     return <HelpPanel runtime={runtime} />;
+  }
+
+  if (state.panel.type === "status") {
+    return <StatusPanel runtime={runtime} />;
   }
 
   if (state.panel.type === "tools") {
