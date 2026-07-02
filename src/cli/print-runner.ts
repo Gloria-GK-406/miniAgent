@@ -42,6 +42,21 @@ export function formatPrintResultJson(result: PrintPromptResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
 
+function denyPendingApprovals(runtime: CLIAppRuntime): () => void {
+  const answered = new Set<string>();
+  return runtime.subscribe((event) => {
+    if (event.type !== "state" || event.state.approval === null) {
+      return;
+    }
+    const { id } = event.state.approval;
+    if (answered.has(id)) {
+      return;
+    }
+    answered.add(id);
+    runtime.answerApproval(id, "deny");
+  });
+}
+
 function writePrintError(
   streams: PrintStreams,
   state: ReturnType<CLIAppRuntime["getState"]>,
@@ -68,6 +83,7 @@ export async function runPrintPrompt(
   options: { output?: "text" | "json" } = {},
 ): Promise<number> {
   const output = options.output ?? "text";
+  const unsubscribe = denyPendingApprovals(runtime);
   try {
     await runtime.submitInput(prompt);
     const state = runtime.getState();
@@ -101,6 +117,7 @@ export async function runPrintPrompt(
     writePrintError(streams, runtime.getState(), errorMessage(error), output);
     return 1;
   } finally {
+    unsubscribe();
     await runtime.destroy();
   }
 }

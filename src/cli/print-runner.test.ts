@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MessageType } from "../core/types.js";
-import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
+import type { CLIAppRuntime, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./runtime/types.js";
 import {
   formatPrintResultJson,
   latestAssistantText,
@@ -182,6 +182,43 @@ describe("runPrintPrompt", () => {
       sessionId: "s1",
       modelName: "test/model",
     }));
+    expect(stderr).not.toHaveBeenCalled();
+    expect(app.destroy).toHaveBeenCalled();
+  });
+
+  it("denies pending approvals during non-interactive print runs", async () => {
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    let listener: CLIRuntimeSubscriber | undefined;
+    let current = state();
+    const app = runtime(current);
+    app.subscribe = vi.fn((next: CLIRuntimeSubscriber) => {
+      listener = next;
+      return () => undefined;
+    });
+    app.submitInput = vi.fn(async () => {
+      const event: CLIEvent = {
+        type: "state",
+        state: state({
+          approval: {
+            id: "approval-1",
+            toolName: "shell",
+            args: { command: "npm test" },
+            decision: "pending",
+          },
+        }),
+      };
+      listener?.(event);
+      current = state({
+        messages: [{ id: "a1", type: MessageType.Assist, content: "approval denied" }],
+      });
+    });
+    app.getState = vi.fn(() => current);
+
+    await expect(runPrintPrompt(app, "do work", { stdout, stderr })).resolves.toBe(0);
+
+    expect(app.answerApproval).toHaveBeenCalledWith("approval-1", "deny");
+    expect(stdout).toHaveBeenCalledWith("approval denied\n");
     expect(stderr).not.toHaveBeenCalled();
     expect(app.destroy).toHaveBeenCalled();
   });
