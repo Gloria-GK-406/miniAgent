@@ -24,6 +24,13 @@ describe("matchSuggestions", () => {
     ]);
   });
 
+  it("fuzzy matches file references after @", () => {
+    const paths = ["README.md", "src/core/agent.ts", "docs/spec.md"];
+    expect(matchSuggestions("Explain @sca", undefined, paths)).toEqual([
+      "@src/core/agent.ts",
+    ]);
+  });
+
   it("matches /h to help and history", () => {
     const result = matchSuggestions("/h");
     expect(result).toEqual(["/help", "/history"]);

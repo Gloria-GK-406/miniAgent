@@ -59,7 +59,8 @@ export function matchSuggestions(
     const referenceQuery = getReferenceQuery(input);
     if (referenceQuery === null) return [];
     return (referencePaths ?? [])
-      .filter((path) => path.startsWith(referenceQuery))
+      .filter((path) => isReferenceMatch(path, referenceQuery))
+      .sort((a, b) => referenceRank(a, referenceQuery) - referenceRank(b, referenceQuery))
       .map((path) => `@${path}`);
   }
 
@@ -99,6 +100,32 @@ export function matchSuggestions(
 function getReferenceQuery(input: string): string | null {
   const match = /(?:^|\s)@([^\s]*)$/.exec(input);
   return match === null ? null : match[1]!;
+}
+
+function isReferenceMatch(path: string, query: string): boolean {
+  const normalizedPath = path.toLowerCase();
+  const normalizedQuery = query.toLowerCase();
+  if (normalizedQuery.length === 0) return true;
+  if (normalizedPath.startsWith(normalizedQuery)) return true;
+
+  let queryIndex = 0;
+  for (const char of normalizedPath) {
+    if (char === normalizedQuery[queryIndex]) {
+      queryIndex++;
+      if (queryIndex === normalizedQuery.length) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function referenceRank(path: string, query: string): number {
+  const normalizedPath = path.toLowerCase();
+  const normalizedQuery = query.toLowerCase();
+  if (normalizedPath.startsWith(normalizedQuery)) return 0;
+  if (normalizedPath.includes(normalizedQuery)) return 1;
+  return 2;
 }
 
 export function applySuggestion(input: string, suggestion: string): string {
