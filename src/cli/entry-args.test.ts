@@ -274,6 +274,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("prints merged config without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--show-config"])).toEqual({
+      type: "show-config",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--show-config", "--json"])).toEqual({
+      type: "show-config",
+      cwd: "C:/repo",
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -512,10 +523,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects prompted show config mode", () => {
+    expect(parseCLIEntryArgs(["--show-config", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --show-config",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -538,6 +556,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--fork-session");
     expect(help).toContain("--completion");
     expect(help).toContain("--config-paths");
+    expect(help).toContain("--show-config");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");

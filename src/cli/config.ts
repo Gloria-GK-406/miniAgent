@@ -22,6 +22,7 @@ export interface LoadConfigOptions {
   env?: Record<string, string | undefined>;
   platform?: NodeJS.Platform;
   homeDir?: string;
+  createTemplateIfMissing?: boolean;
 }
 
 export const CLIProviderSchema = z
@@ -224,6 +225,47 @@ function parseConfig(raw: unknown): CLIConfig {
   return result.data;
 }
 
+export function createDefaultConfigTemplate(baseDir: string): CLIConfig {
+  return {
+    providers: [],
+    defaultModel: "",
+    defaultAgent: "build",
+    permission: {
+      "*": "ask",
+      read: "allow",
+      glob: "allow",
+      grep: "allow",
+    },
+    shell: {
+      windows: "powershell",
+      timeoutMs: 120000,
+    },
+    editor: {},
+    diagnostics: {
+      timeoutMs: 120000,
+    },
+    tui: {
+      showReasoning: false,
+      showToolDetails: false,
+    },
+    systemPrompt: "You are a helpful assistant.",
+    mcp: {
+      servers: {
+        "open-weather": {
+          transport: "streamable-http",
+          url: "https://mcp.open-mcp.org/api/server/open-weather@latest/mcp",
+        },
+      },
+    },
+    skill: {
+      directories: [join(baseDir, CLIAGENT_DIR, "skill")],
+    },
+    subagent: {
+      path: join(baseDir, CLIAGENT_DIR, "subagent"),
+    },
+  };
+}
+
 export async function loadConfig(baseDir: string, options: LoadConfigOptions = {}): Promise<CLIConfig> {
   const dir = join(baseDir, CLIAGENT_DIR);
   const configPath = join(dir, "config.json");
@@ -233,45 +275,11 @@ export async function loadConfig(baseDir: string, options: LoadConfigOptions = {
   const projectConfig = await readJsonIfExists(configPath);
 
   if (projectConfig === null && globalConfig === null) {
+    const template = createDefaultConfigTemplate(baseDir);
+    if (options.createTemplateIfMissing === false) {
+      return template;
+    }
     await mkdir(dir, { recursive: true });
-    const template: CLIConfig = {
-      providers: [],
-      defaultModel: "",
-      defaultAgent: "build",
-      permission: {
-        "*": "ask",
-        read: "allow",
-        glob: "allow",
-        grep: "allow",
-      },
-      shell: {
-        windows: "powershell",
-        timeoutMs: 120000,
-      },
-      editor: {},
-      diagnostics: {
-        timeoutMs: 120000,
-      },
-      tui: {
-        showReasoning: false,
-        showToolDetails: false,
-      },
-      systemPrompt: "You are a helpful assistant.",
-      mcp: {
-        servers: {
-          "open-weather": {
-            transport: "streamable-http",
-            url: "https://mcp.open-mcp.org/api/server/open-weather@latest/mcp",
-          },
-        },
-      },
-      skill: {
-        directories: [join(baseDir, CLIAGENT_DIR, "skill")],
-      },
-      subagent: {
-        path: join(baseDir, CLIAGENT_DIR, "subagent"),
-      },
-    };
     await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");
     console.log(`Config template created at ${configPath}`);
     console.log("Please add your provider configurations and run again.");

@@ -20,6 +20,7 @@ import { runSessionFork } from "./session-fork-runner.js";
 import { runSessionImport } from "./session-import-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
 import { runSessionRename } from "./session-rename-runner.js";
+import { runShowConfig } from "./show-config-runner.js";
 
 function readPackageVersion(): string {
   const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
@@ -48,6 +49,16 @@ async function main(): Promise<void> {
   }
   if (action.type === "config-paths") {
     process.exitCode = runConfigPaths({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "show-config") {
+    process.exitCode = await runShowConfig({
       baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.output !== undefined && { output: action.output }),
     }, {
