@@ -150,7 +150,7 @@ export type CLIEntryAction =
   }
   | { type: "help" }
   | { type: "version" }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string; output?: CLIEntryOutput };
 
 export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let agent: CLIEntryAgentMode | undefined;
@@ -197,6 +197,12 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let output: CLIEntryOutput | undefined;
   let promptFile: string | undefined;
   const promptParts: string[] = [];
+  const errorOutput: CLIEntryOutput | undefined = args.includes("--json") ? "json" : undefined;
+  const parseError = (message: string): CLIEntryAction => ({
+    type: "error",
+    message,
+    ...(errorOutput !== undefined && { output: errorOutput }),
+  });
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
@@ -264,21 +270,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--git-status") {
       if (gitAction !== undefined) {
-        return { type: "error", message: "Cannot combine git headless modes" };
+        return parseError("Cannot combine git headless modes");
       }
       gitAction = "status";
       continue;
     }
     if (arg === "--git-log") {
       if (gitAction !== undefined) {
-        return { type: "error", message: "Cannot combine git headless modes" };
+        return parseError("Cannot combine git headless modes");
       }
       gitAction = "log";
       const next = args[index + 1];
       if (next !== undefined && !next.startsWith("-")) {
         const parsed = Number.parseInt(next, 10);
         if (!Number.isInteger(parsed) || parsed <= 0 || parsed.toString() !== next) {
-          return { type: "error", message: `Invalid limit after --git-log: ${next}` };
+          return parseError(`Invalid limit after --git-log: ${next}`);
         }
         gitLogLimit = parsed;
         index++;
@@ -287,7 +293,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--git-diff") {
       if (gitAction !== undefined) {
-        return { type: "error", message: "Cannot combine git headless modes" };
+        return parseError("Cannot combine git headless modes");
       }
       gitAction = "diff";
       const next = args[index + 1];
@@ -304,14 +310,14 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--set-permission") {
       const target = args[index + 1];
       if (target === undefined || target.trim().length === 0 || target.startsWith("-")) {
-        return { type: "error", message: "Missing target after --set-permission" };
+        return parseError("Missing target after --set-permission");
       }
       const decision = args[index + 2];
       if (decision === undefined || decision.trim().length === 0 || decision.startsWith("-")) {
-        return { type: "error", message: "Missing decision after --set-permission" };
+        return parseError("Missing decision after --set-permission");
       }
       if (decision !== "allow" && decision !== "ask" && decision !== "deny") {
-        return { type: "error", message: `Invalid permission decision: ${decision}` };
+        return parseError(`Invalid permission decision: ${decision}`);
       }
       permissionAction = "set";
       permissionTarget = target;
@@ -322,7 +328,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--unset-permission") {
       const target = args[index + 1];
       if (target === undefined || target.trim().length === 0 || target.startsWith("-")) {
-        return { type: "error", message: "Missing target after --unset-permission" };
+        return parseError("Missing target after --unset-permission");
       }
       permissionAction = "unset";
       permissionTarget = target;
@@ -332,7 +338,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--set-system-prompt") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
-        return { type: "error", message: "Missing prompt after --set-system-prompt" };
+        return parseError("Missing prompt after --set-system-prompt");
       }
       systemPromptAction = "set";
       systemPrompt = next;
@@ -342,7 +348,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--system-prompt-file") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
-        return { type: "error", message: "Missing path after --system-prompt-file" };
+        return parseError("Missing path after --system-prompt-file");
       }
       systemPromptAction = "set";
       systemPromptFile = next;
@@ -365,7 +371,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--import-session") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing path after --import-session" };
+        return parseError("Missing path after --import-session");
       }
       importSessionMode = true;
       importInputPath = next;
@@ -375,7 +381,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--delete-session") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
-        return { type: "error", message: "Missing session id after --delete-session" };
+        return parseError("Missing session id after --delete-session");
       }
       deleteSessionMode = true;
       sessionId = next;
@@ -385,10 +391,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--completion") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
-        return { type: "error", message: "Missing shell after --completion" };
+        return parseError("Missing shell after --completion");
       }
       if (next !== "bash" && next !== "zsh" && next !== "fish" && next !== "powershell") {
-        return { type: "error", message: `Invalid completion shell: ${next}` };
+        return parseError(`Invalid completion shell: ${next}`);
       }
       completionShell = next;
       index++;
@@ -397,7 +403,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--rename-session") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
-        return { type: "error", message: "Missing session id after --rename-session" };
+        return parseError("Missing session id after --rename-session");
       }
       renameSessionMode = true;
       sessionId = next;
@@ -407,7 +413,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--fork-session") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
-        return { type: "error", message: "Missing session id after --fork-session" };
+        return parseError("Missing session id after --fork-session");
       }
       forkSessionMode = true;
       sessionId = next;
@@ -417,7 +423,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--name") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing name after --name" };
+        return parseError("Missing name after --name");
       }
       importName = next;
       index++;
@@ -430,10 +436,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--format") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing format after --format" };
+        return parseError("Missing format after --format");
       }
       if (next !== "json" && next !== "markdown") {
-        return { type: "error", message: `Invalid export format: ${next}` };
+        return parseError(`Invalid export format: ${next}`);
       }
       exportFormat = next;
       index++;
@@ -442,7 +448,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--output") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing path after --output" };
+        return parseError("Missing path after --output");
       }
       outputPath = next;
       index++;
@@ -451,7 +457,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--prompt-file") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing path after --prompt-file" };
+        return parseError("Missing path after --prompt-file");
       }
       promptFile = next;
       index++;
@@ -468,10 +474,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--agent") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing mode after --agent" };
+        return parseError("Missing mode after --agent");
       }
       if (next !== "build" && next !== "plan") {
-        return { type: "error", message: `Invalid agent mode: ${next}` };
+        return parseError(`Invalid agent mode: ${next}`);
       }
       agent = next;
       index++;
@@ -480,7 +486,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--cwd") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing path after --cwd" };
+        return parseError("Missing path after --cwd");
       }
       cwd = next;
       index++;
@@ -489,7 +495,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--session" || arg === "-s") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing session id after --session" };
+        return parseError("Missing session id after --session");
       }
       sessionId = next;
       index++;
@@ -498,7 +504,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--new-session") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing name after --new-session" };
+        return parseError("Missing name after --new-session");
       }
       newSession = next;
       index++;
@@ -507,14 +513,14 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     if (arg === "--model" || arg === "-m") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0) {
-        return { type: "error", message: "Missing selector after --model" };
+        return parseError("Missing selector after --model");
       }
       model = next;
       index++;
       continue;
     }
     if (arg.startsWith("-")) {
-      return { type: "error", message: `Unknown argument: ${arg}` };
+      return parseError(`Unknown argument: ${arg}`);
     }
     promptParts.push(...args.slice(index));
     break;
@@ -522,25 +528,25 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
 
   const prompt = promptParts.join(" ").trim();
   if (sessionId !== undefined && newSession !== undefined) {
-    return { type: "error", message: "Cannot use --session with --new-session" };
+    return parseError("Cannot use --session with --new-session");
   }
   if (promptFile !== undefined && prompt.length > 0) {
-    return { type: "error", message: "Cannot combine --prompt-file with a positional prompt" };
+    return parseError("Cannot combine --prompt-file with a positional prompt");
   }
   if (force && !initMode && !initInstructionsMode) {
-    return { type: "error", message: "Cannot use --force without --init or --init-instructions" };
+    return parseError("Cannot use --force without --init or --init-instructions");
   }
   if (gitDiffStaged && gitAction !== "diff") {
-    return { type: "error", message: "Cannot use --staged without --git-diff" };
+    return parseError("Cannot use --staged without --git-diff");
   }
   if (systemPrompt !== undefined && systemPromptFile !== undefined) {
-    return { type: "error", message: "Cannot combine --set-system-prompt with --system-prompt-file" };
+    return parseError("Cannot combine --set-system-prompt with --system-prompt-file");
   }
   if (doctorMode && printMode) {
-    return { type: "error", message: "Cannot use --doctor with --print" };
+    return parseError("Cannot use --doctor with --print");
   }
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
-    return { type: "error", message: "Cannot combine --diagnostics with another headless mode" };
+    return parseError("Cannot combine --diagnostics with another headless mode");
   }
   if (
     completionShell !== undefined
@@ -569,7 +575,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || forkSessionMode
     )
   ) {
-    return { type: "error", message: "Cannot combine --completion with another headless mode" };
+    return parseError("Cannot combine --completion with another headless mode");
   }
   if (
     configPathsMode
@@ -596,7 +602,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || initInstructionsMode
     )
   ) {
-    return { type: "error", message: "Cannot combine --config-paths with another headless mode" };
+    return parseError("Cannot combine --config-paths with another headless mode");
   }
   if (
     showConfigMode
@@ -624,7 +630,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || initInstructionsMode
     )
   ) {
-    return { type: "error", message: "Cannot combine --show-config with another headless mode" };
+    return parseError("Cannot combine --show-config with another headless mode");
   }
   if (
     initMode
@@ -652,7 +658,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || forkSessionMode
     )
   ) {
-    return { type: "error", message: "Cannot combine --init with another headless mode" };
+    return parseError("Cannot combine --init with another headless mode");
   }
   if (
     initInstructionsMode
@@ -680,66 +686,66 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || forkSessionMode
     )
   ) {
-    return { type: "error", message: "Cannot combine --init-instructions with another headless mode" };
+    return parseError("Cannot combine --init-instructions with another headless mode");
   }
   if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode)) {
-    return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
+    return parseError("Cannot combine --delete-session with another headless mode");
   }
   if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --rename-session with another headless mode" };
+    return parseError("Cannot combine --rename-session with another headless mode");
   }
   if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
-    return { type: "error", message: "Cannot combine --fork-session with another headless mode" };
+    return parseError("Cannot combine --fork-session with another headless mode");
   }
   if (listSessionsMode && printMode) {
-    return { type: "error", message: "Cannot use --list-sessions with --print" };
+    return parseError("Cannot use --list-sessions with --print");
   }
   if (listSessionsMode && doctorMode) {
-    return { type: "error", message: "Cannot use --list-sessions with --doctor" };
+    return parseError("Cannot use --list-sessions with --doctor");
   }
   if (exportSessionMode && (printMode || doctorMode || listSessionsMode)) {
-    return { type: "error", message: "Cannot combine --export-session with another headless mode" };
+    return parseError("Cannot combine --export-session with another headless mode");
   }
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
-    return { type: "error", message: "Cannot combine --import-session with another headless mode" };
+    return parseError("Cannot combine --import-session with another headless mode");
   }
   if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --list-models with another headless mode" };
+    return parseError("Cannot combine --list-models with another headless mode");
   }
   if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --list-commands with another headless mode" };
+    return parseError("Cannot combine --list-commands with another headless mode");
   }
   if (listToolsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --list-tools with another headless mode" };
+    return parseError("Cannot combine --list-tools with another headless mode");
   }
   if (listAgentsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --list-agents with another headless mode" };
+    return parseError("Cannot combine --list-agents with another headless mode");
   }
   if (previewContextMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --preview-context with another headless mode" };
+    return parseError("Cannot combine --preview-context with another headless mode");
   }
   if (showHistoryMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: "Cannot combine --show-history with another headless mode" };
+    return parseError("Cannot combine --show-history with another headless mode");
   }
   if (gitAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
-    return { type: "error", message: `Cannot combine ${flag} with another headless mode` };
+    return parseError(`Cannot combine ${flag} with another headless mode`);
   }
   if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
-    return { type: "error", message: `Cannot combine --${permissionAction}-permission with another headless mode` };
+    return parseError(`Cannot combine --${permissionAction}-permission with another headless mode`);
   }
   if (systemPromptAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     const flag = systemPromptAction === "set"
       ? (systemPromptFile === undefined ? "--set-system-prompt" : "--system-prompt-file")
       : "--unset-system-prompt";
-    return { type: "error", message: `Cannot combine ${flag} with another headless mode` };
+    return parseError(`Cannot combine ${flag} with another headless mode`);
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
-      return { type: "error", message: "Cannot use --json with --completion" };
+      return parseError("Cannot use --json with --completion");
     }
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --completion" };
+      return parseError("Unexpected prompt for --completion");
     }
     return {
       type: "completion",
@@ -748,7 +754,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (configPathsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --config-paths" };
+      return parseError("Unexpected prompt for --config-paths");
     }
     return {
       type: "config-paths",
@@ -758,7 +764,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (showConfigMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --show-config" };
+      return parseError("Unexpected prompt for --show-config");
     }
     return {
       type: "show-config",
@@ -768,7 +774,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (initMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --init" };
+      return parseError("Unexpected prompt for --init");
     }
     return {
       type: "init",
@@ -779,7 +785,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (initInstructionsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --init-instructions" };
+      return parseError("Unexpected prompt for --init-instructions");
     }
     return {
       type: "init-instructions",
@@ -790,7 +796,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (permissionAction !== undefined) {
     if (prompt.length > 0) {
-      return { type: "error", message: `Unexpected prompt for --${permissionAction}-permission` };
+      return parseError(`Unexpected prompt for --${permissionAction}-permission`);
     }
     return {
       type: "permission-update",
@@ -806,7 +812,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ? (systemPromptFile === undefined ? "--set-system-prompt" : "--system-prompt-file")
       : "--unset-system-prompt";
     if (prompt.length > 0) {
-      return { type: "error", message: `Unexpected prompt for ${flag}` };
+      return parseError(`Unexpected prompt for ${flag}`);
     }
     return {
       type: "system-prompt-update",
@@ -819,7 +825,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (diagnosticsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --diagnostics" };
+      return parseError("Unexpected prompt for --diagnostics");
     }
     return {
       type: "diagnostics",
@@ -829,7 +835,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (deleteSessionMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --delete-session" };
+      return parseError("Unexpected prompt for --delete-session");
     }
     return {
       type: "delete-session",
@@ -840,10 +846,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (renameSessionMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --rename-session" };
+      return parseError("Unexpected prompt for --rename-session");
     }
     if (importName === undefined) {
-      return { type: "error", message: "Missing name for --rename-session" };
+      return parseError("Missing name for --rename-session");
     }
     return {
       type: "rename-session",
@@ -855,7 +861,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (forkSessionMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --fork-session" };
+      return parseError("Unexpected prompt for --fork-session");
     }
     return {
       type: "fork-session",
@@ -867,7 +873,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (importSessionMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --import-session" };
+      return parseError("Unexpected prompt for --import-session");
     }
     return {
       type: "import-session",
@@ -879,7 +885,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (exportSessionMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --export-session" };
+      return parseError("Unexpected prompt for --export-session");
     }
     return {
       type: "export-session",
@@ -892,7 +898,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (listSessionsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --list-sessions" };
+      return parseError("Unexpected prompt for --list-sessions");
     }
     return {
       type: "list-sessions",
@@ -902,7 +908,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (listModelsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --list-models" };
+      return parseError("Unexpected prompt for --list-models");
     }
     return {
       type: "list-models",
@@ -912,7 +918,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (listCommandsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --list-commands" };
+      return parseError("Unexpected prompt for --list-commands");
     }
     return {
       type: "list-commands",
@@ -922,7 +928,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (listToolsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --list-tools" };
+      return parseError("Unexpected prompt for --list-tools");
     }
     return {
       type: "list-tools",
@@ -937,7 +943,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (listAgentsMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --list-agents" };
+      return parseError("Unexpected prompt for --list-agents");
     }
     return {
       type: "list-agents",
@@ -952,7 +958,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (previewContextMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --preview-context" };
+      return parseError("Unexpected prompt for --preview-context");
     }
     return {
       type: "preview-context",
@@ -967,7 +973,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (showHistoryMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --show-history" };
+      return parseError("Unexpected prompt for --show-history");
     }
     return {
       type: "show-history",
@@ -983,7 +989,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (gitAction !== undefined) {
     const flag = gitAction === "status" ? "--git-status" : gitAction === "log" ? "--git-log" : "--git-diff";
     if (prompt.length > 0) {
-      return { type: "error", message: `Unexpected prompt for ${flag}` };
+      return parseError(`Unexpected prompt for ${flag}`);
     }
     return {
       type: "git-headless",
@@ -997,7 +1003,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (doctorMode) {
     if (prompt.length > 0) {
-      return { type: "error", message: "Unexpected prompt for --doctor" };
+      return parseError("Unexpected prompt for --doctor");
     }
     return {
       type: "doctor",
@@ -1013,7 +1019,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
 
   if (printMode) {
     if (prompt.length === 0 && promptFile === undefined) {
-      return { type: "error", message: "Missing prompt for --print" };
+      return parseError("Missing prompt for --print");
     }
     return {
       type: "print",
@@ -1029,10 +1035,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return {
-      type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
-    };
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --rename-session, or --fork-session");
   }
 
   return {

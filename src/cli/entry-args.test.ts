@@ -650,6 +650,7 @@ describe("CLI entry args", () => {
     expect(parseCLIEntryArgs(["--delete-session", "--json"])).toEqual({
       type: "error",
       message: "Missing session id after --delete-session",
+      output: "json",
     });
     expect(parseCLIEntryArgs(["--delete-session", "s1", "prompt"])).toEqual({
       type: "error",
@@ -665,6 +666,7 @@ describe("CLI entry args", () => {
     expect(parseCLIEntryArgs(["--rename-session", "--json"])).toEqual({
       type: "error",
       message: "Missing session id after --rename-session",
+      output: "json",
     });
     expect(parseCLIEntryArgs(["--rename-session", "s1"])).toEqual({
       type: "error",
@@ -684,6 +686,7 @@ describe("CLI entry args", () => {
     expect(parseCLIEntryArgs(["--fork-session", "--json"])).toEqual({
       type: "error",
       message: "Missing session id after --fork-session",
+      output: "json",
     });
     expect(parseCLIEntryArgs(["--fork-session", "s1", "prompt"])).toEqual({
       type: "error",
@@ -707,6 +710,7 @@ describe("CLI entry args", () => {
     expect(parseCLIEntryArgs(["--completion", "bash", "--json"])).toEqual({
       type: "error",
       message: "Cannot use --json with --completion",
+      output: "json",
     });
   });
 
@@ -800,6 +804,20 @@ describe("CLI entry args", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
       message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      output: "json",
+    });
+  });
+
+  it("preserves requested json output for parse errors", () => {
+    expect(parseCLIEntryArgs(["--json", "--missing"])).toEqual({
+      type: "error",
+      message: "Unknown argument: --missing",
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--print", "--json"])).toEqual({
+      type: "error",
+      message: "Missing prompt for --print",
+      output: "json",
     });
   });
 

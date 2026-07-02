@@ -51,6 +51,13 @@ async function main(): Promise<void> {
     return;
   }
   if (action.type === "error") {
+    if (action.output === "json") {
+      process.exitCode = writeCLIEntryError({
+        stdout: (text) => process.stdout.write(text),
+        stderr: (text) => process.stderr.write(text),
+      }, new Error(action.message), "json");
+      return;
+    }
     process.stderr.write(`${action.message}\n\n${formatCLIHelp()}\n`);
     process.exitCode = 1;
     return;
