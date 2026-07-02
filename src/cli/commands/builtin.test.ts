@@ -72,6 +72,7 @@ describe("registerBuiltinCommands", () => {
       "compact",
       "context",
       "history",
+      "references",
       "snapshots",
       "tools",
       "models",
@@ -116,6 +117,22 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/status");
 
     expect(commandCtx.getState().panel).toEqual({ type: "status" });
+  });
+
+  it("opens references panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.updateState({
+      referencePaths: ["README.md", "src/cli/index.tsx"],
+    });
+
+    await registry.execute(commandCtx, "/references");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "references",
+      references: ["README.md", "src/cli/index.tsx"],
+    });
   });
 
   it("opens redacted config panel", async () => {

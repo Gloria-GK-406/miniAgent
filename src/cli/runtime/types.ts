@@ -20,6 +20,7 @@ export type CLIViewPanel =
   | { type: "help"; query?: string }
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
+  | { type: "references"; references: string[] }
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[]; query?: string }
   | { type: "agents"; mode: CLIAgentMode; subagents: CLISubagentSummary[] }

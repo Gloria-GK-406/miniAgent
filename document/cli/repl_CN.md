@@ -8,6 +8,7 @@
 - `/diagnostics`：运行配置的诊断命令，或从 `package.json` 自动发现 `npm run typecheck`、`npm run lint`、`npm test`。
 - `/activity`：查看最近工具调用和子 Agent 形态工具调用的活动时间线。
 - `/permissions`：查看当前 allow/ask/deny 权限策略。
+- `/references`：查看可用于 `@file` 引用补全的文件。
 - `--list-references [--json]`：以 headless 方式查看可用于 `@file` 引用补全的文件。
 - `--show-permissions [--json]`：以 headless 方式查看当前 allow/ask/deny 权限策略。
 - `--show-system-prompt [--json]`：以 headless 方式查看基础和实际生效的系统提示词。
@@ -113,6 +114,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/tools` | 列出已注册的工具 |
 | `/history` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
+| `/references` | 列出可用于 `@file` 引用的文件 |
 | `/compact` | 运行上下文压缩 |
 | `/sessions [new\|switch\|fork\|rename\|delete]` | 显示或管理会话 |
 | `/export [json\|markdown] [path]` | 导出当前会话 |

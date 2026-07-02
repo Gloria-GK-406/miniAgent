@@ -202,7 +202,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/help /status /config /history /context /tools /models /sessions</Text>
+          <Text>/help /status /config /history /context /references /tools /models /sessions</Text>
           <Text>/activity /snapshots /permissions /system /agent build|plan /auto</Text>
           <Text>/details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
@@ -333,6 +333,27 @@ function AgentsPanel({
         </Text>
       ))}
       {panel.subagents.length === 0 && <Text dimColor>No configured subagents</Text>}
+    </StaticPanelFrame>
+  );
+}
+
+function ReferencesPanel({
+  panel,
+  runtime,
+}: {
+  panel: Extract<CLIViewPanel, { type: "references" }>;
+  runtime: CLIAppRuntime;
+}) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">References ({plural(panel.references.length, "file")})</Text>
+      {panel.references.length === 0 ? (
+        <Text dimColor>No reference candidates</Text>
+      ) : (
+        panel.references.map((path) => (
+          <Text key={path}>{path}</Text>
+        ))
+      )}
     </StaticPanelFrame>
   );
 }
@@ -697,6 +718,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "agents") {
     return <AgentsPanel runtime={runtime} panel={state.panel} />;
+  }
+
+  if (state.panel.type === "references") {
+    return <ReferencesPanel runtime={runtime} panel={state.panel} />;
   }
 
   if (state.panel.type === "snapshots") {

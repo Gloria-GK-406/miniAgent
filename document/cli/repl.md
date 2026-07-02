@@ -161,6 +161,7 @@ miniagent --completion powershell
 | `/tools` | List registered tools |
 | `/history` | View conversation history |
 | `/context` | Preview context sent to LLM |
+| `/references` | List files available to `@file` references |
 | `/compact` | Run context compression |
 | `/sessions [new|switch|fork|rename|delete]` | Show or manage sessions |
 | `/export [json|markdown] [path]` | Export the current session |

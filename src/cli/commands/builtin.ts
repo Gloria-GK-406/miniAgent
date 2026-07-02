@@ -177,6 +177,20 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "references",
+    aliases: ["refs"],
+    description: "List file reference candidates",
+    usage: "/references",
+    execute: async (ctx) => {
+      ctx.updateState({
+        panel: {
+          type: "references",
+          references: ctx.getState().referencePaths,
+        },
+      });
+    },
+  });
+  registry.register({
     name: "tools",
     description: "List tools",
     usage: "/tools",

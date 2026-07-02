@@ -428,6 +428,7 @@ npm run chat
 | `/tools` | 列出已注册的工具 |
 | `/history` | 查看对话历史 |
 | `/context` | 预览发送给 LLM 的上下文 |
+| `/references` | 列出可用于 `@file` 引用的文件 |
 | `/compact` | 运行上下文压缩 |
 | `/sessions [new\|switch\|fork\|rename\|delete]` | 显示或管理会话 |
 | `/export [json\|markdown] [path]` | 导出当前会话 |
@@ -506,7 +507,7 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 ## CLI Phase 3 补充
 
 - 项目配置位于 `.cliagent/config.json`；全局默认配置可放在 `%APPDATA%/miniagent/config.json`、`$XDG_CONFIG_HOME/miniagent/config.json` 或 `~/.config/miniagent/config.json`。项目配置覆盖全局配置，数组整体替换，对象浅合并。
-- 新增命令：`/git [status|log]`、`/diff [--staged] [path]`、`/editor [initial text]`、`/diagnostics`、`/activity`、`/permissions`、`/system`、`/init [--force]`；headless 支持 `--list-references [--json]`、`--show-permissions [--json]` 和 `--show-system-prompt [--json]`。
+- 新增命令：`/git [status|log]`、`/diff [--staged] [path]`、`/editor [initial text]`、`/diagnostics`、`/activity`、`/permissions`、`/system`、`/references`、`/init [--force]`；headless 支持 `--list-references [--json]`、`--show-permissions [--json]` 和 `--show-system-prompt [--json]`。
 - CLI Agent 现在包含 git-aware 只读工具和受权限保护的 `git_commit`，并提供 diff、诊断、外部编辑器和活动面板。
 
 ## License

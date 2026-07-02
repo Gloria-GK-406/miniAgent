@@ -24,6 +24,7 @@ const COMMANDS = [
   "/permission",
   "/permissions",
   "/quit",
+  "/references",
   "/redo",
   "/session",
   "/sessions",

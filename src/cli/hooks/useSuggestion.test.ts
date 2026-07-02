@@ -134,12 +134,17 @@ describe("matchSuggestions", () => {
     expect(result).toEqual(["/compact", "/context"]);
   });
 
+  it("matches /ref to references", () => {
+    const result = matchSuggestions("/ref");
+    expect(result).toEqual(["/references"]);
+  });
+
   it("matches Phase 2 commands", () => {
     expect(matchSuggestions("/n")).toEqual(["/new"]);
     expect(matchSuggestions("/ex")).toEqual(["/exit", "/export"]);
     expect(matchSuggestions("/i")).toEqual(["/import", "/init"]);
     expect(matchSuggestions("/u")).toEqual(["/undo"]);
-    expect(matchSuggestions("/r")).toEqual(["/redo"]);
+    expect(matchSuggestions("/r")).toEqual(["/references", "/redo"]);
     expect(matchSuggestions("/comp")).toEqual(["/compact"]);
   });
 

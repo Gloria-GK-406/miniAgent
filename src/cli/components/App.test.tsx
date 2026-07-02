@@ -603,6 +603,37 @@ describe("App", () => {
     expect(output).toContain("created generated.txt");
   });
 
+  it("renders references panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "references",
+          references: ["README.md", "src/cli/index.tsx"],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("References (2 files)");
+    expect(output).toContain("README.md");
+    expect(output).toContain("src/cli/index.tsx");
+  });
+
+  it("renders empty references panel state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "references",
+          references: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("References (0 files)");
+    expect(output).toContain("No reference candidates");
+  });
+
   it("renders diagnostics panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({
