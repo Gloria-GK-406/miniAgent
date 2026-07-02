@@ -98,7 +98,7 @@ export async function runPrintPrompt(
     streams.stdout(text.endsWith("\n") ? text : `${text}\n`);
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writePrintError(streams, runtime.getState(), errorMessage(error), output);
     return 1;
   } finally {
     await runtime.destroy();

@@ -166,4 +166,23 @@ describe("runPrintPrompt", () => {
     expect(stderr).toHaveBeenCalledWith("bad config\n");
     expect(app.destroy).toHaveBeenCalled();
   });
+
+  it("prints thrown runtime errors as json when requested", async () => {
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    const app = runtime(state());
+    vi.mocked(app.submitInput).mockRejectedValueOnce(new Error("provider unavailable"));
+
+    await expect(runPrintPrompt(app, "do work", { stdout, stderr }, { output: "json" })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith(formatPrintResultJson({
+      ok: false,
+      response: null,
+      error: "provider unavailable",
+      sessionId: "s1",
+      modelName: "test/model",
+    }));
+    expect(stderr).not.toHaveBeenCalled();
+    expect(app.destroy).toHaveBeenCalled();
+  });
 });
