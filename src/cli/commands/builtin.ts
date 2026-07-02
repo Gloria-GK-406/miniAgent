@@ -1,6 +1,7 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext } from "../runtime/types.js";
 import type { CLIPermissionDecision } from "../config.js";
+import type { SessionMeta } from "../../core/session.js";
 import {
   buildEffectiveSystemPrompt,
   getBaseSystemPrompt,
@@ -12,6 +13,16 @@ function errorMessage(error: unknown): string {
 
 function splitArgs(args: string): string[] {
   return args.trim().length === 0 ? [] : args.trim().split(/\s+/);
+}
+
+function filterSessions(sessions: SessionMeta[], query: string): SessionMeta[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return sessions;
+  }
+  return sessions.filter((session) =>
+    session.name.toLowerCase().includes(normalized) ||
+    session.id.toLowerCase().includes(normalized));
 }
 
 function parsePermissionDecision(value: string | undefined): CLIPermissionDecision | null {
@@ -180,7 +191,7 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     name: "sessions",
     aliases: ["session"],
     description: "Show or manage sessions",
-    usage: "/sessions [new|switch|fork|rename|delete]",
+    usage: "/sessions [search|new|switch|fork|rename|delete]",
     execute: async (ctx, args) => {
       const parts = splitArgs(args);
       const action = parts[0];
@@ -191,6 +202,20 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
 
       await runSessionMutation(ctx, async () => {
         switch (action) {
+          case "search": {
+            const query = args.trim().slice(action.length).trim();
+            if (query.length === 0) {
+              throw new Error("Usage: /sessions search <query>");
+            }
+            ctx.updateState({
+              panel: {
+                type: "sessions",
+                sessions: filterSessions(ctx.getState().sessions, query),
+                query,
+              },
+            });
+            break;
+          }
           case "new": {
             const name = args.trim().slice(action.length).trim();
             await ctx.runtime.createSession(name.length === 0 ? undefined : name);

@@ -243,4 +243,35 @@ describe("registerBuiltinCommands", () => {
 
     expect(commandCtx.getState().panel).toEqual({ type: "sessions", sessions });
   });
+
+  it("filters sessions by name or id", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    const sessions = [
+      {
+        id: "alpha-session",
+        name: "default",
+        createdAt: "2026-07-02T00:00:00.000Z",
+        updatedAt: "2026-07-02T00:00:00.000Z",
+        messageCount: 0,
+      },
+      {
+        id: "beta-session",
+        name: "Refactor CLI",
+        createdAt: "2026-07-02T00:00:01.000Z",
+        updatedAt: "2026-07-02T00:00:01.000Z",
+        messageCount: 3,
+      },
+    ];
+    commandCtx.updateState({ sessions });
+
+    await registry.execute(commandCtx, "/sessions search cli");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "sessions",
+      query: "cli",
+      sessions: [sessions[1]!],
+    });
+  });
 });

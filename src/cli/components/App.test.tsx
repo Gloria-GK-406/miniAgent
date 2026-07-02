@@ -261,6 +261,22 @@ describe("App", () => {
     expect(output).toContain("default");
   });
 
+  it("renders filtered sessions panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "sessions",
+          query: "cli",
+          sessions: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Sessions matching "cli"');
+    expect(output).toContain("No sessions found");
+  });
+
   it("renders git panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

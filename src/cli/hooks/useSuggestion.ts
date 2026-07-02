@@ -32,6 +32,7 @@ const COMMANDS = [
 ];
 
 const AGENT_SUBS = ["build", "plan"];
+const SESSION_SUBS = ["search", "new", "switch", "fork", "rename", "delete"];
 const COMMANDS_WITH_ARGS = new Set([
   "/agent",
   "/diff",
@@ -65,6 +66,9 @@ export function matchSuggestions(
     if (cmd === "/agent") {
       return AGENT_SUBS.filter((s) => s.startsWith(partial));
     }
+    if (cmd === "/sessions" || cmd === "/session") {
+      return SESSION_SUBS.filter((s) => s.startsWith(partial));
+    }
     return [];
   }
 
@@ -72,6 +76,7 @@ export function matchSuggestions(
 
   if (matches.length === 1 && matches[0] === cmd) {
     if (cmd === "/agent") return AGENT_SUBS;
+    if (cmd === "/sessions" || cmd === "/session") return SESSION_SUBS;
     return [];
   }
 

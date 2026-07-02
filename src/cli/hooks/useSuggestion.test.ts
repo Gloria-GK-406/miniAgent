@@ -31,6 +31,18 @@ describe("matchSuggestions", () => {
     expect(result).toEqual(["plan"]);
   });
 
+  it("matches /sessions subcommands", () => {
+    expect(matchSuggestions("/sessions")).toEqual([
+      "search",
+      "new",
+      "switch",
+      "fork",
+      "rename",
+      "delete",
+    ]);
+    expect(matchSuggestions("/sessions sw")).toEqual(["switch"]);
+  });
+
   it("hides exact /auto because it has no subcommands", () => {
     const result = matchSuggestions("/auto");
     expect(result).toEqual([]);

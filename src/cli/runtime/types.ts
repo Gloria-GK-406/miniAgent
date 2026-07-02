@@ -17,7 +17,7 @@ export type CLIViewPanel =
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
   | { type: "models" }
-  | { type: "sessions"; sessions: SessionMeta[] }
+  | { type: "sessions"; sessions: SessionMeta[]; query?: string }
   | { type: "tools"; tools: Tool[] }
   | { type: "permissions"; permission: CLIConfig["permission"]; autoApprove: boolean }
   | { type: "system"; basePrompt: string; effectivePrompt: string }

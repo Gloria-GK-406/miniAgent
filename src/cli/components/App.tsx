@@ -140,7 +140,9 @@ function SessionsPanel({ runtime, panel }: { runtime: CLIAppRuntime; panel: Extr
   const state = runtime.getState();
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>
-      <Text bold color="cyan">Sessions</Text>
+      <Text bold color="cyan">
+        {panel.query === undefined ? "Sessions" : `Sessions matching "${panel.query}"`}
+      </Text>
       {panel.sessions.map((session) => {
         const marker = session.id === state.sessionId ? "*" : " ";
         return (
@@ -149,6 +151,7 @@ function SessionsPanel({ runtime, panel }: { runtime: CLIAppRuntime; panel: Extr
           </Text>
         );
       })}
+      {panel.sessions.length === 0 && <Text dimColor>No sessions found</Text>}
     </StaticPanelFrame>
   );
 }
