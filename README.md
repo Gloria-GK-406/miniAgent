@@ -432,6 +432,8 @@ and shell integration:
 | `--diagnostics [--json]` | Run configured diagnostics |
 | `--set-permission <target> <allow|ask|deny>` | Persist a project permission rule |
 | `--unset-permission <target>` | Remove a project permission rule |
+| `--set-system-prompt <prompt>` / `--system-prompt-file <path>` | Set project system prompt |
+| `--unset-system-prompt` | Remove project system prompt |
 | `--export-session`, `--import-session` | Move session transcripts in and out |
 | `--delete-session`, `--rename-session`, `--fork-session` | Manage sessions without opening the TUI |
 | `--completion bash|zsh|fish|powershell` | Generate shell completions |

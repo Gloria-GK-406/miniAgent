@@ -88,6 +88,9 @@ also accept `--json`.
 | `--diagnostics` | Yes | Run configured or discovered diagnostic commands |
 | `--set-permission <target> <allow|ask|deny>` | Yes | Persist a project permission rule such as `write` or `shell:npm *` |
 | `--unset-permission <target>` | Yes | Remove a project permission rule |
+| `--set-system-prompt <prompt>` | Yes | Persist the project system prompt |
+| `--system-prompt-file <path>` | Yes | Persist the project system prompt from a file |
+| `--unset-system-prompt` | Yes | Remove the project system prompt |
 | `--doctor` | Yes | Run setup checks through the full runtime |
 | `--print <prompt>` | Yes | Run one prompt headlessly and print the final assistant response |
 | `--print --prompt-file <path>` | Yes | Read a headless prompt from a file |
@@ -100,6 +103,7 @@ miniagent --init
 miniagent --list-models --json
 miniagent --list-commands --json
 miniagent --set-permission "shell:npm *" allow
+miniagent --system-prompt-file .cliagent/system.md
 miniagent --print --prompt-file task.md --json
 miniagent --diagnostics
 miniagent --export-session --format markdown --output exports/session.md

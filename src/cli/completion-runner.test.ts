@@ -9,6 +9,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--print");
     expect(script).toContain("--list-commands");
     expect(script).toContain("--set-permission");
+    expect(script).toContain("--set-system-prompt");
     expect(script).toContain("--completion");
     expect(script.endsWith("\n")).toBe(true);
   });
@@ -26,6 +27,7 @@ describe("formatCompletionScript", () => {
 
     expect(script).toContain("complete -c miniagent");
     expect(script).toContain("-l diagnostics");
+    expect(script).toContain("-l system-prompt-file");
   });
 
   it("formats powershell completions", () => {

@@ -89,6 +89,14 @@ export type CLIEntryAction =
     decision?: CLIEntryPermissionDecision;
     output?: CLIEntryOutput;
   }
+  | {
+    type: "system-prompt-update";
+    action: "set" | "unset";
+    cwd?: string;
+    prompt?: string;
+    promptFile?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -109,6 +117,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let permissionAction: "set" | "unset" | undefined;
   let permissionTarget: string | undefined;
   let permissionDecision: CLIEntryPermissionDecision | undefined;
+  let systemPromptAction: "set" | "unset" | undefined;
+  let systemPrompt: string | undefined;
+  let systemPromptFile: string | undefined;
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
@@ -197,6 +208,30 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       permissionAction = "unset";
       permissionTarget = target;
       index++;
+      continue;
+    }
+    if (arg === "--set-system-prompt") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return { type: "error", message: "Missing prompt after --set-system-prompt" };
+      }
+      systemPromptAction = "set";
+      systemPrompt = next;
+      index++;
+      continue;
+    }
+    if (arg === "--system-prompt-file") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return { type: "error", message: "Missing path after --system-prompt-file" };
+      }
+      systemPromptAction = "set";
+      systemPromptFile = next;
+      index++;
+      continue;
+    }
+    if (arg === "--unset-system-prompt") {
+      systemPromptAction = "unset";
       continue;
     }
     if (arg === "--export-session") {
@@ -376,6 +411,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (force && !initMode) {
     return { type: "error", message: "Cannot use --force without --init" };
   }
+  if (systemPrompt !== undefined && systemPromptFile !== undefined) {
+    return { type: "error", message: "Cannot combine --set-system-prompt with --system-prompt-file" };
+  }
   if (doctorMode && printMode) {
     return { type: "error", message: "Cannot use --doctor with --print" };
   }
@@ -395,6 +433,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || permissionAction !== undefined
+      || systemPromptAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -414,6 +453,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || permissionAction !== undefined
+      || systemPromptAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -435,6 +475,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || permissionAction !== undefined
+      || systemPromptAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -457,6 +498,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listModelsMode
       || listCommandsMode
       || permissionAction !== undefined
+      || systemPromptAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -495,6 +537,12 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: `Cannot combine --${permissionAction}-permission with another headless mode` };
+  }
+  if (systemPromptAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || permissionAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    const flag = systemPromptAction === "set"
+      ? (systemPromptFile === undefined ? "--set-system-prompt" : "--system-prompt-file")
+      : "--unset-system-prompt";
+    return { type: "error", message: `Cannot combine ${flag} with another headless mode` };
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
@@ -549,6 +597,22 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       target: permissionTarget!,
       ...(cwd !== undefined && { cwd }),
       ...(permissionDecision !== undefined && { decision: permissionDecision }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (systemPromptAction !== undefined) {
+    const flag = systemPromptAction === "set"
+      ? (systemPromptFile === undefined ? "--set-system-prompt" : "--system-prompt-file")
+      : "--unset-system-prompt";
+    if (prompt.length > 0) {
+      return { type: "error", message: `Unexpected prompt for ${flag}` };
+    }
+    return {
+      type: "system-prompt-update",
+      action: systemPromptAction,
+      ...(cwd !== undefined && { cwd }),
+      ...(systemPrompt !== undefined && { prompt: systemPrompt }),
+      ...(systemPromptFile !== undefined && { promptFile: systemPromptFile }),
       ...(output !== undefined && { output }),
     };
   }
@@ -691,7 +755,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -744,6 +808,9 @@ export function formatCLIHelp(): string {
     "  --force         Overwrite existing files for supported commands",
     "  --set-permission Set a project permission rule",
     "  --unset-permission Unset a project permission rule",
+    "  --set-system-prompt Set the project system prompt",
+    "  --system-prompt-file Read project system prompt from a file",
+    "  --unset-system-prompt Unset the project system prompt",
     "  --completion     Generate shell completions: bash, zsh, fish, powershell",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",

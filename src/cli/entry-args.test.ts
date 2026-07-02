@@ -342,6 +342,26 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("updates system prompt without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--set-system-prompt", "Custom prompt.", "--json"])).toEqual({
+      type: "system-prompt-update",
+      action: "set",
+      prompt: "Custom prompt.",
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--system-prompt-file", "prompt.md"])).toEqual({
+      type: "system-prompt-update",
+      action: "set",
+      cwd: "C:/repo",
+      promptFile: "prompt.md",
+    });
+    expect(parseCLIEntryArgs(["--unset-system-prompt", "--json"])).toEqual({
+      type: "system-prompt-update",
+      action: "unset",
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -635,10 +655,29 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed system prompt update options", () => {
+    expect(parseCLIEntryArgs(["--set-system-prompt"])).toEqual({
+      type: "error",
+      message: "Missing prompt after --set-system-prompt",
+    });
+    expect(parseCLIEntryArgs(["--system-prompt-file"])).toEqual({
+      type: "error",
+      message: "Missing path after --system-prompt-file",
+    });
+    expect(parseCLIEntryArgs(["--set-system-prompt", "prompt", "--system-prompt-file", "prompt.md"])).toEqual({
+      type: "error",
+      message: "Cannot combine --set-system-prompt with --system-prompt-file",
+    });
+    expect(parseCLIEntryArgs(["--unset-system-prompt", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --unset-system-prompt",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -668,6 +707,9 @@ describe("CLI entry args", () => {
     expect(help).toContain("--force");
     expect(help).toContain("--set-permission");
     expect(help).toContain("--unset-permission");
+    expect(help).toContain("--set-system-prompt");
+    expect(help).toContain("--system-prompt-file");
+    expect(help).toContain("--unset-system-prompt");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");
