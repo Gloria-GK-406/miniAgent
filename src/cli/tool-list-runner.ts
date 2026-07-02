@@ -1,6 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { Tool } from "../tool/types.js";
 import type { PrintStreams } from "./print-runner.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import { createModeAwarePermissionService, createPermissionService } from "./runtime/permission-service.js";
 import type { CLIAppRuntime, CLIPermissionResult } from "./runtime/types.js";
 
@@ -11,10 +12,6 @@ export interface ToolListItem {
   description: string;
   parameters: Record<string, unknown>;
   permission?: CLIPermissionResult;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function toToolListItem(
@@ -54,6 +51,7 @@ export async function runToolList(
   streams: PrintStreams,
   options: { output?: ToolListOutput } = {},
 ): Promise<number> {
+  const output = options.output ?? "text";
   try {
     const state = runtime.getState();
     const permissionService = createModeAwarePermissionService({
@@ -67,13 +65,13 @@ export async function runToolList(
       ))
       .sort((left, right) => left.name.localeCompare(right.name));
     streams.stdout(
-      options.output === "json"
+      output === "json"
         ? formatToolListJson(tools)
         : formatToolList(tools),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   } finally {
     await runtime.destroy();

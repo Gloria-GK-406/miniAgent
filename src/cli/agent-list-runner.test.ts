@@ -87,4 +87,22 @@ describe("runAgentList", () => {
     expect(stdout).toHaveBeenCalledWith(formatAgentListJson(panel));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints thrown runtime errors as json when requested", async () => {
+    const runtime = {
+      showAgents: vi.fn(async () => {
+        throw new Error("agent config failed");
+      }),
+      getState: () => ({ panel: { type: "none" } }) as CLIState,
+      destroy: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runAgentList(runtime, { stdout, stderr }, { output: "json" })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"agent config failed\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+    expect(runtime.destroy).toHaveBeenCalled();
+  });
 });

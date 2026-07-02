@@ -78,4 +78,22 @@ describe("runHistory", () => {
     expect(stdout).toHaveBeenCalledWith(formatHistoryJson(messages));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints thrown runtime errors as json when requested", async () => {
+    const runtime = {
+      runCommand: vi.fn(async () => {
+        throw new Error("history unavailable");
+      }),
+      getState: () => ({ panel: { type: "none" } }) as CLIState,
+      destroy: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runHistory(runtime, { stdout, stderr }, { output: "json" })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"history unavailable\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+    expect(runtime.destroy).toHaveBeenCalled();
+  });
 });

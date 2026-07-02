@@ -1,12 +1,9 @@
 import type { Message, MessageContent } from "../core/types.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export type HistoryOutput = "text" | "json";
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function formatContent(content: MessageContent): string {
   if (typeof content === "string") {
@@ -41,21 +38,22 @@ export async function runHistory(
   streams: PrintStreams,
   options: { output?: HistoryOutput } = {},
 ): Promise<number> {
+  const output = options.output ?? "text";
   try {
     await runtime.runCommand("history", "");
     const panel = runtime.getState().panel;
     if (panel.type !== "history") {
-      streams.stderr("History did not produce results\n");
+      writeHeadlessError(streams, "History did not produce results", output);
       return 1;
     }
     streams.stdout(
-      options.output === "json"
+      output === "json"
         ? formatHistoryJson(panel.messages)
         : formatHistory(panel.messages),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   } finally {
     await runtime.destroy();

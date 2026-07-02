@@ -1,10 +1,7 @@
 import type { CLIDoctorCheck } from "./runtime/doctor-service.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 import type { PrintStreams } from "./print-runner.js";
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export function formatDoctorChecks(checks: CLIDoctorCheck[]): string {
   return checks
@@ -25,21 +22,22 @@ export async function runDoctorChecks(
   streams: PrintStreams,
   options: { output?: "text" | "json" } = {},
 ): Promise<number> {
+  const output = options.output ?? "text";
   try {
     await runtime.runDoctor();
     const panel = runtime.getState().panel;
     if (panel.type !== "doctor") {
-      streams.stderr("Doctor did not produce results\n");
+      writeHeadlessError(streams, "Doctor did not produce results", output);
       return 1;
     }
     streams.stdout(
-      options.output === "json"
+      output === "json"
         ? formatDoctorChecksJson(panel.checks)
         : formatDoctorChecks(panel.checks),
     );
     return panel.checks.some((check) => check.status === "fail") ? 1 : 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   } finally {
     await runtime.destroy();

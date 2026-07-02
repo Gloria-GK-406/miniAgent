@@ -172,4 +172,17 @@ describe("runDoctorChecks", () => {
     expect(stderr).not.toHaveBeenCalled();
     expect(app.destroy).toHaveBeenCalled();
   });
+
+  it("prints thrown runtime errors as json when requested", async () => {
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    const app = runtime(state());
+    vi.mocked(app.runDoctor).mockRejectedValueOnce(new Error("doctor unavailable"));
+
+    await expect(runDoctorChecks(app, { stdout, stderr }, { output: "json" })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"doctor unavailable\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+    expect(app.destroy).toHaveBeenCalled();
+  });
 });

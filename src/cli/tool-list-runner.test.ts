@@ -182,4 +182,22 @@ describe("runToolList", () => {
     ].join("\n"));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints thrown runtime errors as json when requested", async () => {
+    const runtime = {
+      getState: vi.fn(() => state()),
+      listTools: vi.fn(async () => {
+        throw new Error("tool registry unavailable");
+      }),
+      destroy: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runToolList(runtime, { stdout, stderr }, { output: "json" })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"tool registry unavailable\"\n}\n");
+    expect(stderr).not.toHaveBeenCalled();
+    expect(runtime.destroy).toHaveBeenCalled();
+  });
 });

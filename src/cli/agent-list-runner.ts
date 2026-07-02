@@ -1,12 +1,9 @@
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
+import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export type AgentListOutput = "text" | "json";
 export type AgentListPanel = Extract<CLIState["panel"], { type: "agents" }>;
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function formatSubagent(subagent: AgentListPanel["subagents"][number]): string {
   const name = subagent.name !== subagent.id ? ` (${subagent.name})` : "";
@@ -40,21 +37,22 @@ export async function runAgentList(
   streams: PrintStreams,
   options: { output?: AgentListOutput } = {},
 ): Promise<number> {
+  const output = options.output ?? "text";
   try {
     await runtime.showAgents();
     const panel = runtime.getState().panel;
     if (panel.type !== "agents") {
-      streams.stderr("Agent list did not produce results\n");
+      writeHeadlessError(streams, "Agent list did not produce results", output);
       return 1;
     }
     streams.stdout(
-      options.output === "json"
+      output === "json"
         ? formatAgentListJson(panel)
         : formatAgentList(panel),
     );
     return 0;
   } catch (error: unknown) {
-    streams.stderr(`${errorMessage(error)}\n`);
+    writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   } finally {
     await runtime.destroy();
