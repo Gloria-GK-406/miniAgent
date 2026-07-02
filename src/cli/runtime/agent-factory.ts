@@ -35,6 +35,7 @@ import { createGitService } from "./git-service.js";
 import type { PermissionService } from "./permission-service.js";
 import type { ShellService } from "./shell-service.js";
 import type { SnapshotService } from "./snapshot-service.js";
+import { buildEffectiveSystemPrompt, getBaseSystemPrompt } from "./system-prompt.js";
 
 const DEFAULT_MESSAGE_FILE_NAME = "messages.jsonl";
 const TODO_TOOL_NAMES = ["todo_create", "todo_update", "todo_delete"];
@@ -185,7 +186,7 @@ export async function createCLIAgentFactory(
   await sessionManager.load();
 
   let currentParentAgent: MiniAgent | undefined;
-  const userSystemPrompt = config.systemPrompt ?? "You are a helpful assistant.";
+  const userSystemPrompt = getBaseSystemPrompt(config);
   const subagentFactory = createConfiguredSubagentFactory(
     sessionManager,
     config,
@@ -294,7 +295,11 @@ async function buildAgentInner(
     engines: uniqueEngines(config),
     persistDir,
     systemPrompt: {
-      prompt: buildSystemPrompt(options.baseDir, userSystemPrompt, options.mode),
+      prompt: buildEffectiveSystemPrompt({
+        baseDir: options.baseDir,
+        userSystemPrompt,
+        mode: options.mode,
+      }),
     },
     baseDir: options.baseDir,
   });
@@ -431,15 +436,4 @@ function injectPluginCapabilities(
       capabilities: parsedCapabilities,
     },
   };
-}
-
-function buildSystemPrompt(baseDir: string, userSystemPrompt: string, mode: CLIAgentMode): string {
-  return [
-    userSystemPrompt,
-    "",
-    `Working directory: ${baseDir}`,
-    `Agent mode: ${mode}`,
-    "You have access to tools for reading, writing, editing, searching files, executing shell commands, managing tasks, and spawning sub-agents.",
-    "Use tools proactively to accomplish tasks. For file operations, always use the appropriate tool.",
-  ].join("\n");
 }

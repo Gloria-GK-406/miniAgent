@@ -24,6 +24,7 @@ const COMMANDS = [
   "/redo",
   "/session",
   "/sessions",
+  "/system",
   "/thinking",
   "/tools",
   "/undo",

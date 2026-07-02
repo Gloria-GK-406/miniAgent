@@ -368,4 +368,27 @@ describe("App", () => {
     expect(output).toContain("ALLOW read");
     expect(output).toContain("DENY shell:rm *");
   });
+
+  it("renders system prompt panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "system",
+          basePrompt: "Base prompt.",
+          effectivePrompt: [
+            "Base prompt.",
+            "",
+            "Working directory: C:/repo",
+            "Agent mode: plan",
+          ].join("\n"),
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("System Prompt");
+    expect(output).toContain("Base prompt.");
+    expect(output).toContain("Working directory: C:/repo");
+    expect(output).toContain("Agent mode: plan");
+  });
 });

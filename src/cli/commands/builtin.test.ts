@@ -140,6 +140,13 @@ describe("registerBuiltinCommands", () => {
     commandCtx.runtime.showActivity = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/permissions");
+    expect(commandCtx.getState().panel).toEqual({
+      type: "permissions",
+      permission: commandCtx.getState().config.permission,
+      autoApprove: false,
+    });
+
+    await registry.execute(commandCtx, "/system");
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
     await registry.execute(commandCtx, "/compact");
@@ -158,9 +165,9 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.runDiagnostics).toHaveBeenCalled();
     expect(commandCtx.runtime.showActivity).toHaveBeenCalled();
     expect(commandCtx.getState().panel).toEqual({
-      type: "permissions",
-      permission: commandCtx.getState().config.permission,
-      autoApprove: false,
+      type: "system",
+      basePrompt: "You are a helpful assistant.",
+      effectivePrompt: expect.stringContaining("Agent mode: build"),
     });
   });
 

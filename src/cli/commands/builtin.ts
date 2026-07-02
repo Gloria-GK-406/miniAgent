@@ -1,5 +1,9 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext } from "../runtime/types.js";
+import {
+  buildEffectiveSystemPrompt,
+  getBaseSystemPrompt,
+} from "../runtime/system-prompt.js";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -66,6 +70,26 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
           type: "permissions",
           permission: state.config.permission,
           autoApprove: state.autoApprove,
+        },
+      });
+    },
+  });
+  registry.register({
+    name: "system",
+    description: "Show the current system prompt",
+    usage: "/system",
+    execute: async (ctx) => {
+      const state = ctx.getState();
+      const basePrompt = getBaseSystemPrompt(state.config);
+      ctx.updateState({
+        panel: {
+          type: "system",
+          basePrompt,
+          effectivePrompt: buildEffectiveSystemPrompt({
+            baseDir: state.baseDir,
+            mode: state.mode,
+            userSystemPrompt: basePrompt,
+          }),
         },
       });
     },

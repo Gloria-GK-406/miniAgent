@@ -89,6 +89,7 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/ed")).toEqual(["/editor"]);
     expect(matchSuggestions("/ac")).toEqual(["/activity"]);
     expect(matchSuggestions("/pe")).toEqual(["/permissions"]);
+    expect(matchSuggestions("/sy")).toEqual(["/system"]);
   });
 });
 
