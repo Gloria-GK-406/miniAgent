@@ -265,6 +265,32 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("shows an error panel for empty shell shortcuts", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-empty-shell-shortcut-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "allow",
+        shell: "allow",
+      },
+      shell: {
+        windows: "powershell",
+        executable: process.execPath,
+        args: ["-e"],
+        timeoutMs: 120000,
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("!   ");
+
+    expect(runtime.getState().panel).toEqual({
+      type: "error",
+      message: "Missing shell command after !",
+    });
+    expect(runtime.getState().messages).toEqual([]);
+    await runtime.destroy();
+  });
+
   it("records rejected shell approvals in activity", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-approval-activity-"));
     await writeConfig(baseDir, {

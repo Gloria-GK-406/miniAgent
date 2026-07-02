@@ -81,6 +81,27 @@ describe("InputRouter", () => {
     });
   });
 
+  it("rejects empty shell shortcuts before permission checks or execution", async () => {
+    const shell = { execute: vi.fn() };
+    const permission = { resolve: vi.fn(() => ({ decision: "allow" as const, reason: "global allow" })) };
+    const requestApproval = vi.fn(async () => true);
+    const router = createInputRouter({
+      commandRegistry: { execute: vi.fn() },
+      shellService: shell,
+      referenceService: { resolveReferences: vi.fn() },
+      permissionService: permission,
+      getAutoApprove: () => false,
+      requestApproval,
+    });
+
+    await expect(router.route({} as never, "!   ")).rejects.toThrow(
+      "Missing shell command after !",
+    );
+    expect(permission.resolve).not.toHaveBeenCalled();
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(shell.execute).not.toHaveBeenCalled();
+  });
+
   it("rejects denied shell shortcuts before execution", async () => {
     const shell = {
       execute: vi.fn(async () => ({

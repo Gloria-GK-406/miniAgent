@@ -68,6 +68,9 @@ export function createInputRouter(deps: InputRouterDeps): InputRouter {
       }
       if (trimmed.startsWith("!")) {
         const command = trimmed.slice(1).trim();
+        if (command.length === 0) {
+          throw new Error("Missing shell command after !");
+        }
         await assertShellPermission(deps, command);
         const result = await deps.shellService.execute({
           command,
