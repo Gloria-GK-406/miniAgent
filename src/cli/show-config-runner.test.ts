@@ -75,4 +75,27 @@ describe("runShowConfig", () => {
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"error\""));
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints config schema errors as json when requested", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-show-config-"));
+    await mkdir(join(baseDir, ".cliagent"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "config.json"), JSON.stringify({
+      defaultAgent: "review",
+    }), "utf-8");
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runShowConfig({
+      baseDir,
+      output: "json",
+      platform: "linux",
+      env: {},
+      homeDir: baseDir,
+    }, { stdout, stderr })).resolves.toBe(1);
+
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"ok\": false"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("Invalid config file"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("defaultAgent"));
+    expect(stderr).not.toHaveBeenCalled();
+  });
 });

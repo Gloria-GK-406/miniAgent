@@ -413,4 +413,28 @@ describe("CLI config provider mode", () => {
       },
     });
   });
+
+  it("throws invalid config schema errors instead of exiting", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-config-invalid-"));
+    await writeJson(join(baseDir, ".cliagent", "config.json"), {
+      defaultAgent: "review",
+    });
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: string | number | null) => {
+      throw new Error(`exit ${String(code)}`);
+    }) as never);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await expect(loadConfig(baseDir, {
+        platform: "linux",
+        env: {},
+        homeDir: baseDir,
+      })).rejects.toThrow("Invalid config file:");
+      expect(exit).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+      error.mockRestore();
+    }
+  });
 });

@@ -225,11 +225,11 @@ async function readJsonIfExists(path: string): Promise<unknown | null> {
 function parseConfig(raw: unknown): CLIConfig {
   const result = CLIConfigSchema.safeParse(raw);
   if (!result.success) {
-    console.error("Invalid config file:");
-    for (const issue of result.error.issues) {
-      console.error(`  ${issue.path.join(".")}: ${issue.message}`);
-    }
-    process.exit(1);
+    const details = result.error.issues.map((issue) => {
+      const path = issue.path.length === 0 ? "(root)" : issue.path.join(".");
+      return `  ${path}: ${issue.message}`;
+    });
+    throw new Error(["Invalid config file:", ...details].join("\n"));
   }
 
   return result.data;
