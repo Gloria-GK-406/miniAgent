@@ -10,7 +10,7 @@ import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
-import { formatSessionList } from "./session-list-runner.js";
+import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
 
 function readPackageVersion(): string {
   const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
@@ -42,7 +42,12 @@ async function main(): Promise<void> {
       } catch {
         activeSessionId = undefined;
       }
-      process.stdout.write(formatSessionList(service.listSessions(), activeSessionId));
+      const sessions = service.listSessions();
+      process.stdout.write(
+        action.output === "json"
+          ? formatSessionListJson(sessions, activeSessionId)
+          : formatSessionList(sessions, activeSessionId),
+      );
     } catch (e: unknown) {
       process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exitCode = 1;
@@ -53,10 +58,16 @@ async function main(): Promise<void> {
     try {
       const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
       await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runDoctorChecks(runtime, {
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      });
+      process.exitCode = await runDoctorChecks(
+        runtime,
+        {
+          stdout: (text) => process.stdout.write(text),
+          stderr: (text) => process.stderr.write(text),
+        },
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      );
     } catch (e: unknown) {
       process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exitCode = 1;
@@ -67,10 +78,17 @@ async function main(): Promise<void> {
     try {
       const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
       await applyCLIEntryRuntimeOptions(runtime, action);
-      process.exitCode = await runPrintPrompt(runtime, action.prompt, {
-        stdout: (text) => process.stdout.write(text),
-        stderr: (text) => process.stderr.write(text),
-      });
+      process.exitCode = await runPrintPrompt(
+        runtime,
+        action.prompt,
+        {
+          stdout: (text) => process.stdout.write(text),
+          stderr: (text) => process.stderr.write(text),
+        },
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      );
     } catch (e: unknown) {
       process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exitCode = 1;

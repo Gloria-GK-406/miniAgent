@@ -13,9 +13,17 @@ export function formatDoctorChecks(checks: CLIDoctorCheck[]): string {
     .concat("\n");
 }
 
+export function formatDoctorChecksJson(checks: CLIDoctorCheck[]): string {
+  return `${JSON.stringify({
+    ok: !checks.some((check) => check.status === "fail"),
+    checks,
+  }, null, 2)}\n`;
+}
+
 export async function runDoctorChecks(
   runtime: CLIAppRuntime,
   streams: PrintStreams,
+  options: { output?: "text" | "json" } = {},
 ): Promise<number> {
   try {
     await runtime.runDoctor();
@@ -24,7 +32,11 @@ export async function runDoctorChecks(
       streams.stderr("Doctor did not produce results\n");
       return 1;
     }
-    streams.stdout(formatDoctorChecks(panel.checks));
+    streams.stdout(
+      options.output === "json"
+        ? formatDoctorChecksJson(panel.checks)
+        : formatDoctorChecks(panel.checks),
+    );
     return panel.checks.some((check) => check.status === "fail") ? 1 : 0;
   } catch (error: unknown) {
     streams.stderr(`${errorMessage(error)}\n`);

@@ -102,6 +102,14 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("prints a prompt as json", () => {
+    expect(parseCLIEntryArgs(["--print", "--json", "hello"])).toEqual({
+      type: "print",
+      output: "json",
+      prompt: "hello",
+    });
+  });
+
   it("runs doctor checks without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--doctor"])).toEqual({ type: "doctor" });
     expect(parseCLIEntryArgs([
@@ -120,6 +128,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("runs doctor checks as json", () => {
+    expect(parseCLIEntryArgs(["--doctor", "--json"])).toEqual({
+      type: "doctor",
+      output: "json",
+    });
+  });
+
   it("lists sessions without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--list-sessions"])).toEqual({
       type: "list-sessions",
@@ -127,6 +142,13 @@ describe("CLI entry args", () => {
     expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--list-sessions"])).toEqual({
       type: "list-sessions",
       cwd: "C:/repo",
+    });
+  });
+
+  it("lists sessions as json", () => {
+    expect(parseCLIEntryArgs(["--list-sessions", "--json"])).toEqual({
+      type: "list-sessions",
+      output: "json",
     });
   });
 
@@ -245,6 +267,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects json output for interactive TUI mode", () => {
+    expect(parseCLIEntryArgs(["--json"])).toEqual({
+      type: "error",
+      message: "Cannot use --json without --print, --doctor, or --list-sessions",
+    });
+  });
+
   it("formats concise help text", () => {
     const help = formatCLIHelp();
 
@@ -257,6 +286,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--new-session");
     expect(help).toContain("--list-sessions");
     expect(help).toContain("--doctor");
+    expect(help).toContain("--json");
     expect(help).toContain("--print");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");

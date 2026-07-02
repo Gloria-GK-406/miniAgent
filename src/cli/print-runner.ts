@@ -6,6 +6,14 @@ export interface PrintStreams {
   stderr: (text: string) => void;
 }
 
+export interface PrintPromptResult {
+  ok: boolean;
+  response: string | null;
+  error: string | null;
+  sessionId: string;
+  modelName: string;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -30,27 +38,62 @@ function formatMessageContent(content: MessageContent): string {
   return `[image:${content.mediaType}]`;
 }
 
+export function formatPrintResultJson(result: PrintPromptResult): string {
+  return `${JSON.stringify(result, null, 2)}\n`;
+}
+
+function writePrintError(
+  streams: PrintStreams,
+  state: ReturnType<CLIAppRuntime["getState"]>,
+  message: string,
+  output: "text" | "json",
+): void {
+  if (output === "json") {
+    streams.stdout(formatPrintResultJson({
+      ok: false,
+      response: null,
+      error: message,
+      sessionId: state.sessionId,
+      modelName: state.modelName,
+    }));
+    return;
+  }
+  streams.stderr(`${message}\n`);
+}
+
 export async function runPrintPrompt(
   runtime: CLIAppRuntime,
   prompt: string,
   streams: PrintStreams,
+  options: { output?: "text" | "json" } = {},
 ): Promise<number> {
+  const output = options.output ?? "text";
   try {
     await runtime.submitInput(prompt);
     const state = runtime.getState();
     if (state.panel.type === "error") {
-      streams.stderr(`${state.panel.message}\n`);
+      writePrintError(streams, state, state.panel.message, output);
       return 1;
     }
     if (state.error !== null) {
-      streams.stderr(`${state.error}\n`);
+      writePrintError(streams, state, state.error, output);
       return 1;
     }
 
     const text = latestAssistantText(state.messages);
     if (text === null) {
-      streams.stderr("No assistant response\n");
+      writePrintError(streams, state, "No assistant response", output);
       return 1;
+    }
+    if (output === "json") {
+      streams.stdout(formatPrintResultJson({
+        ok: true,
+        response: text,
+        error: null,
+        sessionId: state.sessionId,
+        modelName: state.modelName,
+      }));
+      return 0;
     }
     streams.stdout(text.endsWith("\n") ? text : `${text}\n`);
     return 0;

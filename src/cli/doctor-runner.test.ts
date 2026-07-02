@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
 import {
   formatDoctorChecks,
+  formatDoctorChecksJson,
   runDoctorChecks,
 } from "./doctor-runner.js";
 
@@ -83,6 +84,33 @@ describe("formatDoctorChecks", () => {
   });
 });
 
+describe("formatDoctorChecksJson", () => {
+  it("formats doctor checks as json with an ok flag", () => {
+    expect(formatDoctorChecksJson([
+      { id: "configuration", label: "Configuration", status: "pass", detail: "ok" },
+      { id: "model", label: "Default model", status: "fail", detail: "missing" },
+    ])).toBe([
+      "{",
+      "  \"ok\": false,",
+      "  \"checks\": [",
+      "    {",
+      "      \"id\": \"configuration\",",
+      "      \"label\": \"Configuration\",",
+      "      \"status\": \"pass\",",
+      "      \"detail\": \"ok\"",
+      "    },",
+      "    {",
+      "      \"id\": \"model\",",
+      "      \"label\": \"Default model\",",
+      "      \"status\": \"fail\",",
+      "      \"detail\": \"missing\"",
+      "    }",
+      "  ]",
+      "}\n",
+    ].join("\n"));
+  });
+});
+
 describe("runDoctorChecks", () => {
   it("runs doctor, prints checks, and returns zero when there are no failures", async () => {
     const stdout = vi.fn();
@@ -103,6 +131,25 @@ describe("runDoctorChecks", () => {
     expect(stdout).toHaveBeenCalledWith("PASS Configuration - ok\nWARN Git - not a repo\n");
     expect(stderr).not.toHaveBeenCalled();
     expect(app.destroy).toHaveBeenCalled();
+  });
+
+  it("prints json when requested", async () => {
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    const app = runtime(state({
+      panel: {
+        type: "doctor",
+        checks: [
+          { id: "configuration", label: "Configuration", status: "pass", detail: "ok" },
+        ],
+      },
+    }));
+
+    await expect(runDoctorChecks(app, { stdout, stderr }, { output: "json" })).resolves.toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith(formatDoctorChecksJson([
+      { id: "configuration", label: "Configuration", status: "pass", detail: "ok" },
+    ]));
   });
 
   it("returns non-zero when any doctor check fails", async () => {

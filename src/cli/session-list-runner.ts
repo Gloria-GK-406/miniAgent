@@ -21,3 +21,13 @@ export function formatSessionList(
     ].join(" ");
   }).join("\n")}\n`;
 }
+
+export function formatSessionListJson(
+  sessions: SessionMeta[],
+  activeSessionId: string | undefined,
+): string {
+  return `${JSON.stringify({
+    activeSessionId: activeSessionId ?? null,
+    sessions,
+  }, null, 2)}\n`;
+}

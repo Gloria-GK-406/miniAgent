@@ -1,4 +1,5 @@
 export type CLIEntryAgentMode = "build" | "plan";
+export type CLIEntryOutput = "text" | "json";
 
 export type CLIEntryAction =
   | {
@@ -19,6 +20,7 @@ export type CLIEntryAction =
     model?: string;
     sessionId?: string;
     newSession?: string;
+    output?: CLIEntryOutput;
     prompt: string;
   }
   | {
@@ -29,8 +31,9 @@ export type CLIEntryAction =
     model?: string;
     sessionId?: string;
     newSession?: string;
+    output?: CLIEntryOutput;
   }
-  | { type: "list-sessions"; cwd?: string }
+  | { type: "list-sessions"; cwd?: string; output?: CLIEntryOutput }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -45,6 +48,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let printMode = false;
   let doctorMode = false;
   let listSessionsMode = false;
+  let output: CLIEntryOutput | undefined;
   const promptParts: string[] = [];
 
   for (let index = 0; index < args.length; index++) {
@@ -65,6 +69,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-sessions") {
       listSessionsMode = true;
+      continue;
+    }
+    if (arg === "--json") {
+      output = "json";
       continue;
     }
     if (arg === "--auto-approve" || arg === "-y") {
@@ -146,6 +154,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     return {
       type: "list-sessions",
       ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
     };
   }
   if (doctorMode) {
@@ -160,6 +169,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(model !== undefined && { model }),
       ...(sessionId !== undefined && { sessionId }),
       ...(newSession !== undefined && { newSession }),
+      ...(output !== undefined && { output }),
     };
   }
 
@@ -175,7 +185,14 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(model !== undefined && { model }),
       ...(sessionId !== undefined && { sessionId }),
       ...(newSession !== undefined && { newSession }),
+      ...(output !== undefined && { output }),
       prompt,
+    };
+  }
+  if (output !== undefined) {
+    return {
+      type: "error",
+      message: "Cannot use --json without --print, --doctor, or --list-sessions",
     };
   }
 
@@ -210,6 +227,7 @@ export function formatCLIHelp(): string {
     "  --list-sessions List sessions headlessly",
     "  -m, --model     Select a configured model by id or provider/id",
     "  --doctor        Run setup checks headlessly",
+    "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
     "  -h, --help      Show this help text",
     "  -v, --version   Show package version",

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MessageType } from "../core/types.js";
 import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
 import {
+  formatPrintResultJson,
   latestAssistantText,
   runPrintPrompt,
 } from "./print-runner.js";
@@ -95,6 +96,26 @@ describe("latestAssistantText", () => {
   });
 });
 
+describe("formatPrintResultJson", () => {
+  it("formats a successful print result as json", () => {
+    expect(formatPrintResultJson({
+      ok: true,
+      response: "done",
+      error: null,
+      sessionId: "s1",
+      modelName: "test/model",
+    })).toBe([
+      "{",
+      "  \"ok\": true,",
+      "  \"response\": \"done\",",
+      "  \"error\": null,",
+      "  \"sessionId\": \"s1\",",
+      "  \"modelName\": \"test/model\"",
+      "}\n",
+    ].join("\n"));
+  });
+});
+
 describe("runPrintPrompt", () => {
   it("submits the prompt, prints the final assistant response, and destroys the runtime", async () => {
     const stdout = vi.fn();
@@ -109,6 +130,25 @@ describe("runPrintPrompt", () => {
     expect(stdout).toHaveBeenCalledWith("done\n");
     expect(stderr).not.toHaveBeenCalled();
     expect(app.destroy).toHaveBeenCalled();
+  });
+
+  it("prints json when requested", async () => {
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    const app = runtime(state({
+      messages: [{ id: "a1", type: MessageType.Assist, content: "done" }],
+    }));
+
+    await expect(runPrintPrompt(app, "do work", { stdout, stderr }, { output: "json" })).resolves.toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith(formatPrintResultJson({
+      ok: true,
+      response: "done",
+      error: null,
+      sessionId: "s1",
+      modelName: "test/model",
+    }));
+    expect(stderr).not.toHaveBeenCalled();
   });
 
   it("prints runtime errors to stderr and returns non-zero", async () => {

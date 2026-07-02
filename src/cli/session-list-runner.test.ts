@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SessionMeta } from "../core/session.js";
-import { formatSessionList } from "./session-list-runner.js";
+import {
+  formatSessionList,
+  formatSessionListJson,
+} from "./session-list-runner.js";
 
 function session(overrides: Partial<SessionMeta>): SessionMeta {
   return {
@@ -27,5 +30,24 @@ describe("formatSessionList", () => {
 
   it("formats an empty session list", () => {
     expect(formatSessionList([], undefined)).toBe("No sessions\n");
+  });
+
+  it("formats sessions as json with the active session id", () => {
+    expect(formatSessionListJson([
+      session({ id: "s1", name: "default", messageCount: 1 }),
+    ], "s1")).toBe([
+      "{",
+      "  \"activeSessionId\": \"s1\",",
+      "  \"sessions\": [",
+      "    {",
+      "      \"id\": \"s1\",",
+      "      \"name\": \"default\",",
+      "      \"createdAt\": \"2026-07-02T00:00:00.000Z\",",
+      "      \"updatedAt\": \"2026-07-02T00:00:01.000Z\",",
+      "      \"messageCount\": 1",
+      "    }",
+      "  ]",
+      "}\n",
+    ].join("\n"));
   });
 });
