@@ -30,6 +30,7 @@ export type CLIEntryAction =
     sessionId?: string;
     newSession?: string;
   }
+  | { type: "list-sessions"; cwd?: string }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -43,6 +44,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let newSession: string | undefined;
   let printMode = false;
   let doctorMode = false;
+  let listSessionsMode = false;
   const promptParts: string[] = [];
 
   for (let index = 0; index < args.length; index++) {
@@ -59,6 +61,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--doctor") {
       doctorMode = true;
+      continue;
+    }
+    if (arg === "--list-sessions") {
+      listSessionsMode = true;
       continue;
     }
     if (arg === "--auto-approve" || arg === "-y") {
@@ -127,6 +133,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (doctorMode && printMode) {
     return { type: "error", message: "Cannot use --doctor with --print" };
   }
+  if (listSessionsMode && printMode) {
+    return { type: "error", message: "Cannot use --list-sessions with --print" };
+  }
+  if (listSessionsMode && doctorMode) {
+    return { type: "error", message: "Cannot use --list-sessions with --doctor" };
+  }
+  if (listSessionsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --list-sessions" };
+    }
+    return {
+      type: "list-sessions",
+      ...(cwd !== undefined && { cwd }),
+    };
+  }
   if (doctorMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --doctor" };
@@ -186,6 +207,7 @@ export function formatCLIHelp(): string {
     "  --cwd <path>    Open the TUI for a specific project directory",
     "  -s, --session   Resume a session by id",
     "  --new-session   Create and start in a named session",
+    "  --list-sessions List sessions headlessly",
     "  -m, --model     Select a configured model by id or provider/id",
     "  --doctor        Run setup checks headlessly",
     "  -p, --print     Run one prompt headlessly and print the final response",

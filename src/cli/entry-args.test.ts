@@ -120,6 +120,16 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("lists sessions without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--list-sessions"])).toEqual({
+      type: "list-sessions",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--list-sessions"])).toEqual({
+      type: "list-sessions",
+      cwd: "C:/repo",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -220,6 +230,21 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects conflicting or prompted session listing mode", () => {
+    expect(parseCLIEntryArgs(["--list-sessions", "--print", "hello"])).toEqual({
+      type: "error",
+      message: "Cannot use --list-sessions with --print",
+    });
+    expect(parseCLIEntryArgs(["--list-sessions", "--doctor"])).toEqual({
+      type: "error",
+      message: "Cannot use --list-sessions with --doctor",
+    });
+    expect(parseCLIEntryArgs(["--list-sessions", "hello"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --list-sessions",
+    });
+  });
+
   it("formats concise help text", () => {
     const help = formatCLIHelp();
 
@@ -230,6 +255,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--model");
     expect(help).toContain("--session");
     expect(help).toContain("--new-session");
+    expect(help).toContain("--list-sessions");
     expect(help).toContain("--doctor");
     expect(help).toContain("--print");
     expect(help).toContain("[prompt]");

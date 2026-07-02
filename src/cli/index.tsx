@@ -9,6 +9,8 @@ import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
+import { createCLISessionService } from "./runtime/session-service.js";
+import { formatSessionList } from "./session-list-runner.js";
 
 function readPackageVersion(): string {
   const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
@@ -29,6 +31,22 @@ async function main(): Promise<void> {
   if (action.type === "error") {
     process.stderr.write(`${action.message}\n\n${formatCLIHelp()}\n`);
     process.exitCode = 1;
+    return;
+  }
+  if (action.type === "list-sessions") {
+    try {
+      const service = await createCLISessionService(resolve(action.cwd ?? process.cwd()));
+      let activeSessionId: string | undefined;
+      try {
+        activeSessionId = service.getActiveSession().id;
+      } catch {
+        activeSessionId = undefined;
+      }
+      process.stdout.write(formatSessionList(service.listSessions(), activeSessionId));
+    } catch (e: unknown) {
+      process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.exitCode = 1;
+    }
     return;
   }
   if (action.type === "doctor") {
