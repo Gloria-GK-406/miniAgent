@@ -53,6 +53,8 @@ describe("useRuntime", () => {
       forkSession: vi.fn(),
       exportSession: vi.fn(),
       importSession: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
       destroy: vi.fn(),
     };
 

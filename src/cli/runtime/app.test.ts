@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ThinkingLevel } from "../../core/config.js";
+import { MessageType, type Message } from "../../core/types.js";
 import { createCLIRuntime } from "./app.js";
+import { createCLISessionService } from "./session-service.js";
+import { createSnapshotService } from "./snapshot-service.js";
 
 async function writeConfig(baseDir: string): Promise<void> {
   await mkdir(join(baseDir, ".cliagent"), { recursive: true });
@@ -105,6 +108,40 @@ describe("createCLIRuntime", () => {
     await runtime.submitInput("/shortcut");
 
     expect(runtime.getState().panel).toEqual({ type: "help" });
+    await runtime.destroy();
+  });
+
+  it("undoes and redoes the last turn with file snapshots", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-undo-"));
+    await writeConfig(baseDir);
+    const runtime = await createCLIRuntime(baseDir);
+    const sessionId = runtime.getState().sessionId;
+    const sessionService = await createCLISessionService(baseDir);
+    const messages: Message[] = [
+      { id: "u1", type: MessageType.User, content: "change file" },
+      { id: "a1", type: MessageType.Assist, content: "changed" },
+    ];
+    await sessionService.writeMessages(sessionId, messages);
+    await writeFile(join(baseDir, "a.txt"), "before", "utf-8");
+    const snapshotService = createSnapshotService({
+      baseDir,
+      sessionService,
+      getActiveSessionId: () => sessionId,
+      getActiveTurnId: () => "u1",
+    });
+    await snapshotService.recordBeforeMutation("a.txt", async () => {
+      await writeFile(join(baseDir, "a.txt"), "after", "utf-8");
+    });
+
+    await runtime.submitInput("/undo");
+
+    expect(runtime.getState().messages).toEqual([]);
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("before");
+
+    await runtime.submitInput("/redo");
+
+    expect(runtime.getState().messages).toEqual(messages);
+    await expect(readFile(join(baseDir, "a.txt"), "utf-8")).resolves.toBe("after");
     await runtime.destroy();
   });
 });

@@ -23,6 +23,12 @@ function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICo
   return current ? formatResolvedModelPath(current) : "(none)";
 }
 
+interface RedoEntry {
+  sessionId: string;
+  turnId: string;
+  messages: Message[];
+}
+
 export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> {
   const config = await loadConfig(baseDir);
   const sessionService = await createCLISessionService(baseDir);
@@ -31,6 +37,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
   const approvalResolvers = new Map<string, (decision: boolean) => void>();
+  const redoStack: RedoEntry[] = [];
   const permissionService = createPermissionService(config.permission);
   const shellService = createShellService(config.shell);
   let activeTurnId: string | null = null;
@@ -262,6 +269,33 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     importSession: async (inputPath, name) => {
       await exportService.importJson(inputPath, name);
       await replaceAgentForActiveSession();
+    },
+    undo: async () => {
+      const removed = await sessionService.removeLastUserTurn(state.sessionId);
+      try {
+        await snapshotService.restoreTurn(removed.turnId);
+      } catch (error: unknown) {
+        await sessionService.appendMessages(state.sessionId, removed.messages);
+        throw error;
+      }
+      redoStack.push({
+        sessionId: state.sessionId,
+        turnId: removed.turnId,
+        messages: removed.messages,
+      });
+      await replaceAgentForActiveSession();
+      emit({ type: "notice", level: "info", message: `Undid turn ${removed.turnId}` });
+    },
+    redo: async () => {
+      const index = redoStack.findLastIndex((entry) => entry.sessionId === state.sessionId);
+      if (index === -1) {
+        throw new Error("No turn to redo");
+      }
+      const entry = redoStack.splice(index, 1)[0]!;
+      await snapshotService.reapplyTurn(entry.turnId);
+      await sessionService.appendMessages(state.sessionId, entry.messages);
+      await replaceAgentForActiveSession();
+      emit({ type: "notice", level: "info", message: `Redid turn ${entry.turnId}` });
     },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);

@@ -164,6 +164,26 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "undo",
+    description: "Undo the last user turn",
+    usage: "/undo",
+    execute: async (ctx) => {
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.undo();
+      });
+    },
+  });
+  registry.register({
+    name: "redo",
+    description: "Redo the last undone turn",
+    usage: "/redo",
+    execute: async (ctx) => {
+      await runSessionMutation(ctx, async () => {
+        await ctx.runtime.redo();
+      });
+    },
+  });
+  registry.register({
     name: "agent",
     description: "Switch agent mode",
     usage: "/agent build|plan",

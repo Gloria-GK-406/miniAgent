@@ -19,6 +19,8 @@ export interface CLISessionService {
   getSessionPersistDir(id: string): string;
   readMessages(id: string): Promise<Message[]>;
   writeMessages(id: string, messages: Message[]): Promise<void>;
+  removeLastUserTurn(id: string): Promise<{ turnId: string; messages: Message[] }>;
+  appendMessages(id: string, messages: Message[]): Promise<void>;
 }
 
 function parseMessagesJsonl(content: string): Message[] {
@@ -44,6 +46,15 @@ function requireNonEmptyName(name: string): string {
     throw new Error("Session name cannot be empty");
   }
   return trimmed;
+}
+
+function findLastUserTurnIndex(messages: Message[]): number {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]!.type === "user") {
+      return index;
+    }
+  }
+  return -1;
 }
 
 function optionalMetaUpdates(meta: SessionMeta): Partial<Pick<SessionMeta, "messageCount" | "model">> {
@@ -118,6 +129,28 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     await manager.updateMeta(id, { messageCount: messages.length });
   }
 
+  async function removeLastUserTurn(id: string): Promise<{ turnId: string; messages: Message[] }> {
+    const messages = await readMessages(id);
+    const index = findLastUserTurnIndex(messages);
+    if (index === -1) {
+      throw new Error("No user turn to undo");
+    }
+    const userMessage = messages[index]!;
+    const removed = messages.slice(index);
+    await writeMessages(id, messages.slice(0, index));
+    return {
+      turnId: userMessage.id,
+      messages: removed,
+    };
+  }
+
+  async function appendMessages(id: string, messages: Message[]): Promise<void> {
+    if (messages.length === 0) {
+      return;
+    }
+    await writeMessages(id, [...await readMessages(id), ...messages]);
+  }
+
   async function createSession(name?: string): Promise<SessionMeta> {
     const created = await manager.create(name === undefined ? undefined : requireNonEmptyName(name));
     manager.setActive(created.id);
@@ -176,5 +209,7 @@ export async function createCLISessionService(baseDir: string): Promise<CLISessi
     getSessionPersistDir,
     readMessages,
     writeMessages,
+    removeLastUserTurn,
+    appendMessages,
   };
 }

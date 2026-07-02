@@ -123,6 +123,20 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.importSession).toHaveBeenCalledWith("exports/session.json", "imported session");
   });
 
+  it("dispatches undo and redo commands to runtime methods", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.undo = vi.fn(async () => undefined);
+    commandCtx.runtime.redo = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/undo");
+    await registry.execute(commandCtx, "/redo");
+
+    expect(commandCtx.runtime.undo).toHaveBeenCalled();
+    expect(commandCtx.runtime.redo).toHaveBeenCalled();
+  });
+
   it("opens sessions panel with session metadata", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);
