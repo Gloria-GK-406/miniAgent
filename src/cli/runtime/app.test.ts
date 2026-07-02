@@ -277,6 +277,38 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("requires approval for shell shortcuts in plan mode despite global allow", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-plan-shell-shortcut-"));
+    await writeConfig(baseDir, {
+      permission: {
+        "*": "allow",
+      },
+      shell: {
+        windows: "powershell",
+        executable: process.execPath,
+        args: ["-e"],
+        timeoutMs: 120000,
+      },
+    });
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/agent plan");
+    await runtime.submitInput("/auto");
+    const pending = runtime.submitInput("!console.log('plan-shell-should-not-run')");
+    const approvalId = runtime.getState().approval?.id;
+    expect(approvalId).toEqual(expect.any(String));
+
+    runtime.answerApproval(approvalId!, false);
+    await pending;
+
+    expect(runtime.getState().panel).toEqual({
+      type: "error",
+      message: "Permission rejected for shell shortcut",
+    });
+    expect(runtime.getState().messages).toEqual([]);
+    await runtime.destroy();
+  });
+
   it("persists shell shortcut output as a tool-style transcript", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-shell-persist-"));
     await writeConfig(baseDir, {

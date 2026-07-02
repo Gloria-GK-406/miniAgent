@@ -29,7 +29,7 @@ import { createExportService } from "./export-service.js";
 import { createGitService } from "./git-service.js";
 import { createInputRouter } from "./input-router.js";
 import { createInputHistoryService } from "./input-history-service.js";
-import { createPermissionService } from "./permission-service.js";
+import { createModeAwarePermissionService, createPermissionService } from "./permission-service.js";
 import { createPermissionConfigService } from "./permission-config-service.js";
 import { createProjectInstructionsService } from "./project-instructions-service.js";
 import { createReferenceService } from "./reference-service.js";
@@ -197,9 +197,13 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     }
   }
   updateState({ commandSuggestions: getCommandSuggestions(registry.list()) });
+  const routerPermissionService = createModeAwarePermissionService({
+    base: permissionService,
+    getMode: () => state.mode,
+  });
   const router = createInputRouter({
     commandRegistry: registry,
-    permissionService,
+    permissionService: routerPermissionService,
     getAutoApprove: () => state.autoApprove,
     requestApproval,
     shellService,
