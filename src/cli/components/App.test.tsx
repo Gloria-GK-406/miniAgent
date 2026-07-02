@@ -182,6 +182,17 @@ describe("App", () => {
     expect(output).toContain("my-session");
   });
 
+  it("renders token usage from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        tokenUsage: { input: 1536, output: 2500, total: 4036 },
+      })}
+      />,
+    );
+
+    expect(output).toContain("1.5k in / 2.5k out / 4.0k total");
+  });
+
   it("renders InputBox area", () => {
     const output = renderToString(
       <App runtime={createMockRuntime()} />,

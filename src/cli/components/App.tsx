@@ -30,6 +30,21 @@ export const STATIC_PANEL_CLOSE_TEXT = "ESC close";
 
 export type CtrlCAction = "stop" | "arm-exit" | "exit";
 
+function formatTokenCount(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}k`;
+  }
+  return String(count);
+}
+
+function formatTokenUsage(tokenUsage: {
+  input: number;
+  output: number;
+  total: number;
+}): string {
+  return `${formatTokenCount(tokenUsage.input)} in / ${formatTokenCount(tokenUsage.output)} out / ${formatTokenCount(tokenUsage.total)} total`;
+}
+
 export function resolveCtrlCAction(isRunning: boolean, exitArmed: boolean): CtrlCAction {
   if (isRunning) {
     return "stop";
@@ -618,14 +633,12 @@ export function App({ runtime }: AppProps) {
           onSuggestionComplete={handleSuggestionComplete}
           {...(state.isRunning && { placeholder: "Thinking..." })}
         />
-        <Box flexDirection="row" gap={1}>
+        <Text>
           <Text bold color="cyan">{state.modelName}</Text>
-          <Text dimColor>{state.mode}</Text>
-          <Text dimColor>{state.autoApprove ? "auto" : "ask"}</Text>
-          <Text dimColor>{state.sessionName}</Text>
-          <Text dimColor>-</Text>
-          <Text dimColor>/help for commands</Text>
-        </Box>
+          <Text dimColor>
+            {` ${state.mode} ${state.autoApprove ? "auto" : "ask"} ${state.sessionName} - ${formatTokenUsage(state.tokenUsage)} - /help for commands`}
+          </Text>
+        </Text>
         {exitArmed && !state.isRunning && (
           <Text color="yellow">{EXIT_CONFIRM_TEXT}</Text>
         )}
