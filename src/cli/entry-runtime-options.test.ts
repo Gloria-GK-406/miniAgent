@@ -31,6 +31,23 @@ describe("applyCLIEntryRuntimeOptions", () => {
     expect(runtime.runCommand).toHaveBeenCalledBefore(runtime.selectModel);
   });
 
+  it("enables startup auto approval before selecting a model", async () => {
+    const runtime = {
+      runCommand: vi.fn(async () => undefined),
+      selectModel: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "print",
+      autoApprove: true,
+      model: "openai/fast",
+      prompt: "think",
+    });
+
+    expect(runtime.runCommand).toHaveBeenCalledWith("auto", "");
+    expect(runtime.runCommand).toHaveBeenCalledBefore(runtime.selectModel);
+  });
+
   it("does not switch agents when no startup agent is present", async () => {
     const runtime = {
       runCommand: vi.fn(async () => undefined),

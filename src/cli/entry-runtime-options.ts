@@ -5,6 +5,9 @@ export async function applyCLIEntryRuntimeOptions(
   runtime: CLIAppRuntime,
   action: Extract<CLIEntryAction, { type: "tui" | "print" }>,
 ): Promise<void> {
+  if (action.autoApprove === true) {
+    await runtime.runCommand("auto", "");
+  }
   if (action.agent !== undefined) {
     await runtime.runCommand("agent", action.agent);
   }

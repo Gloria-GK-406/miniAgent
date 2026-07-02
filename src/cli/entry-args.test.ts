@@ -31,6 +31,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("opens the TUI with startup auto approval enabled", () => {
+    expect(parseCLIEntryArgs(["--auto-approve"])).toEqual({
+      type: "tui",
+      autoApprove: true,
+    });
+    expect(parseCLIEntryArgs(["-y"])).toEqual({
+      type: "tui",
+      autoApprove: true,
+    });
+  });
+
   it("opens the TUI with an initial prompt", () => {
     expect(parseCLIEntryArgs(["explain", "the", "repo"])).toEqual({
       type: "tui",
@@ -39,9 +50,10 @@ describe("CLI entry args", () => {
   });
 
   it("opens an explicit working directory with an initial prompt", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--agent", "plan", "--model", "openai/fast", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--auto-approve", "--agent", "plan", "--model", "openai/fast", "fix", "tests"])).toEqual({
       type: "tui",
       agent: "plan",
+      autoApprove: true,
       cwd: "C:/repo",
       model: "openai/fast",
       prompt: "fix tests",
@@ -60,9 +72,10 @@ describe("CLI entry args", () => {
   });
 
   it("prints from an explicit working directory", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--agent", "plan", "--model", "openai/fast", "--print", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--auto-approve", "--agent", "plan", "--model", "openai/fast", "--print", "fix", "tests"])).toEqual({
       type: "print",
       agent: "plan",
+      autoApprove: true,
       cwd: "C:/repo",
       model: "openai/fast",
       prompt: "fix tests",
@@ -123,6 +136,7 @@ describe("CLI entry args", () => {
 
     expect(help).toContain("Usage: miniagent");
     expect(help).toContain("--agent");
+    expect(help).toContain("--auto-approve");
     expect(help).toContain("--cwd");
     expect(help).toContain("--model");
     expect(help).toContain("--print");

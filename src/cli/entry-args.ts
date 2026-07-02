@@ -1,14 +1,15 @@
 export type CLIEntryAgentMode = "build" | "plan";
 
 export type CLIEntryAction =
-  | { type: "tui"; agent?: CLIEntryAgentMode; cwd?: string; model?: string; prompt?: string }
-  | { type: "print"; agent?: CLIEntryAgentMode; cwd?: string; model?: string; prompt: string }
+  | { type: "tui"; agent?: CLIEntryAgentMode; autoApprove?: boolean; cwd?: string; model?: string; prompt?: string }
+  | { type: "print"; agent?: CLIEntryAgentMode; autoApprove?: boolean; cwd?: string; model?: string; prompt: string }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
 
 export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let agent: CLIEntryAgentMode | undefined;
+  let autoApprove = false;
   let cwd: string | undefined;
   let model: string | undefined;
   let printMode = false;
@@ -24,6 +25,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--print" || arg === "-p") {
       printMode = true;
+      continue;
+    }
+    if (arg === "--auto-approve" || arg === "-y") {
+      autoApprove = true;
       continue;
     }
     if (arg === "--agent") {
@@ -71,6 +76,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     return {
       type: "print",
       ...(agent !== undefined && { agent }),
+      ...(autoApprove && { autoApprove: true }),
       ...(cwd !== undefined && { cwd }),
       ...(model !== undefined && { model }),
       prompt,
@@ -80,6 +86,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   return {
     type: "tui",
     ...(agent !== undefined && { agent }),
+    ...(autoApprove && { autoApprove: true }),
     ...(cwd !== undefined && { cwd }),
     ...(model !== undefined && { model }),
     ...(prompt.length > 0 && { prompt }),
@@ -97,6 +104,8 @@ export function formatCLIHelp(): string {
     "",
     "Options:",
     "  --agent <mode>  Start in build or plan mode",
+    "  -y, --auto-approve",
+    "                  Auto-approve CLI tool calls for this run",
     "  --cwd <path>    Open the TUI for a specific project directory",
     "  -m, --model     Select a configured model by id or provider/id",
     "  -p, --print     Run one prompt headlessly and print the final response",
