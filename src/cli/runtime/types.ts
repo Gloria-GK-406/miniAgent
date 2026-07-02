@@ -25,6 +25,7 @@ export type CLIViewPanel =
   | { type: "tools"; tools: Tool[] }
   | { type: "permissions"; permission: CLIConfig["permission"]; autoApprove: boolean }
   | { type: "system"; basePrompt: string; effectivePrompt: string }
+  | { type: "config"; title: string; content: string }
   | { type: "git"; title: string; content: string }
   | { type: "diff"; title: string; content: string }
   | { type: "diagnostics"; results: DiagnosticResult[] }

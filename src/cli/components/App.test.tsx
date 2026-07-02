@@ -549,6 +549,22 @@ describe("App", () => {
     expect(output).toContain("+new");
   });
 
+  it("renders config panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "config",
+          title: "Config",
+          content: "{\n  \"key\": \"<redacted>\"\n}",
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Config");
+    expect(output).toContain("<redacted>");
+  });
+
   it("renders diagnostics panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

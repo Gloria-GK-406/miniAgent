@@ -201,8 +201,8 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/help /status /history /context /tools /models /sessions /activity</Text>
-          <Text>/permissions /system /agent build|plan /auto /details</Text>
+          <Text>/help /status /config /history /context /tools /models /sessions</Text>
+          <Text>/activity /permissions /system /agent build|plan /auto /details</Text>
           <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
@@ -640,7 +640,11 @@ export function App({ runtime }: AppProps) {
     );
   }
 
-  if (state.panel.type === "git" || state.panel.type === "diff") {
+  if (
+    state.panel.type === "config" ||
+    state.panel.type === "git" ||
+    state.panel.type === "diff"
+  ) {
     return (
       <DiffView
         title={state.panel.title}

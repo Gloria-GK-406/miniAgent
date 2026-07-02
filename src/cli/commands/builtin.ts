@@ -2,6 +2,8 @@ import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext } from "../runtime/types.js";
 import type { CLIPermissionDecision } from "../config.js";
 import type { SessionMeta } from "../../core/session.js";
+import { formatConfigForDisplay } from "../config-display.js";
+import { formatConfigPaths, resolveConfigPaths } from "../config-paths-runner.js";
 import {
   buildEffectiveSystemPrompt,
   getBaseSystemPrompt,
@@ -103,6 +105,37 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     usage: "/status",
     execute: async (ctx) => {
       ctx.updateState({ panel: { type: "status" } });
+    },
+  });
+  registry.register({
+    name: "config",
+    description: "Show effective config",
+    usage: "/config [paths]",
+    execute: async (ctx, args) => {
+      const action = args.trim();
+      if (action.length === 0) {
+        ctx.updateState({
+          panel: {
+            type: "config",
+            title: "Config",
+            content: formatConfigForDisplay(ctx.getState().config),
+          },
+        });
+        return;
+      }
+
+      if (action === "paths") {
+        ctx.updateState({
+          panel: {
+            type: "config",
+            title: "Config Paths",
+            content: formatConfigPaths(resolveConfigPaths(ctx.getState().baseDir)),
+          },
+        });
+        return;
+      }
+
+      ctx.updateState({ panel: { type: "error", message: "Usage: /config [paths]" } });
     },
   });
   registry.register({

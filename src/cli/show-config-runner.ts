@@ -1,4 +1,5 @@
 import { loadConfig, type CLIConfig, type LoadConfigOptions } from "./config.js";
+import { formatConfigForDisplay } from "./config-display.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
@@ -10,7 +11,7 @@ export interface ShowConfigRequest extends LoadConfigOptions {
 }
 
 export function formatShowConfigJson(config: unknown): string {
-  return `${JSON.stringify(config, null, 2)}\n`;
+  return formatConfigForDisplay(config);
 }
 
 async function loadConfigForDisplay(request: ShowConfigRequest): Promise<CLIConfig> {

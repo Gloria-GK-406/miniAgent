@@ -68,6 +68,7 @@ describe("registerBuiltinCommands", () => {
     expect(registry.list().map((command) => command.name)).toEqual(expect.arrayContaining([
       "help",
       "status",
+      "config",
       "compact",
       "context",
       "history",
@@ -114,6 +115,67 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/status");
 
     expect(commandCtx.getState().panel).toEqual({ type: "status" });
+  });
+
+  it("opens redacted config panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.updateState({
+      config: CLIConfigSchema.parse({
+        providers: [{
+          engine: "openai",
+          key: "sk-secret",
+          models: [{ id: "fast", name: "gpt-4o-mini" }],
+        }],
+        defaultModel: "openai/fast",
+      }),
+    });
+
+    await registry.execute(commandCtx, "/config");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "config",
+      title: "Config",
+      content: expect.stringContaining("\"key\": \"<redacted>\""),
+    });
+    expect(commandCtx.getState().panel).not.toEqual({
+      type: "config",
+      title: "Config",
+      content: expect.stringContaining("sk-secret"),
+    });
+  });
+
+  it("opens config paths panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/config paths");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "config",
+      title: "Config Paths",
+      content: expect.stringContaining("Project config:"),
+    });
+    expect(commandCtx.getState().panel).toEqual({
+      type: "config",
+      title: "Config Paths",
+      content: expect.stringContaining("Global config:"),
+    });
+  });
+
+  it("shows an error panel for malformed config commands", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/config reload");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /config [paths]",
+    });
   });
 
   it("requests quit through the runtime without exiting directly", async () => {
