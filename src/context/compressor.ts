@@ -8,13 +8,12 @@ import {
 import type {
     AgentConfig,
     GenerationConfig,
-    JsonValue,
     LLMGenerateRequest,
-    ModelPreset,
     ModelProviderConfig,
     NormalizedAgentConfig,
     ResolvedModel,
 } from "../core/config.js";
+import { cloneProviderConfig } from "../core/model-config-utils.js";
 import { resolveModelsFromProviders, selectResolvedModel } from "../core/model-resolution.js";
 
 const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the following conversation into a concise summary that preserves:
@@ -35,38 +34,6 @@ function extractText(content: Message["content"]): string {
     if (typeof content === "string") return content;
     if (content.type === "text") return content.text;
     return "";
-}
-
-function cloneJsonRecord<T extends Record<string, JsonValue>>(value: T): T {
-    return structuredClone(value) as T;
-}
-
-function cloneModelPreset(model: ModelPreset): ModelPreset {
-    return {
-        id: model.id,
-        name: model.name,
-        ...(model.displayName !== undefined && { displayName: model.displayName }),
-        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        ...(model.thinkingLevels !== undefined && {
-            thinkingLevels: [...model.thinkingLevels],
-        }),
-        ...(model.capabilities !== undefined && {
-            capabilities: cloneJsonRecord(model.capabilities),
-        }),
-        ...(model.metadata !== undefined && {
-            metadata: cloneJsonRecord(model.metadata),
-        }),
-    };
-}
-
-function cloneProviderConfig(provider: ModelProviderConfig): ModelProviderConfig {
-    return {
-        provider: provider.provider,
-        key: provider.key,
-        ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
-        models: (provider.models ?? []).map(cloneModelPreset),
-    };
 }
 
 function buildFallbackSummary(messages: Message[]): string {

@@ -45,14 +45,22 @@ import type {
     AgentConfig,
     GenerationConfig,
     GenerationConfigInput,
-    JsonValue,
     LLMGenerateRequest,
-    ModelPreset,
     ModelProviderConfig,
     ModelSelector,
     NormalizedAgentConfig,
     ResolvedModel,
 } from "./config.js";
+import {
+    availableModelIds,
+    cloneAgentConfig,
+    cloneGenerationConfig,
+    cloneProviderConfig,
+    cloneResolvedModel,
+    selectorDescription,
+    selectorFromResolvedModel,
+    validateUniqueProviders,
+} from "./model-config-utils.js";
 import {
     resolveModelsFromProviders,
     selectResolvedModel,
@@ -90,117 +98,6 @@ interface ToolCallBuffer {
     id?: string;
     name?: string;
     argumentsText: string;
-}
-
-function cloneJsonRecord<T extends Record<string, JsonValue>>(value: T): T {
-    return structuredClone(value) as T;
-}
-
-function cloneModelPreset(model: ModelPreset): ModelPreset {
-    return {
-        id: model.id,
-        name: model.name,
-        ...(model.displayName !== undefined && { displayName: model.displayName }),
-        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        ...(model.thinkingLevels !== undefined && {
-            thinkingLevels: [...model.thinkingLevels],
-        }),
-        ...(model.capabilities !== undefined && {
-            capabilities: cloneJsonRecord(model.capabilities),
-        }),
-        ...(model.metadata !== undefined && {
-            metadata: cloneJsonRecord(model.metadata),
-        }),
-    };
-}
-
-function cloneProviderConfig(provider: ModelProviderConfig): ModelProviderConfig {
-    return {
-        provider: provider.provider,
-        key: provider.key,
-        ...(provider.baseUrl !== undefined && { baseUrl: provider.baseUrl }),
-        models: (provider.models ?? []).map(cloneModelPreset),
-    };
-}
-
-function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
-    return {
-        id: model.id,
-        provider: model.provider,
-        name: model.name,
-        ...(model.displayName !== undefined && { displayName: model.displayName }),
-        ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-        ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-        thinkingLevels: [...model.thinkingLevels],
-        ...(model.capabilities !== undefined && {
-            capabilities: cloneJsonRecord(model.capabilities),
-        }),
-        ...(model.metadata !== undefined && {
-            metadata: cloneJsonRecord(model.metadata),
-        }),
-    };
-}
-
-function cloneGenerationConfig(config: GenerationConfig): GenerationConfig {
-    return { ...config };
-}
-
-function cloneSelector(selector: ModelSelector): ModelSelector {
-    if ("id" in selector) {
-        return {
-            id: selector.id,
-            ...(selector.provider !== undefined && { provider: selector.provider }),
-        };
-    }
-    return {
-        provider: selector.provider,
-        model: selector.model,
-    };
-}
-
-function cloneAgentConfig(config: NormalizedAgentConfig): NormalizedAgentConfig {
-    return AgentConfigSchema.parse({
-        providers: config.providers.map(cloneProviderConfig),
-        ...(config.defaultModel !== undefined && {
-            defaultModel: cloneSelector(config.defaultModel),
-        }),
-        ...(config.generation !== undefined && {
-            generation: cloneGenerationConfig(config.generation),
-        }),
-        plugins: new Map(config.plugins),
-        paths: { ...config.paths },
-    });
-}
-
-function selectorDescription(selector: ModelSelector): string {
-    if ("id" in selector) {
-        return selector.provider !== undefined
-            ? `${selector.provider}:${selector.id}`
-            : selector.id;
-    }
-    return `${selector.provider}/${selector.model}`;
-}
-
-function availableModelIds(models: ResolvedModel[]): string {
-    return models.map((model) => `${model.provider}:${model.id}`).join(", ") || "(none)";
-}
-
-function selectorFromResolvedModel(model: ResolvedModel): ModelSelector {
-    return {
-        id: model.id,
-        provider: model.provider,
-    };
-}
-
-function validateUniqueProviders(providers: ModelProviderConfig[]): void {
-    const seen = new Set<string>();
-    for (const provider of providers) {
-        if (seen.has(provider.provider)) {
-            throw new Error(`Duplicate provider: "${provider.provider}"`);
-        }
-        seen.add(provider.provider);
-    }
 }
 
 function isCreateOptions(value: LLMRequest | MiniAgentCreateOptions): value is MiniAgentCreateOptions {

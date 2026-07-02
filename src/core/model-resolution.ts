@@ -1,34 +1,17 @@
 import type {
-  JsonValue,
   ModelPreset,
   ModelProviderConfig,
   ModelSelector,
   ResolvedModel,
 } from "./config.js";
 import { ModelPresetSchema, ThinkingLevel } from "./config.js";
+import {
+  availableModelIds,
+  cloneJsonRecord,
+  cloneResolvedModel,
+  selectorDescription,
+} from "./model-config-utils.js";
 import type { LLMRequest } from "./types.js";
-
-function cloneJsonRecord<T extends Record<string, JsonValue>>(value: T): T {
-  return structuredClone(value) as T;
-}
-
-function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
-  return {
-    id: model.id,
-    provider: model.provider,
-    name: model.name,
-    ...(model.displayName !== undefined && { displayName: model.displayName }),
-    ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-    ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-    thinkingLevels: [...model.thinkingLevels],
-    ...(model.capabilities !== undefined && {
-      capabilities: cloneJsonRecord(model.capabilities),
-    }),
-    ...(model.metadata !== undefined && {
-      metadata: cloneJsonRecord(model.metadata),
-    }),
-  };
-}
 
 function resolveProviderOverride(
   provider: ModelProviderConfig,
@@ -98,19 +81,6 @@ export function resolveModelsFromProviders(
       resolveProviderOverride(provider, engineModels, model),
     );
   });
-}
-
-function availableModelIds(models: ResolvedModel[]): string {
-  return models.map((model) => `${model.provider}:${model.id}`).join(", ") || "(none)";
-}
-
-function selectorDescription(selector: ModelSelector): string {
-  if ("id" in selector) {
-    return selector.provider !== undefined
-      ? `${selector.provider}:${selector.id}`
-      : selector.id;
-  }
-  return `${selector.provider}/${selector.model}`;
 }
 
 function selectUniqueMatch(
