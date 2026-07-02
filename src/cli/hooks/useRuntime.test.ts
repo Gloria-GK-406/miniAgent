@@ -66,6 +66,8 @@ describe("useRuntime", () => {
       initializeProjectInstructions: vi.fn(),
       setPermissionRule: vi.fn(),
       unsetPermissionRule: vi.fn(),
+      setSystemPrompt: vi.fn(),
+      unsetSystemPrompt: vi.fn(),
       destroy: vi.fn(),
     };
 

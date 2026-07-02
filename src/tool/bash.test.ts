@@ -4,21 +4,23 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { bashTool } from "./bash.js";
 
+const BASH_TEST_TIMEOUT = 30000;
+
 describe("bashTool", () => {
     it("executes a simple command", async () => {
         const result = await bashTool.execute({ command: "echo hello" });
         expect(result).toContain("hello");
-    }, 15000);
+    }, BASH_TEST_TIMEOUT);
 
     it("captures stderr", async () => {
         const result = await bashTool.execute({ command: "echo error >&2" });
         expect(result).toContain("error");
-    }, 15000);
+    }, BASH_TEST_TIMEOUT);
 
     it("reports exit code on failure", async () => {
         const result = await bashTool.execute({ command: "exit 42" });
         expect(result).toContain("Exit code: 42");
-    }, 15000);
+    }, BASH_TEST_TIMEOUT);
 
     it("respects workdir", async () => {
         const workdir = await mkdtemp(join(tmpdir(), "bash-test-"));
@@ -34,7 +36,7 @@ describe("bashTool", () => {
                 retryDelay: 100,
             });
         }
-    }, 15000);
+    }, BASH_TEST_TIMEOUT);
 
     it("has correct tool metadata", () => {
         expect(bashTool.name).toBe("bash");

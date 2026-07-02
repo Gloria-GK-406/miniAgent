@@ -104,6 +104,8 @@ export interface CLIAppRuntime {
   initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;
   setPermissionRule(target: string, decision: CLIPermissionDecision): Promise<void>;
   unsetPermissionRule(target: string): Promise<void>;
+  setSystemPrompt(prompt: string): Promise<void>;
+  unsetSystemPrompt(): Promise<void>;
   answerApproval(id: string, decision: boolean): void;
   stop(): void;
   rebuildAgent(reason: string): Promise<void>;

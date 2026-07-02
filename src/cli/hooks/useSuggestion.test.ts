@@ -43,6 +43,11 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/sessions sw")).toEqual(["switch"]);
   });
 
+  it("matches /system subcommands", () => {
+    expect(matchSuggestions("/system")).toEqual(["set", "unset"]);
+    expect(matchSuggestions("/system un")).toEqual(["unset"]);
+  });
+
   it("hides exact /auto because it has no subcommands", () => {
     const result = matchSuggestions("/auto");
     expect(result).toEqual([]);
@@ -221,6 +226,10 @@ describe("useSuggestion", () => {
 
   it("adds a trailing space for permissions command completion", () => {
     expect(applySuggestion("/pe", "/permissions")).toBe("/permissions ");
+  });
+
+  it("adds a trailing space for system command completion", () => {
+    expect(applySuggestion("/sy", "/system")).toBe("/system ");
   });
 
   it("applies selected agent mode completion", () => {

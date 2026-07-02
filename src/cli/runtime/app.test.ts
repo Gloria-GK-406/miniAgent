@@ -73,6 +73,25 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("edits the system prompt from slash commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-system-prompt-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    await runtime.submitInput("/system set Custom project prompt");
+
+    expect(runtime.getState().config.systemPrompt).toBe("Custom project prompt");
+    expect(runtime.getState().panel).toEqual({
+      type: "system",
+      basePrompt: "Custom project prompt",
+      effectivePrompt: expect.stringContaining("Custom project prompt"),
+    });
+    await expect(readFile(join(baseDir, ".cliagent", "config.json"), "utf-8"))
+      .resolves.toContain('"systemPrompt": "Custom project prompt"');
+
+    await runtime.destroy();
+  });
+
   it("creates, switches, and renames sessions from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-sessions-"));
     await writeConfig(baseDir);

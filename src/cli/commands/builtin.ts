@@ -43,6 +43,22 @@ function showPermissionsPanel(ctx: CLICommandContext): void {
   });
 }
 
+function showSystemPanel(ctx: CLICommandContext): void {
+  const state = ctx.getState();
+  const basePrompt = getBaseSystemPrompt(state.config);
+  ctx.updateState({
+    panel: {
+      type: "system",
+      basePrompt,
+      effectivePrompt: buildEffectiveSystemPrompt({
+        baseDir: state.baseDir,
+        mode: state.mode,
+        userSystemPrompt: basePrompt,
+      }),
+    },
+  });
+}
+
 async function runSessionMutation(
   ctx: CLICommandContext,
   action: () => Promise<void>,
@@ -160,21 +176,37 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   });
   registry.register({
     name: "system",
-    description: "Show the current system prompt",
-    usage: "/system",
-    execute: async (ctx) => {
-      const state = ctx.getState();
-      const basePrompt = getBaseSystemPrompt(state.config);
-      ctx.updateState({
-        panel: {
-          type: "system",
-          basePrompt,
-          effectivePrompt: buildEffectiveSystemPrompt({
-            baseDir: state.baseDir,
-            mode: state.mode,
-            userSystemPrompt: basePrompt,
-          }),
-        },
+    description: "Show or edit the current system prompt",
+    usage: "/system [set <prompt>|unset]",
+    execute: async (ctx, args) => {
+      const parts = splitArgs(args);
+      const action = parts[0];
+      if (action === undefined) {
+        showSystemPanel(ctx);
+        return;
+      }
+
+      await runSessionMutation(ctx, async () => {
+        switch (action) {
+          case "set": {
+            const prompt = args.trim().slice(action.length).trim();
+            if (prompt.length === 0) {
+              throw new Error("Usage: /system set <prompt>");
+            }
+            await ctx.runtime.setSystemPrompt(prompt);
+            showSystemPanel(ctx);
+            ctx.notice("info", "Updated system prompt");
+            break;
+          }
+          case "unset": {
+            await ctx.runtime.unsetSystemPrompt();
+            showSystemPanel(ctx);
+            ctx.notice("info", "Unset system prompt");
+            break;
+          }
+          default:
+            throw new Error(`Unknown system action: ${action}`);
+        }
       });
     },
   });

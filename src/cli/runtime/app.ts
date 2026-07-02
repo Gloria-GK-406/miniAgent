@@ -22,6 +22,7 @@ import { createReferenceService } from "./reference-service.js";
 import { createShellService } from "./shell-service.js";
 import { createCLISessionService } from "./session-service.js";
 import { createSnapshotService } from "./snapshot-service.js";
+import { createSystemPromptConfigService } from "./system-prompt-config-service.js";
 import type { CLIAppRuntime, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
 
 function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
@@ -42,6 +43,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const exportService = createExportService({ baseDir, sessionService });
   const projectInstructionsService = createProjectInstructionsService(baseDir);
   const permissionConfigService = createPermissionConfigService(baseDir);
+  const systemPromptConfigService = createSystemPromptConfigService(baseDir);
   const editorService = createEditorService({ config: config.editor });
 
   const subscribers = new Set<CLIRuntimeSubscriber>();
@@ -68,6 +70,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const factory = await createCLIAgentFactory({
     baseDir,
     mode: () => activeMode,
+    getConfig: () => config,
     permissionService,
     getAutoApprove: () => state.autoApprove,
     requestApproval: (toolName, args) => new Promise((resolve) => {
@@ -162,6 +165,24 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     }
+  }
+
+  async function rebuildCurrentAgent(): Promise<void> {
+    const previous = built.agent;
+    built = await factory.build(state.sessionId);
+    await previous.destroy();
+    bindAgentEvents();
+    updateState({
+      modelName: formatCurrentModel(built.agent),
+      modelPaths: getResolvedModelPaths(built.agent),
+      messages: await built.agent.getMessages(),
+      sessions: sessionService.listSessions(),
+    });
+  }
+
+  async function updateSystemPrompt(update: () => Promise<CLIConfig>): Promise<void> {
+    applyConfig(await update());
+    await rebuildCurrentAgent();
   }
 
   function createCommandContext(runtime: CLIAppRuntime): CLICommandContext {
@@ -411,6 +432,12 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     unsetPermissionRule: async (target: string) => {
       await updatePermissionRule(() => permissionConfigService.unsetRule(target));
     },
+    setSystemPrompt: async (prompt: string) => {
+      await updateSystemPrompt(() => systemPromptConfigService.setSystemPrompt(prompt));
+    },
+    unsetSystemPrompt: async () => {
+      await updateSystemPrompt(() => systemPromptConfigService.unsetSystemPrompt());
+    },
     answerApproval: (id, decision) => {
       approvalResolvers.get(id)?.(decision);
       approvalResolvers.delete(id);
@@ -420,16 +447,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       built.agent.stop();
     },
     rebuildAgent: async (_reason) => {
-      const previous = built.agent;
-      built = await factory.build(state.sessionId);
-      await previous.destroy();
-      bindAgentEvents();
-      updateState({
-        modelName: formatCurrentModel(built.agent),
-        modelPaths: getResolvedModelPaths(built.agent),
-        messages: await built.agent.getMessages(),
-        sessions: sessionService.listSessions(),
-      });
+      await rebuildCurrentAgent();
     },
     destroy: async () => {
       for (const resolve of approvalResolvers.values()) {

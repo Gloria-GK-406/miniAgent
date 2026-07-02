@@ -144,6 +144,8 @@ describe("registerBuiltinCommands", () => {
     }));
     commandCtx.runtime.setPermissionRule = vi.fn(async () => undefined);
     commandCtx.runtime.unsetPermissionRule = vi.fn(async () => undefined);
+    commandCtx.runtime.setSystemPrompt = vi.fn(async () => undefined);
+    commandCtx.runtime.unsetSystemPrompt = vi.fn(async () => undefined);
 
     await registry.execute(commandCtx, "/init");
     await registry.execute(commandCtx, "/init --force");
@@ -157,6 +159,8 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/permissions unset write");
 
     await registry.execute(commandCtx, "/system");
+    await registry.execute(commandCtx, "/system set Custom coding prompt");
+    await registry.execute(commandCtx, "/system unset");
     await registry.execute(commandCtx, "/undo");
     await registry.execute(commandCtx, "/redo");
     await registry.execute(commandCtx, "/compact");
@@ -178,6 +182,8 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.runtime.initializeProjectInstructions).toHaveBeenNthCalledWith(2, true);
     expect(commandCtx.runtime.setPermissionRule).toHaveBeenCalledWith("shell:npm *", "allow");
     expect(commandCtx.runtime.unsetPermissionRule).toHaveBeenCalledWith("write");
+    expect(commandCtx.runtime.setSystemPrompt).toHaveBeenCalledWith("Custom coding prompt");
+    expect(commandCtx.runtime.unsetSystemPrompt).toHaveBeenCalled();
     expect(commandCtx.getState().panel).toEqual({
       type: "system",
       basePrompt: "You are a helpful assistant.",
@@ -197,6 +203,21 @@ describe("registerBuiltinCommands", () => {
     expect(commandCtx.getState().panel).toEqual({
       type: "error",
       message: "Usage: /permissions set <target> <allow|ask|deny>",
+    });
+  });
+
+  it("shows an error panel for malformed system commands", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    commandCtx.runtime.setSystemPrompt = vi.fn(async () => undefined);
+
+    await registry.execute(commandCtx, "/system set");
+
+    expect(commandCtx.runtime.setSystemPrompt).not.toHaveBeenCalled();
+    expect(commandCtx.getState().panel).toEqual({
+      type: "error",
+      message: "Usage: /system set <prompt>",
     });
   });
 

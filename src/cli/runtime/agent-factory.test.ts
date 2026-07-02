@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { ThinkingLevel } from "../../core/config.js";
 import { MessageType } from "../../core/types.js";
-import { type CLIAgentMode } from "../config.js";
+import { loadConfig, type CLIAgentMode, type CLIConfig } from "../config.js";
 import { createCLIAgentFactory, formatResolvedModelPath } from "./agent-factory.js";
 import { createPermissionService } from "./permission-service.js";
 import { createShellService } from "./shell-service.js";
@@ -77,5 +77,36 @@ describe("createCLIAgentFactory", () => {
       .toContain("Agent mode: build");
     expect(planContext.find((message) => message.type === MessageType.System)?.content)
       .toContain("Agent mode: plan");
+  });
+
+  it("reads runtime config dynamically for each build", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-agent-factory-config-"));
+    await writeConfig(baseDir);
+    let runtimeConfig: CLIConfig = {
+      ...(await loadConfig(baseDir)),
+      systemPrompt: "Initial prompt.",
+    };
+    const factory = await createCLIAgentFactory({
+      baseDir,
+      mode: "build",
+      getConfig: () => runtimeConfig,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: createShellService({ windows: "powershell", timeoutMs: 120000 }),
+    });
+
+    const initialAgent = await factory.build("session-initial");
+    const initialContext = await initialAgent.agent.previewContext();
+    await initialAgent.agent.destroy();
+    runtimeConfig = { ...runtimeConfig, systemPrompt: "Updated prompt." };
+    const updatedAgent = await factory.build("session-updated");
+    const updatedContext = await updatedAgent.agent.previewContext();
+    await updatedAgent.agent.destroy();
+
+    expect(initialContext.find((message) => message.type === MessageType.System)?.content)
+      .toContain("Initial prompt.");
+    expect(updatedContext.find((message) => message.type === MessageType.System)?.content)
+      .toContain("Updated prompt.");
   });
 });

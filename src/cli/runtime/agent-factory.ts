@@ -92,6 +92,7 @@ export interface BuildSubagentAgentConfigOptions {
 export interface CLIAgentFactoryOptions {
   baseDir: string;
   mode: CLIAgentMode | (() => CLIAgentMode);
+  getConfig?: () => CLIConfig;
   permissionService: PermissionService;
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
@@ -190,7 +191,6 @@ export async function createCLIAgentFactory(
   await sessionManager.load();
 
   let currentParentAgent: MiniAgent | undefined;
-  const userSystemPrompt = getBaseSystemPrompt(config);
   const subagentFactory = createConfiguredSubagentFactory(
     sessionManager,
     config,
@@ -200,18 +200,19 @@ export async function createCLIAgentFactory(
 
   return {
     build: async (sessionId): Promise<BuiltRuntimeAgent> => {
+      const activeConfig = options.getConfig?.() ?? config;
       const built = await buildAgentInner(
         sessionId,
-        config,
+        activeConfig,
         options,
         subagentFactory,
-        userSystemPrompt,
+        getBaseSystemPrompt(activeConfig),
         () => currentParentAgent?.getConfig(),
       );
       currentParentAgent = built.agent;
       return {
         ...built,
-        config,
+        config: activeConfig,
       };
     },
   };
