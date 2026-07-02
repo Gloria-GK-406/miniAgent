@@ -70,14 +70,15 @@ export async function loadCustomCommands(baseDir: string): Promise<CLICommand[]>
       description: parsed.frontmatter.description ?? `Custom command: ${name}`,
       usage: `/${name} [args]`,
       execute: async (ctx, args) => {
-        if (parsed.frontmatter.agent !== undefined && parsed.frontmatter.agent !== ctx.getState().mode) {
-          ctx.updateState({ mode: parsed.frontmatter.agent });
-          await ctx.runtime.rebuildAgent(`custom command ${name} agent ${parsed.frontmatter.agent}`);
+        const input = renderCommandBody(parsed.body, args.trim());
+        if (parsed.frontmatter.agent !== undefined || parsed.frontmatter.model !== undefined) {
+          await ctx.runtime.submitInputWithOverrides(input, {
+            ...(parsed.frontmatter.agent !== undefined && { mode: parsed.frontmatter.agent }),
+            ...(parsed.frontmatter.model !== undefined && { model: parsed.frontmatter.model }),
+          });
+          return;
         }
-        if (parsed.frontmatter.model !== undefined) {
-          await ctx.runtime.selectModel(parsed.frontmatter.model);
-        }
-        await ctx.runtime.submitInput(renderCommandBody(parsed.body, args.trim()));
+        await ctx.runtime.submitInput(input);
       },
     });
   }

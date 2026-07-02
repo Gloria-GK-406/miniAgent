@@ -45,6 +45,7 @@ describe("useRuntime", () => {
         return () => undefined;
       }),
       submitInput: vi.fn(),
+      submitInputWithOverrides: vi.fn(),
       runCommand: vi.fn(),
       selectModel: vi.fn(),
       setAgentMode: vi.fn(),

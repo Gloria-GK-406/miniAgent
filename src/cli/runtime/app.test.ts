@@ -500,6 +500,46 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("restores session agent and model after custom command frontmatter overrides", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-custom-command-overrides-"));
+    await writeConfig(baseDir, {
+      providers: [{
+        engine: "openai",
+        key: "sk-test",
+        models: [
+          { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
+          { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
+        ],
+      }],
+      defaultModel: "fast",
+    });
+    await mkdir(join(baseDir, ".cliagent", "commands"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "commands", "review.md"), [
+      "---",
+      "description: Review with specialist settings",
+      "agent: plan",
+      "model: openai/slow",
+      "---",
+      "",
+      "/help",
+    ].join("\n"), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+    const sessionId = runtime.getState().sessionId;
+
+    await runtime.submitInput("/review");
+
+    expect(runtime.getState().panel).toEqual({ type: "help" });
+    expect(runtime.getState().mode).toBe("build");
+    expect(runtime.getState().modelName).toBe("openai/fast");
+
+    const sessionService = await createCLISessionService(baseDir);
+    const session = sessionService.getSession(sessionId);
+    expect(session.model).toBeUndefined();
+    expect((await sessionService.readSessionRuntimeMetadata(sessionId)).mode).toBeUndefined();
+    await runtime.destroy();
+  });
+
   it("undoes and redoes the last turn with file snapshots", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-undo-"));
     await writeConfig(baseDir);

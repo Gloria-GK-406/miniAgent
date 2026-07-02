@@ -46,7 +46,6 @@ describe("loadCustomCommands", () => {
     await writeCommand(baseDir, "test", [
       "---",
       "description: Run tests",
-      "agent: build",
       "---",
       "",
       "Run tests with these arguments: {{args}}",
@@ -88,5 +87,44 @@ describe("loadCustomCommands", () => {
     await command!.execute(ctx, "src/core");
 
     expect(submitInput).toHaveBeenCalledWith("Review this: src/core");
+  });
+
+  it("passes agent and model frontmatter as scoped input overrides", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-custom-command-overrides-"));
+    await writeCommand(baseDir, "review", [
+      "---",
+      "description: Review with specialist settings",
+      "agent: plan",
+      "model: openai/slow",
+      "---",
+      "",
+      "Review these files: {{args}}",
+    ].join("\n"));
+    const [command] = await loadCustomCommands(baseDir);
+    const submitInput = vi.fn(async () => undefined);
+    const submitInputWithOverrides = vi.fn(async () => undefined);
+    const ctx = {
+      runtime: {
+        submitInput,
+        submitInputWithOverrides,
+        rebuildAgent: vi.fn(async () => undefined),
+        selectModel: vi.fn(async () => undefined),
+      },
+      agent: {},
+      getState: state,
+      updateState: vi.fn(),
+      notice: vi.fn(),
+    } as unknown as CLICommandContext;
+
+    await command!.execute(ctx, "src/core");
+
+    expect(submitInputWithOverrides).toHaveBeenCalledWith(
+      "Review these files: src/core",
+      { mode: "plan", model: "openai/slow" },
+    );
+    expect(submitInput).not.toHaveBeenCalled();
+    expect(ctx.updateState).not.toHaveBeenCalled();
+    expect(ctx.runtime.rebuildAgent).not.toHaveBeenCalled();
+    expect(ctx.runtime.selectModel).not.toHaveBeenCalled();
   });
 });

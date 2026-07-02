@@ -4,6 +4,7 @@ import {
   type ToolCallMessage,
   type ToolResultMessage,
 } from "../../core/types.js";
+import type { ResolvedModel } from "../../core/config.js";
 import { type SessionMeta } from "../../core/session.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
 import { loadConfig, type CLIConfig, type CLIPermissionDecision } from "../config.js";
@@ -38,7 +39,15 @@ import { createCLISessionService } from "./session-service.js";
 import { createSnapshotService } from "./snapshot-service.js";
 import { createSubagentService } from "./subagent-service.js";
 import { createSystemPromptConfigService } from "./system-prompt-config-service.js";
-import type { CLIAppRuntime, CLICommand, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
+import type {
+  CLIAppRuntime,
+  CLICommand,
+  CLICommandContext,
+  CLIEvent,
+  CLIInputOverrides,
+  CLIRuntimeSubscriber,
+  CLIState,
+} from "./types.js";
 
 function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
   const current = agent.getCurrentResolvedModel();
@@ -249,6 +258,48 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     });
   }
 
+  function selectCurrentAgentModel(path: string): string {
+    const selected = selectResolvedModelForCLI(built.agent, path);
+    const modelName = formatResolvedModelPath(selected);
+    updateState({ modelName });
+    return modelName;
+  }
+
+  function restoreCurrentAgentModel(
+    previousModel: ResolvedModel | undefined,
+    previousModelName: string,
+  ): void {
+    if (previousModel === undefined) {
+      updateState({ modelName: previousModelName });
+      return;
+    }
+    selectCurrentAgentModel(formatResolvedModelPath(previousModel));
+  }
+
+  async function applyInputOverrides(overrides: CLIInputOverrides): Promise<void> {
+    if (overrides.mode !== undefined && overrides.mode !== state.mode) {
+      updateState({ mode: overrides.mode });
+      await rebuildCurrentAgent();
+    }
+    if (overrides.model !== undefined) {
+      selectCurrentAgentModel(overrides.model);
+    }
+  }
+
+  async function restoreInputOverrides(
+    previousMode: CLIState["mode"],
+    previousModel: ResolvedModel | undefined,
+    previousModelName: string,
+  ): Promise<void> {
+    if (state.mode !== previousMode) {
+      updateState({ mode: previousMode });
+      await rebuildCurrentAgent();
+    }
+    if (formatCurrentModel(built.agent) !== previousModelName) {
+      restoreCurrentAgentModel(previousModel, previousModelName);
+    }
+  }
+
   async function updateSystemPrompt(update: () => Promise<CLIConfig>): Promise<void> {
     applyConfig(await update());
     await rebuildCurrentAgent();
@@ -431,12 +482,22 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         updateState({ panel: { type: "error", message: errorMessage(error) } });
       }
     },
+    submitInputWithOverrides: async (input, overrides) => {
+      const previousMode = state.mode;
+      const previousModel = built.agent.getCurrentResolvedModel();
+      const previousModelName = formatCurrentModel(built.agent);
+      try {
+        await applyInputOverrides(overrides);
+        await runtime.submitInput(input);
+      } finally {
+        await restoreInputOverrides(previousMode, previousModel, previousModelName);
+      }
+    },
     runCommand: async (name, args) => {
       await registry.execute(createCommandContext(runtime), `/${name} ${args}`.trim());
     },
     selectModel: async (path) => {
-      const selected = selectResolvedModelForCLI(built.agent, path);
-      const modelName = formatResolvedModelPath(selected);
+      const modelName = selectCurrentAgentModel(path);
       await sessionService.updateSessionModel(state.sessionId, modelName);
       updateState({
         modelName,

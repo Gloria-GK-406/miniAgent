@@ -76,6 +76,11 @@ export interface CLIState {
   error: string | null;
 }
 
+export interface CLIInputOverrides {
+  mode?: CLIAgentMode;
+  model?: string;
+}
+
 export type CLIEvent =
   | { type: "state"; state: CLIState }
   | { type: "notice"; level: "info" | "warn" | "error"; message: string }
@@ -90,6 +95,7 @@ export interface CLIAppRuntime {
   getState(): CLIState;
   subscribe(listener: CLIRuntimeSubscriber): () => void;
   submitInput(input: string): Promise<void>;
+  submitInputWithOverrides(input: string, overrides: CLIInputOverrides): Promise<void>;
   runCommand(name: string, args: string): Promise<void>;
   selectModel(path: string): Promise<void>;
   setAgentMode(mode: CLIAgentMode): Promise<void>;

@@ -64,6 +64,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
       };
     },
     submitInput: vi.fn(async () => undefined),
+    submitInputWithOverrides: vi.fn(async () => undefined),
     runCommand: vi.fn(async (name) => {
       if (name === "panel-close") {
         current = { ...current, panel: { type: "none" } };

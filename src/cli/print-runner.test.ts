@@ -43,6 +43,7 @@ function runtime(current: CLIState): CLIAppRuntime {
     getState: () => current,
     subscribe: vi.fn(() => () => undefined),
     submitInput: vi.fn(async () => undefined),
+    submitInputWithOverrides: vi.fn(async () => undefined),
     runCommand: vi.fn(async () => undefined),
     selectModel: vi.fn(async () => undefined),
     setAgentMode: vi.fn(async () => undefined),
