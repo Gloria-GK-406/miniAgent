@@ -49,6 +49,7 @@ export interface CLIToolkitOptions {
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
   shellService: ShellService;
   snapshotService?: SnapshotService;
+  onWorkspaceFilesChanged?: () => Promise<void>;
 }
 
 export interface CLIToolkit {
@@ -76,9 +77,11 @@ async function mutateWithSnapshot(
 ): Promise<void> {
   if (options.snapshotService === undefined) {
     await mutate();
+    await options.onWorkspaceFilesChanged?.();
     return;
   }
   await options.snapshotService.recordBeforeMutation(path, mutate);
+  await options.onWorkspaceFilesChanged?.();
 }
 
 function countOccurrences(content: string, needle: string): number {

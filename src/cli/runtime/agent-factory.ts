@@ -98,6 +98,7 @@ export interface CLIAgentFactoryOptions {
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
   shellService: ShellService;
   snapshotService?: SnapshotService;
+  onWorkspaceFilesChanged?: () => Promise<void>;
 }
 
 export interface BuiltRuntimeAgent {
@@ -331,6 +332,9 @@ function createRuntimeExtraUses(options: CLIAgentFactoryOptions): ReturnType<typ
     requestApproval: options.requestApproval,
     shellService: options.shellService,
     ...(options.snapshotService !== undefined && { snapshotService: options.snapshotService }),
+    ...(options.onWorkspaceFilesChanged !== undefined && {
+      onWorkspaceFilesChanged: options.onWorkspaceFilesChanged,
+    }),
   }).tools;
   const gitTools = createGitToolkit({
     gitService: createGitService(options.baseDir),

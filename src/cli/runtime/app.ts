@@ -74,6 +74,10 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   });
   let state: CLIState;
 
+  async function refreshReferencePaths(): Promise<void> {
+    updateState({ referencePaths: await referenceService.listReferenceCandidates() });
+  }
+
   function requestApproval(toolName: string, args: Record<string, unknown>): Promise<boolean> {
     return new Promise((resolve) => {
       const id = crypto.randomUUID();
@@ -91,6 +95,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     requestApproval,
     shellService,
     snapshotService,
+    onWorkspaceFilesChanged: refreshReferencePaths,
   });
   let built = await factory.build(session.id);
 
@@ -450,9 +455,13 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     },
-    initializeProjectInstructions: async (overwrite) => (
-      projectInstructionsService.initialize({ overwrite })
-    ),
+    initializeProjectInstructions: async (overwrite) => {
+      const result = await projectInstructionsService.initialize({ overwrite });
+      if (result.written) {
+        await refreshReferencePaths();
+      }
+      return result;
+    },
     setPermissionRule: async (target: string, decision: CLIPermissionDecision) => {
       await updatePermissionRule(() =>
         permissionConfigService.setRule(target, decision, state.config.permission));

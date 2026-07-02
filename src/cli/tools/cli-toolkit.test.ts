@@ -72,6 +72,49 @@ describe("createCLIToolkit", () => {
     );
   });
 
+  it("notifies after successful workspace mutations", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-refresh-"));
+    await writeFile(join(baseDir, "a.txt"), "before", "utf-8");
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      onWorkspaceFilesChanged,
+    });
+
+    const write = toolkit.tools.find((tool) => tool.name === "write")!;
+    const edit = toolkit.tools.find((tool) => tool.name === "edit")!;
+
+    await write.execute({ path: "created.txt", content: "created" });
+    expect(onWorkspaceFilesChanged).toHaveBeenCalledTimes(1);
+
+    await edit.execute({ path: "a.txt", oldString: "before", newString: "after" });
+    expect(onWorkspaceFilesChanged).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not notify when a workspace mutation fails", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-refresh-failure-"));
+    await writeFile(join(baseDir, "a.txt"), "before", "utf-8");
+    const onWorkspaceFilesChanged = vi.fn(async () => {});
+    const toolkit = createCLIToolkit({
+      baseDir,
+      permissionService: createPermissionService({ "*": "allow" }),
+      getAutoApprove: () => false,
+      requestApproval: vi.fn(),
+      shellService: { execute: vi.fn() },
+      onWorkspaceFilesChanged,
+    });
+
+    const edit = toolkit.tools.find((tool) => tool.name === "edit")!;
+
+    await expect(edit.execute({ path: "a.txt", oldString: "missing", newString: "after" }))
+      .rejects.toThrow("oldString not found");
+    expect(onWorkspaceFilesChanged).not.toHaveBeenCalled();
+  });
+
   it("applies multi_edit atomically", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-tools-multiedit-"));
     await writeFile(join(baseDir, "a.txt"), "one two three", "utf-8");

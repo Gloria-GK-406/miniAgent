@@ -59,6 +59,19 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("refreshes reference paths after project initialization", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-reference-refresh-"));
+    await writeConfig(baseDir);
+
+    const runtime = await createCLIRuntime(baseDir);
+    expect(runtime.getState().referencePaths).not.toContain("AGENTS.md");
+
+    await runtime.submitInput("/init");
+
+    expect(runtime.getState().referencePaths).toContain("AGENTS.md");
+    await runtime.destroy();
+  });
+
   it("edits permission policy from slash commands", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-permissions-"));
     await writeConfig(baseDir);
