@@ -25,6 +25,7 @@ import { runPrintPrompt } from "./print-runner.js";
 import { runProjectInstructionsInit } from "./project-instructions-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
+import { runSessionClear } from "./session-clear-runner.js";
 import { runSessionDelete } from "./session-delete-runner.js";
 import { runSessionExport } from "./session-export-runner.js";
 import { runSessionFork } from "./session-fork-runner.js";
@@ -285,6 +286,17 @@ async function main(): Promise<void> {
     process.exitCode = await runSessionDelete({
       baseDir: resolve(action.cwd ?? process.cwd()),
       sessionId: action.sessionId,
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "clear-session") {
+    process.exitCode = await runSessionClear({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.sessionId !== undefined && { sessionId: action.sessionId }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

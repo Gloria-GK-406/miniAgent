@@ -358,6 +358,21 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("clears a session without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--clear-session", "--json"])).toEqual({
+      type: "clear-session",
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--clear-session", "s1"])).toEqual({
+      type: "clear-session",
+      sessionId: "s1",
+    });
+    expect(parseCLIEntryArgs(["--session", "s1", "--clear-session"])).toEqual({
+      type: "clear-session",
+      sessionId: "s1",
+    });
+  });
+
   it("renames a session without opening the TUI", () => {
     expect(parseCLIEntryArgs([
       "--rename-session",
@@ -687,6 +702,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed clear session options", () => {
+    expect(parseCLIEntryArgs(["--clear-session", "s1", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --clear-session",
+    });
+    expect(parseCLIEntryArgs(["--clear-session", "--print", "hello"])).toEqual({
+      type: "error",
+      message: "Cannot combine --clear-session with another headless mode",
+    });
+  });
+
   it("rejects malformed rename session options", () => {
     expect(parseCLIEntryArgs(["--rename-session"])).toEqual({
       type: "error",
@@ -832,7 +858,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
       output: "json",
     });
   });
@@ -875,6 +901,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");
     expect(help).toContain("--delete-session");
+    expect(help).toContain("--clear-session");
     expect(help).toContain("--rename-session");
     expect(help).toContain("--fork-session");
     expect(help).toContain("--completion");

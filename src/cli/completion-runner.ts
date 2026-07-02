@@ -27,6 +27,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--export-session", description: "Export a session headlessly" },
   { long: "--import-session", description: "Import a session export headlessly" },
   { long: "--delete-session", description: "Delete a session headlessly" },
+  { long: "--clear-session", description: "Clear a session transcript headlessly" },
   { long: "--rename-session", description: "Rename a session headlessly" },
   { long: "--fork-session", description: "Fork a session headlessly" },
   { long: "--name", description: "Set a session name" },

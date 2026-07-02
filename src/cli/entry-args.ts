@@ -63,6 +63,12 @@ export type CLIEntryAction =
     output?: CLIEntryOutput;
   }
   | {
+    type: "clear-session";
+    cwd?: string;
+    sessionId?: string;
+    output?: CLIEntryOutput;
+  }
+  | {
     type: "rename-session";
     cwd?: string;
     sessionId: string;
@@ -182,6 +188,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
+  let clearSessionMode = false;
   let renameSessionMode = false;
   let forkSessionMode = false;
   let configPathsMode = false;
@@ -392,6 +399,15 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       index++;
       continue;
     }
+    if (arg === "--clear-session") {
+      clearSessionMode = true;
+      const next = args[index + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        sessionId = next;
+        index++;
+      }
+      continue;
+    }
     if (arg === "--completion") {
       const next = args[index + 1];
       if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
@@ -583,6 +599,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
+      || clearSessionMode
       || renameSessionMode
       || forkSessionMode
     )
@@ -608,6 +625,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
+      || clearSessionMode
       || renameSessionMode
       || forkSessionMode
       || initMode
@@ -636,6 +654,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
+      || clearSessionMode
       || renameSessionMode
       || forkSessionMode
       || initMode
@@ -666,6 +685,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
+      || clearSessionMode
       || renameSessionMode
       || forkSessionMode
     )
@@ -694,6 +714,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
+      || clearSessionMode
       || renameSessionMode
       || forkSessionMode
     )
@@ -702,6 +723,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode)) {
     return parseError("Cannot combine --delete-session with another headless mode");
+  }
+  if (clearSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    return parseError("Cannot combine --clear-session with another headless mode");
   }
   if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || listAgentsMode || previewContextMode || showHistoryMode || gitAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
     return parseError("Cannot combine --rename-session with another headless mode");
@@ -853,6 +877,17 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       type: "delete-session",
       sessionId: sessionId!,
       ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (clearSessionMode) {
+    if (prompt.length > 0) {
+      return parseError("Unexpected prompt for --clear-session");
+    }
+    return {
+      type: "clear-session",
+      ...(cwd !== undefined && { cwd }),
+      ...(sessionId !== undefined && { sessionId }),
       ...(output !== undefined && { output }),
     };
   }
@@ -1047,7 +1082,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     };
   }
   if (output !== undefined) {
-    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --rename-session, or --fork-session");
+    return parseError("Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session");
   }
 
   return {
@@ -1093,6 +1128,7 @@ export function formatCLIHelp(): string {
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",
+    "  --clear-session Clear a session transcript headlessly",
     "  --rename-session Rename a session headlessly",
     "  --fork-session Fork a session headlessly",
     "  --name           Set imported session name",

@@ -10,6 +10,7 @@ describe("formatCompletionScript", () => {
       "--init",
       "--force",
       "--staged",
+      "--clear-session",
     ];
     const bash = formatCompletionScript("bash");
     const zsh = formatCompletionScript("zsh");
