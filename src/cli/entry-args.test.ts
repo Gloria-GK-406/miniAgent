@@ -285,6 +285,18 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("initializes project config without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--init"])).toEqual({
+      type: "init",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--init", "--force", "--json"])).toEqual({
+      type: "init",
+      cwd: "C:/repo",
+      force: true,
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -530,10 +542,21 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed init options", () => {
+    expect(parseCLIEntryArgs(["--init", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --init",
+    });
+    expect(parseCLIEntryArgs(["--force"])).toEqual({
+      type: "error",
+      message: "Cannot use --force without --init",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -557,6 +580,8 @@ describe("CLI entry args", () => {
     expect(help).toContain("--completion");
     expect(help).toContain("--config-paths");
     expect(help).toContain("--show-config");
+    expect(help).toContain("--init");
+    expect(help).toContain("--force");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");

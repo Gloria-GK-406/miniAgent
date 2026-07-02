@@ -11,6 +11,7 @@ import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
+import { runInitConfig } from "./init-runner.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
@@ -60,6 +61,17 @@ async function main(): Promise<void> {
   if (action.type === "show-config") {
     process.exitCode = await runShowConfig({
       baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "init") {
+    process.exitCode = await runInitConfig({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.force === true && { force: true }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),
