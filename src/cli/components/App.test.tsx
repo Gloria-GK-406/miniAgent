@@ -1,40 +1,67 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "ink";
 import { App, getMessageWindow, padMessageWindow } from "./App.js";
 import { buildRenderableLines } from "./MessageList.js";
 import { MessageType } from "../../core/types.js";
+import type { CLIAppRuntime, CLIEvent, CLIRuntimeSubscriber, CLIState } from "../runtime/types.js";
 
-function createMockAgent() {
-  const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
   return {
-    on(event: string, listener: (...args: unknown[]) => void) {
-      let set = listeners.get(event);
-      if (!set) {
-        set = new Set();
-        listeners.set(event, set);
+    baseDir: process.cwd(),
+    config: {} as CLIState["config"],
+    mode: "build",
+    modelName: "test/model",
+    modelPaths: ["test/model"],
+    sessionId: "s1",
+    sessionName: "default",
+    autoApprove: false,
+    showReasoning: false,
+    showToolDetails: false,
+    isRunning: false,
+    currentTool: null,
+    messages: [],
+    streamingText: "",
+    reasoningText: "",
+    turnCount: 0,
+    tokenUsage: { input: 0, output: 0, total: 0 },
+    panel: { type: "none" },
+    approval: null,
+    error: null,
+    ...overrides,
+  };
+}
+
+function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
+  let current = runtimeState(overrides);
+  const listeners = new Set<CLIRuntimeSubscriber>();
+  const emit = (event: CLIEvent): void => {
+    for (const listener of listeners) {
+      listener(event);
+    }
+  };
+  return {
+    getState: () => current,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    submitInput: vi.fn(async () => undefined),
+    runCommand: vi.fn(async (name) => {
+      if (name === "panel-close") {
+        current = { ...current, panel: { type: "none" } };
+        emit({ type: "state", state: current });
       }
-      set.add(listener);
-      return undefined;
-    },
-    off(event: string, listener: (...args: unknown[]) => void) {
-      listeners.get(event)?.delete(listener);
-      return undefined;
-    },
-    removeAllListeners(_event?: string) {
-      return undefined;
-    },
-    async run() {
-      return [];
-    },
-    async getMessages() {
-      return [];
-    },
-    async previewContext() {
-      return [];
-    },
-    getContextCount() {
-      return { input: 0, output: 0, total: 0 };
-    },
+    }),
+    selectModel: vi.fn(async (path) => {
+      current = { ...current, modelName: path };
+      emit({ type: "state", state: current });
+    }),
+    answerApproval: vi.fn(),
+    stop: vi.fn(),
+    rebuildAgent: vi.fn(async () => undefined),
+    destroy: vi.fn(async () => undefined),
   };
 }
 
@@ -84,71 +111,38 @@ describe("App", () => {
     expect(padded.slice(3).map((line) => line.text)).toEqual(["hello", "world"]);
   });
 
-  it("renders StatusBar with model name", () => {
-    const agent = createMockAgent();
+  it("renders model name from runtime state", () => {
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="anthropic/claude-sonnet-4"
-        hitlEnabled={true}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
-      />,
+      <App runtime={createMockRuntime({ modelName: "anthropic/claude-sonnet-4" })} />,
     );
     expect(output).toContain("anthropic/claude-sonnet-4");
   });
 
-  it("renders StatusBar with session name", () => {
-    const agent = createMockAgent();
+  it("renders session name from runtime state", () => {
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="test/model"
-        sessionName="my-session"
-        hitlEnabled={false}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
-      />,
+      <App runtime={createMockRuntime({ sessionName: "my-session" })} />,
     );
     expect(output).toContain("my-session");
   });
 
-  it("renders model info in input bar", () => {
-    const agent = createMockAgent();
+  it("renders InputBox area", () => {
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="test/model"
-        hitlEnabled={true}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
-      />,
+      <App runtime={createMockRuntime()} />,
     );
-    expect(output).toContain("test/model");
+    expect(output).toContain("/help for commands");
   });
 
-  it("renders InputBox", () => {
-    const agent = createMockAgent();
+  it("renders history panel from runtime state", () => {
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="test/model"
-        hitlEnabled={false}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "history",
+          messages: [{ id: "1", type: MessageType.User, content: "hello" }],
+        },
+      })}
       />,
     );
-    expect(output).toContain("❯");
-  });
-
-  it("calls onCommand for slash-prefixed input via handleSubmit", () => {
-    const agent = createMockAgent();
-    let receivedCommand: string | undefined;
-    renderToString(
-      <App
-        agent={agent}
-        modelName="test/model"
-        hitlEnabled={false}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
-        onCommand={(cmd) => { receivedCommand = cmd; }}
-      />,
-    );
-    expect(receivedCommand).toBeUndefined();
+    expect(output).toContain("History");
+    expect(output).toContain("hello");
   });
 });

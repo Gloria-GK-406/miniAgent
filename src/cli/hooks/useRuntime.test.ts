@@ -1,0 +1,60 @@
+// @vitest-environment jsdom
+
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { CLIAppRuntime, CLIState } from "../runtime/types.js";
+import { useRuntime } from "./useRuntime.js";
+
+function state(): CLIState {
+  return {
+    baseDir: process.cwd(),
+    config: {} as CLIState["config"],
+    mode: "build",
+    modelName: "openai/fast",
+    modelPaths: ["openai/fast"],
+    sessionId: "s1",
+    sessionName: "default",
+    autoApprove: false,
+    showReasoning: false,
+    showToolDetails: false,
+    isRunning: false,
+    currentTool: null,
+    messages: [],
+    streamingText: "",
+    reasoningText: "",
+    turnCount: 0,
+    tokenUsage: { input: 0, output: 0, total: 0 },
+    panel: { type: "none" },
+    approval: null,
+    error: null,
+  };
+}
+
+describe("useRuntime", () => {
+  it("subscribes to runtime state", () => {
+    let listener: ((event: { type: "state"; state: CLIState }) => void) | undefined;
+    const runtime: CLIAppRuntime = {
+      getState: vi.fn(state),
+      subscribe: vi.fn((next) => {
+        listener = next as typeof listener;
+        return () => undefined;
+      }),
+      submitInput: vi.fn(),
+      runCommand: vi.fn(),
+      selectModel: vi.fn(),
+      answerApproval: vi.fn(),
+      stop: vi.fn(),
+      rebuildAgent: vi.fn(),
+      destroy: vi.fn(),
+    };
+
+    const { result } = renderHook(() => useRuntime(runtime));
+    expect(result.current.state.modelName).toBe("openai/fast");
+
+    act(() => {
+      listener?.({ type: "state", state: { ...state(), modelName: "openai/slow" } });
+    });
+
+    expect(result.current.state.modelName).toBe("openai/slow");
+  });
+});

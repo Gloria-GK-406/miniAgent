@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
-import { Box, Text, useStdout, useInput } from "ink";
-import type { Message, TokenCount } from "../../core/types.js";
-import { useAgent } from "../hooks/useAgent.js";
+import { useCallback, useEffect, useState } from "react";
+import { Box, Text, useInput, useStdout } from "ink";
+import type { Message } from "../../core/types.js";
+import { useRuntime } from "../hooks/useRuntime.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
+import type { CLIAppRuntime, CLIViewPanel } from "../runtime/types.js";
 import { buildRenderableLines } from "./MessageList.js";
 import type { RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
@@ -10,27 +11,9 @@ import { CommandPalette } from "./CommandPalette.js";
 import { InputBox } from "./InputBox.js";
 import { ModelSelectView } from "./ModelSelectView.js";
 import { PanelView } from "./PanelView.js";
-import type { PanelData } from "./PanelView.js";
-
-interface AgentLike {
-  on(event: string, listener: (...args: unknown[]) => void): unknown;
-  off(event: string, listener: (...args: unknown[]) => void): unknown;
-  removeAllListeners(event?: string): unknown;
-  run(input: Message): Promise<Message[]>;
-  getMessages(): Promise<Message[]>;
-  previewContext(): Promise<Message[]>;
-  getContextCount(): TokenCount;
-}
 
 export interface AppProps {
-  agent: AgentLike;
-  modelName: string;
-  modelPaths?: string[];
-  sessionName?: string;
-  hitlEnabled: boolean;
-  tokenUsage: { input: number; output: number; total: number };
-  onCommand?: (command: string) => void;
-  onSelectModel?: (path: string) => Promise<void> | void;
+  runtime: CLIAppRuntime;
 }
 
 const BOTTOM_RESERVED = 6;
@@ -75,17 +58,61 @@ export function getMessageWindow(
   };
 }
 
-export function App({
-  agent,
-  modelName,
-  modelPaths = [],
-  sessionName,
-  hitlEnabled: _hitlEnabled,
-  tokenUsage: _tokenUsage,
-  onCommand,
-  onSelectModel,
-}: AppProps) {
-  const state = useAgent(agent);
+function closePanel(runtime: CLIAppRuntime): void {
+  void runtime.runCommand("panel-close", "");
+}
+
+function panelTitle(panel: Extract<CLIViewPanel, { type: "history" | "context" }>): string {
+  return panel.type === "history" ? "History" : "Context";
+}
+
+function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
+  return (
+    <Box flexDirection="column">
+      <Text bold color="cyan">Help</Text>
+      <Text>/help /history /context /tools /models /sessions</Text>
+      <Text>/agent build|plan /auto /details /thinking /quit</Text>
+      <Text dimColor>ESC is handled by focused panels. Use /panel-close to close.</Text>
+      <Text dimColor>{runtime.getState().mode} mode</Text>
+    </Box>
+  );
+}
+
+function ToolsPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "tools" }> }) {
+  return (
+    <Box flexDirection="column">
+      <Text bold color="cyan">Tools ({panel.tools.length})</Text>
+      {panel.tools.map((tool) => (
+        <Text key={tool.name}>
+          <Text color="cyan">{tool.name}</Text>
+          <Text dimColor> {tool.description}</Text>
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function SessionsPanel({ runtime }: { runtime: CLIAppRuntime }) {
+  const state = runtime.getState();
+  return (
+    <Box flexDirection="column">
+      <Text bold color="cyan">Sessions</Text>
+      <Text>{state.sessionName} ({state.sessionId.slice(0, 8)})</Text>
+    </Box>
+  );
+}
+
+function ErrorPanel({ panel }: { panel: Extract<CLIViewPanel, { type: "error" }> }) {
+  return (
+    <Box flexDirection="column">
+      <Text bold color="red">Error</Text>
+      <Text>{panel.message}</Text>
+    </Box>
+  );
+}
+
+export function App({ runtime }: AppProps) {
+  const { state } = useRuntime(runtime);
   const {
     suggestions,
     selectedIndex,
@@ -94,11 +121,9 @@ export function App({
     selectNext,
     selectPrev,
     applySelected,
-  } = useSuggestion({ modelPaths });
+  } = useSuggestion({ modelPaths: state.modelPaths });
   const { stdout } = useStdout();
   const [scrollFromBottom, setScrollFromBottom] = useState(0);
-  const [panelData, setPanelData] = useState<PanelData | null>(null);
-  const [isModelSelectOpen, setIsModelSelectOpen] = useState(false);
 
   const terminalHeight = stdout?.rows ?? 24;
   const terminalWidth = stdout?.columns ?? 80;
@@ -119,7 +144,7 @@ export function App({
   const paddedVisibleLines = padMessageWindow(visibleLines, messageAreaHeight);
 
   useInput((_input, key) => {
-    if (panelData || isModelSelectOpen) return;
+    if (state.panel.type !== "none") return;
     const pageSize = Math.max(1, Math.floor(messageAreaHeight / 2));
 
     if (key.upArrow) {
@@ -155,23 +180,11 @@ export function App({
   const canScrollUp = clampedScrollFromBottom < maxScrollFromBottom;
 
   const handleSubmit = useCallback(
-    async (text: string) => {
+    (text: string) => {
       setScrollFromBottom(0);
-      if (text === "/history" || text.startsWith("/history ")) {
-        const messages = await agent.getMessages();
-        setPanelData({ title: "History", messages });
-      } else if (text === "/context") {
-        const ctxMsgs = await agent.previewContext();
-        setPanelData({ title: "Context", messages: ctxMsgs });
-      } else if ((text === "/models" || text === "/model") && onSelectModel !== undefined) {
-        setIsModelSelectOpen(true);
-      } else if (text.startsWith("/")) {
-        onCommand?.(text);
-      } else {
-        state.sendMessage(text);
-      }
+      void runtime.submitInput(text);
     },
-    [state, onCommand, agent, onSelectModel],
+    [runtime],
   );
 
   const handleInputChange = useCallback((text: string) => {
@@ -182,21 +195,40 @@ export function App({
     return applySelected(text);
   }, [applySelected]);
 
-  if (panelData) {
-    return <PanelView data={panelData} onClose={() => setPanelData(null)} />;
-  }
-
-  if (isModelSelectOpen) {
+  if (state.panel.type === "history" || state.panel.type === "context") {
     return (
-      <ModelSelectView
-        modelPaths={modelPaths}
-        currentModelPath={modelName}
-        onSelect={async (path) => {
-          await onSelectModel?.(path);
-        }}
-        onClose={() => setIsModelSelectOpen(false)}
+      <PanelView
+        data={{ title: panelTitle(state.panel), messages: state.panel.messages }}
+        onClose={() => closePanel(runtime)}
       />
     );
+  }
+
+  if (state.panel.type === "models") {
+    return (
+      <ModelSelectView
+        modelPaths={state.modelPaths}
+        currentModelPath={state.modelName}
+        onSelect={runtime.selectModel}
+        onClose={() => closePanel(runtime)}
+      />
+    );
+  }
+
+  if (state.panel.type === "help") {
+    return <HelpPanel runtime={runtime} />;
+  }
+
+  if (state.panel.type === "tools") {
+    return <ToolsPanel panel={state.panel} />;
+  }
+
+  if (state.panel.type === "sessions") {
+    return <SessionsPanel runtime={runtime} />;
+  }
+
+  if (state.panel.type === "error") {
+    return <ErrorPanel panel={state.panel} />;
   }
 
   return (
@@ -214,12 +246,12 @@ export function App({
       </Box>
       {isScrolledUp && (
         <Text dimColor>
-          ↑ older messages above · {clampedScrollFromBottom}/{maxScrollFromBottom} from bottom ·
-          ↓/PgDn/End to follow latest
+          Older messages above - {clampedScrollFromBottom}/{maxScrollFromBottom} from bottom -
+          PgDn/End to follow latest
         </Text>
       )}
       {!isScrolledUp && canScrollUp && (
-        <Text dimColor>↑/PgUp/Home to browse history</Text>
+        <Text dimColor>PgUp/Home to browse history</Text>
       )}
       <StatusIndicator
         isRunning={state.isRunning}
@@ -244,14 +276,21 @@ export function App({
           {...(state.isRunning && { placeholder: "Thinking..." })}
         />
         <Box flexDirection="row" gap={1}>
-          <Text bold color="cyan">{modelName}</Text>
-          {sessionName && <Text dimColor>{sessionName}</Text>}
-          <Text dimColor>·</Text>
+          <Text bold color="cyan">{state.modelName}</Text>
+          <Text dimColor>{state.mode}</Text>
+          <Text dimColor>{state.autoApprove ? "auto" : "ask"}</Text>
+          <Text dimColor>{state.sessionName}</Text>
+          <Text dimColor>-</Text>
           <Text dimColor>/help for commands</Text>
         </Box>
+        {state.approval && (
+          <Text color="yellow">
+            Approval requested: {state.approval.toolName}
+          </Text>
+        )}
       </Box>
     </Box>
   );
 }
 
-export type { Message, TokenCount };
+export type { Message };

@@ -1,24 +1,24 @@
 import { useCallback, useState } from "react";
 
 const COMMANDS = [
-  "/clear",
-  "/compress",
+  "/agent",
+  "/auto",
   "/context",
+  "/details",
   "/exit",
   "/help",
   "/history",
-  "/hitl",
   "/model",
   "/models",
   "/quit",
   "/session",
-  "/system",
+  "/sessions",
+  "/thinking",
   "/tools",
 ];
 
-const SESSION_SUBS = ["new", "switch", "delete", "rename"];
-const HITL_SUBS = ["on", "off"];
-const COMMANDS_WITH_ARGS = new Set(["/hitl", "/model", "/session", "/system"]);
+const AGENT_SUBS = ["build", "plan"];
+const COMMANDS_WITH_ARGS = new Set(["/agent", "/model"]);
 
 export function matchSuggestions(
   input: string,
@@ -36,11 +36,8 @@ export function matchSuggestions(
     if (cmd === "/model") {
       return (modelPaths ?? []).filter((p) => p.startsWith(partial));
     }
-    if (cmd === "/session") {
-      return SESSION_SUBS.filter((s) => s.startsWith(partial));
-    }
-    if (cmd === "/hitl") {
-      return HITL_SUBS.filter((s) => s.startsWith(partial));
+    if (cmd === "/agent") {
+      return AGENT_SUBS.filter((s) => s.startsWith(partial));
     }
     return [];
   }
@@ -48,8 +45,7 @@ export function matchSuggestions(
   const matches = COMMANDS.filter((c) => c.startsWith(cmd));
 
   if (matches.length === 1 && matches[0] === cmd) {
-    if (cmd === "/session") return SESSION_SUBS;
-    if (cmd === "/hitl") return HITL_SUBS;
+    if (cmd === "/agent") return AGENT_SUBS;
     return [];
   }
 

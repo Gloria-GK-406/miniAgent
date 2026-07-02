@@ -9,27 +9,46 @@ import { App } from "./components/App.js";
 import { matchSuggestions } from "./hooks/useSuggestion.js";
 import { MessageType } from "../core/types.js";
 import type { Message } from "../core/types.js";
+import type { CLIAppRuntime, CLIRuntimeSubscriber, CLIState } from "./runtime/types.js";
 
-function createMockAgent() {
-  const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+function runtimeState(overrides: Partial<CLIState> = {}): CLIState {
   return {
-    listeners,
-    on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
-      if (!listeners.has(event)) listeners.set(event, new Set());
-      listeners.get(event)!.add(listener);
-    }),
-    off: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
-      listeners.get(event)?.delete(listener);
-    }),
-    removeAllListeners: vi.fn((_event?: string) => {}),
-    run: vi.fn((_input: unknown) => Promise.resolve([])),
-    getMessages: vi.fn(() => Promise.resolve([])),
-    previewContext: vi.fn(() => Promise.resolve([])),
-    getContextCount: vi.fn(() => ({
-      input: 0,
-      output: 0,
-      total: 0,
-    })),
+    baseDir: process.cwd(),
+    config: {} as CLIState["config"],
+    mode: "build",
+    modelName: "test/model",
+    modelPaths: ["test/model"],
+    sessionId: "s1",
+    sessionName: "default",
+    autoApprove: false,
+    showReasoning: false,
+    showToolDetails: false,
+    isRunning: false,
+    currentTool: null,
+    messages: [],
+    streamingText: "",
+    reasoningText: "",
+    turnCount: 0,
+    tokenUsage: { input: 0, output: 0, total: 0 },
+    panel: { type: "none" },
+    approval: null,
+    error: null,
+    ...overrides,
+  };
+}
+
+function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
+  const current = runtimeState(overrides);
+  return {
+    getState: () => current,
+    subscribe: vi.fn((_listener: CLIRuntimeSubscriber) => () => undefined),
+    submitInput: vi.fn(async () => undefined),
+    runCommand: vi.fn(async () => undefined),
+    selectModel: vi.fn(async () => undefined),
+    answerApproval: vi.fn(),
+    stop: vi.fn(),
+    rebuildAgent: vi.fn(async () => undefined),
+    destroy: vi.fn(async () => undefined),
   };
 }
 
@@ -154,28 +173,20 @@ describe("MessageList + MessageItem integration", () => {
 
 describe("App component basic rendering", () => {
   it("renders StatusBar content and InputBox prompt", () => {
-    const agent = createMockAgent();
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="anthropic/claude-sonnet-4"
-        hitlEnabled={true}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
-      />,
+      <App runtime={createMockRuntime({ modelName: "anthropic/claude-sonnet-4" })} />,
     );
     expect(output).toContain("anthropic/claude-sonnet-4");
     expect(output).toContain("❯");
   });
 
   it("renders StatusBar with session name", () => {
-    const agent = createMockAgent();
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="glm/glm-4"
-        sessionName="test-session"
-        hitlEnabled={false}
-        tokenUsage={{ input: 50, output: 100, total: 150 }}
+      <App runtime={createMockRuntime({
+        modelName: "glm/glm-4",
+        sessionName: "test-session",
+        tokenUsage: { input: 50, output: 100, total: 150 },
+      })}
       />,
     );
     expect(output).toContain("glm/glm-4");
@@ -183,14 +194,8 @@ describe("App component basic rendering", () => {
   });
 
   it("renders StatusIndicator as Ready when idle", () => {
-    const agent = createMockAgent();
     const output = renderToString(
-      <App
-        agent={agent}
-        modelName="test/model"
-        hitlEnabled={false}
-        tokenUsage={{ input: 0, output: 0, total: 0 }}
-      />,
+      <App runtime={createMockRuntime()} />,
     );
     expect(output).toContain("Ready");
     expect(output).toContain("Turn 0");
@@ -201,13 +206,13 @@ describe("useSuggestion + CommandPalette integration", () => {
   it("renders suggestion text via CommandPalette", () => {
     const output = renderToString(
       <CommandPalette
-        suggestions={["/help", "/history", "/hitl"]}
+        suggestions={["/help", "/history", "/agent"]}
         selectedIndex={0}
       />,
     );
     expect(output).toContain("/help");
     expect(output).toContain("/history");
-    expect(output).toContain("/hitl");
+    expect(output).toContain("/agent");
   });
 
   it("useSuggestion output feeds into CommandPalette", () => {
@@ -220,7 +225,7 @@ describe("useSuggestion + CommandPalette integration", () => {
     );
     expect(output).toContain("/help");
     expect(output).toContain("/history");
-    expect(output).toContain("/hitl");
+    expect(output).not.toContain("/hitl");
   });
 
   it("useSuggestion with selectedIndex feeds into CommandPalette", () => {
@@ -228,10 +233,9 @@ describe("useSuggestion + CommandPalette integration", () => {
     const output = renderToString(
       <CommandPalette
         suggestions={suggestions}
-        selectedIndex={1}
+        selectedIndex={0}
       />,
     );
-    expect(output).toContain("/compress");
     expect(output).toContain("/context");
   });
 
@@ -248,8 +252,8 @@ describe("useSuggestion + CommandPalette integration", () => {
     const firstOutput = renderToString(
       <CommandPalette suggestions={suggestions} selectedIndex={0} />,
     );
-    expect(firstOutput).toContain("/clear");
-    expect(firstOutput).toContain("/help");
+    expect(firstOutput).toContain("/agent");
+    expect(firstOutput).toContain("/auto");
     expect(firstOutput).not.toContain("/model");
 
     const scrolledOutput = renderToString(

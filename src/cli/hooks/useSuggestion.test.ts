@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import {
   applySuggestion,
   matchSuggestions,
@@ -16,29 +16,24 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("hello")).toEqual([]);
   });
 
-  it("matches /h → /help, /history, /hitl", () => {
+  it("matches /h to help and history", () => {
     const result = matchSuggestions("/h");
-    expect(result).toEqual(["/help", "/history", "/hitl"]);
+    expect(result).toEqual(["/help", "/history"]);
   });
 
-  it("matches /session → subcommands", () => {
-    const result = matchSuggestions("/session");
-    expect(result).toEqual(["new", "switch", "delete", "rename"]);
+  it("matches /agent to build and plan", () => {
+    const result = matchSuggestions("/agent");
+    expect(result).toEqual(["build", "plan"]);
   });
 
-  it("matches /session sw → switch", () => {
-    const result = matchSuggestions("/session sw");
-    expect(result).toEqual(["switch"]);
+  it("matches /agent pl to plan", () => {
+    const result = matchSuggestions("/agent pl");
+    expect(result).toEqual(["plan"]);
   });
 
-  it("matches /hitl o → on, off", () => {
-    const result = matchSuggestions("/hitl o");
-    expect(result).toEqual(["on", "off"]);
-  });
-
-  it("matches /hitl → on, off", () => {
-    const result = matchSuggestions("/hitl");
-    expect(result).toEqual(["on", "off"]);
+  it("hides exact /auto because it has no subcommands", () => {
+    const result = matchSuggestions("/auto");
+    expect(result).toEqual([]);
   });
 
   it("matches /model with modelPaths", () => {
@@ -47,7 +42,7 @@ describe("matchSuggestions", () => {
     expect(result).toEqual(["anthropic/claude", "anthropic/haiku"]);
   });
 
-  it("matches /model <empty> → all modelPaths", () => {
+  it("matches /model empty to all modelPaths", () => {
     const paths = ["anthropic/claude", "openai/gpt-4"];
     const result = matchSuggestions("/model ", paths);
     expect(result).toEqual(["anthropic/claude", "openai/gpt-4"]);
@@ -59,13 +54,13 @@ describe("matchSuggestions", () => {
     expect(result).toHaveLength(10);
   });
 
-  it("matches /q → /quit, /exit", () => {
+  it("matches /q to quit", () => {
     const result = matchSuggestions("/q");
     expect(result).toEqual(["/quit"]);
   });
 
   it("matches single exact command without subcommands", () => {
-    const result = matchSuggestions("/clear");
+    const result = matchSuggestions("/details");
     expect(result).toEqual([]);
   });
 
@@ -74,9 +69,9 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/tools")).toEqual([]);
   });
 
-  it("matches /co → /compress, /context", () => {
+  it("matches /co to context", () => {
     const result = matchSuggestions("/co");
-    expect(result).toEqual(["/compress", "/context"]);
+    expect(result).toEqual(["/context"]);
   });
 });
 
@@ -92,7 +87,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/h");
     });
-    expect(result.current.suggestions).toEqual(["/help", "/history", "/hitl"]);
+    expect(result.current.suggestions).toEqual(["/help", "/history"]);
     expect(result.current.selectedIndex).toBe(0);
   });
 
@@ -110,7 +105,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.selectNext();
     });
-    expect(result.current.selectedIndex).toBe(2);
+    expect(result.current.selectedIndex).toBe(0);
   });
 
   it("wraps around with selectNext", () => {
@@ -118,10 +113,9 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.updateInput("/h");
     });
-    expect(result.current.suggestions).toHaveLength(3);
+    expect(result.current.suggestions).toHaveLength(2);
 
     act(() => {
-      result.current.selectNext();
       result.current.selectNext();
       result.current.selectNext();
     });
@@ -137,7 +131,7 @@ describe("useSuggestion", () => {
     act(() => {
       result.current.selectPrev();
     });
-    expect(result.current.selectedIndex).toBe(2);
+    expect(result.current.selectedIndex).toBe(1);
   });
 
   it("resets selection on new input", () => {
@@ -161,7 +155,6 @@ describe("useSuggestion", () => {
     const { result } = renderHook(() => useSuggestion());
     act(() => {
       result.current.updateInput("/h");
-      result.current.selectNext();
       result.current.selectNext();
       result.current.resetSelection();
     });
@@ -195,16 +188,16 @@ describe("useSuggestion", () => {
     expect(result.current.applySelected("/he")).toBe("/help");
   });
 
-  it("applies selected subcommand completion", () => {
+  it("applies selected agent mode completion", () => {
     const { result } = renderHook(() => useSuggestion());
     act(() => {
-      result.current.updateInput("/session sw");
+      result.current.updateInput("/agent pl");
     });
-    expect(result.current.applySelected("/session sw")).toBe("/session switch ");
+    expect(result.current.applySelected("/agent pl")).toBe("/agent plan ");
   });
 
   it("does not apply when input is already complete", () => {
     expect(applySuggestion("/help", "/help")).toBe("/help");
-    expect(applySuggestion("/hitl on", "on")).toBe("/hitl on");
+    expect(applySuggestion("/agent plan", "plan")).toBe("/agent plan");
   });
 });
