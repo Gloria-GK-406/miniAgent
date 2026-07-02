@@ -37,6 +37,19 @@ describe("CLI package entry", () => {
     expect(excluded).not.toContain("src/cli");
   });
 
+  it("keeps compiled test artifacts out of the published dist", async () => {
+    const pkg = await readJson("package.json");
+    const scripts = pkg["scripts"] as Record<string, unknown>;
+    const tsconfig = await readJson("tsconfig.json");
+    const excluded = tsconfig["exclude"] as string[];
+
+    expect(excluded).toEqual(expect.arrayContaining([
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+    ]));
+    expect(scripts["prebuild"]).toBe("node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"");
+  });
+
   it("keeps the compiled CLI directly executable by Node package managers", async () => {
     const entry = await readFile("src/cli/index.tsx", "utf-8");
 
