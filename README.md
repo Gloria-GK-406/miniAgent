@@ -416,6 +416,23 @@ at `%APPDATA%/miniagent/config.json` on Windows or
 macOS/Linux. Project config overrides global config; arrays replace and objects
 are shallow-merged.
 
+The `miniagent` binary also supports headless workflows for setup, CI, scripts,
+and shell integration:
+
+| Command | Description |
+|---------|-------------|
+| `--init [--force]` | Create project CLI config |
+| `--config-paths [--json]` | Print project/global config paths |
+| `--show-config [--json]` | Print merged runtime config |
+| `--list-models [--json]` | List configured model selectors |
+| `--list-sessions [--json]` | List project sessions |
+| `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |
+| `--doctor [--json]` | Run setup checks |
+| `--diagnostics [--json]` | Run configured diagnostics |
+| `--export-session`, `--import-session` | Move session transcripts in and out |
+| `--delete-session`, `--rename-session`, `--fork-session` | Manage sessions without opening the TUI |
+| `--completion bash|zsh|fish|powershell` | Generate shell completions |
+
 ### CLI Commands
 
 | Command | Description |

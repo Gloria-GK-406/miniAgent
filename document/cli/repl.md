@@ -65,6 +65,42 @@ project file can override one setting without restating every global default.
 If neither file exists, the CLI keeps the first-run behavior and creates a
 project-local `.cliagent/config.json` template.
 
+## Headless Commands
+
+The same `miniagent` binary can run non-interactive commands for scripts,
+automation, CI, and installation flows. Headless commands accept `--cwd <path>`
+when they need to target a project directory. Commands marked with JSON support
+also accept `--json`.
+
+| Command | JSON | Description |
+|---------|------|-------------|
+| `--init [--force]` | Yes | Create `.cliagent/config.json` from the default project template |
+| `--config-paths` | Yes | Print the resolved project and global config file paths without creating files |
+| `--show-config` | Yes | Print the merged effective CLI config without creating missing config files |
+| `--list-models` | Yes | List configured model selectors and mark the default model |
+| `--list-sessions` | Yes | List project sessions and mark the active session |
+| `--export-session [id] --format json|markdown --output <path>` | Yes | Export a session transcript |
+| `--import-session <path> [--name <name>]` | Yes | Import a JSON session export as a new session |
+| `--delete-session <id>` | Yes | Delete a session; the last remaining session is protected |
+| `--rename-session <id> --name <name>` | Yes | Rename a session |
+| `--fork-session <id> [--name <name>]` | Yes | Copy a session into a new branch session |
+| `--diagnostics` | Yes | Run configured or discovered diagnostic commands |
+| `--doctor` | Yes | Run setup checks through the full runtime |
+| `--print <prompt>` | Yes | Run one prompt headlessly and print the final assistant response |
+| `--print --prompt-file <path>` | Yes | Read a headless prompt from a file |
+| `--completion bash|zsh|fish|powershell` | No | Print a shell completion script |
+
+Examples:
+
+```bash
+miniagent --init
+miniagent --list-models --json
+miniagent --print --prompt-file task.md --json
+miniagent --diagnostics
+miniagent --export-session --format markdown --output exports/session.md
+miniagent --completion powershell
+```
+
 ## Commands
 
 | Command | Description |
