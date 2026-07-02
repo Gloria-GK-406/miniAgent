@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 import type { Tool } from "../tool/types.js";
-import type { CLIAppRuntime } from "./runtime/types.js";
+import { CLIConfigSchema } from "./config.js";
+import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
 import {
   formatToolList,
   formatToolListJson,
@@ -28,6 +29,37 @@ const shellTool: Tool = {
   execute: async () => "ok",
 };
 
+function state(overrides: Partial<CLIState> = {}): CLIState {
+  return {
+    baseDir: process.cwd(),
+    config: CLIConfigSchema.parse({}),
+    mode: "build",
+    modelName: "openai/fast",
+    modelPaths: ["openai/fast"],
+    commandSuggestions: [],
+    referencePaths: [],
+    inputHistory: [],
+    sessionId: "s1",
+    sessionName: "default",
+    sessions: [],
+    autoApprove: false,
+    showReasoning: false,
+    showToolDetails: false,
+    isRunning: false,
+    currentTool: null,
+    messages: [],
+    streamingText: "",
+    reasoningText: "",
+    turnCount: 0,
+    tokenUsage: { input: 0, output: 0, total: 0 },
+    activity: [],
+    panel: { type: "none" },
+    approval: null,
+    error: null,
+    ...overrides,
+  };
+}
+
 describe("toToolListItem", () => {
   it("converts tool metadata to a serializable item", () => {
     expect(toToolListItem(readTool)).toMatchObject({
@@ -41,6 +73,19 @@ describe("toToolListItem", () => {
           },
         },
         required: ["path"],
+      },
+    });
+  });
+
+  it("includes permission metadata when provided", () => {
+    expect(toToolListItem(readTool, {
+      decision: "allow",
+      reason: "tool rule read",
+    })).toMatchObject({
+      name: "read",
+      permission: {
+        decision: "allow",
+        reason: "tool rule read",
       },
     });
   });
@@ -72,6 +117,7 @@ describe("formatToolListJson", () => {
 describe("runToolList", () => {
   it("prints the runtime tool list and destroys the runtime", async () => {
     const runtime = {
+      getState: vi.fn(() => state()),
       listTools: vi.fn(async () => [readTool]),
       destroy: vi.fn(async () => undefined),
     } as unknown as CLIAppRuntime;
@@ -80,13 +126,14 @@ describe("runToolList", () => {
 
     await expect(runToolList(runtime, { stdout, stderr })).resolves.toBe(0);
 
-    expect(stdout).toHaveBeenCalledWith("read - Read a workspace file\n");
+    expect(stdout).toHaveBeenCalledWith("ALLOW read - Read a workspace file (tool rule read)\n");
     expect(stderr).not.toHaveBeenCalled();
     expect(runtime.destroy).toHaveBeenCalled();
   });
 
   it("prints the runtime tool list as json", async () => {
     const runtime = {
+      getState: vi.fn(() => state()),
       listTools: vi.fn(async () => [readTool]),
       destroy: vi.fn(async () => undefined),
     } as unknown as CLIAppRuntime;
@@ -100,7 +147,39 @@ describe("runToolList", () => {
       output: "json",
     })).resolves.toBe(0);
 
-    expect(stdout).toHaveBeenCalledWith(formatToolListJson([toToolListItem(readTool)]));
+    expect(stdout).toHaveBeenCalledWith(formatToolListJson([
+      toToolListItem(readTool, { decision: "allow", reason: "tool rule read" }),
+    ]));
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
+  it("prints mode-aware permission state for headless tool lists", async () => {
+    const runtime = {
+      getState: vi.fn(() => state({
+        mode: "plan",
+        autoApprove: true,
+        config: CLIConfigSchema.parse({
+          permission: { "*": "allow" },
+        }),
+      })),
+      listTools: vi.fn(async () => [readTool, {
+        name: "write",
+        description: "Write a workspace file",
+        parameters: z.object({ path: z.string() }),
+        execute: async () => "ok",
+      } satisfies Tool]),
+      destroy: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runToolList(runtime, { stdout, stderr })).resolves.toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith([
+      "ALLOW read - Read a workspace file (global rule *)",
+      "ASK write - Write a workspace file (plan mode default write)",
+      "",
+    ].join("\n"));
     expect(stderr).not.toHaveBeenCalled();
   });
 });
