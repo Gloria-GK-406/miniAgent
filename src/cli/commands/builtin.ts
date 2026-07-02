@@ -112,6 +112,15 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "keybindings",
+    aliases: ["keys", "shortcuts"],
+    description: "Show keyboard shortcuts",
+    usage: "/keybindings",
+    execute: async (ctx) => {
+      ctx.updateState({ panel: { type: "keybindings" } });
+    },
+  });
+  registry.register({
     name: "status",
     aliases: ["st"],
     description: "Show runtime status",

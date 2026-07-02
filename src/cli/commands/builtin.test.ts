@@ -67,6 +67,7 @@ describe("registerBuiltinCommands", () => {
 
     expect(registry.list().map((command) => command.name)).toEqual(expect.arrayContaining([
       "help",
+      "keybindings",
       "status",
       "config",
       "commands",
@@ -128,6 +129,16 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/status");
 
     expect(commandCtx.getState().panel).toEqual({ type: "status" });
+  });
+
+  it("opens keybindings panel from alias", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/keys");
+
+    expect(commandCtx.getState().panel).toEqual({ type: "keybindings" });
   });
 
   it("opens references panel", async () => {

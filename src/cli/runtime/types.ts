@@ -18,6 +18,7 @@ export type CLIViewPanel =
   | { type: "none" }
   | { type: "status" }
   | { type: "help"; query?: string }
+  | { type: "keybindings" }
   | { type: "history"; messages: Message[] }
   | { type: "context"; messages: Message[] }
   | { type: "references"; references: string[] }

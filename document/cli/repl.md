@@ -171,6 +171,7 @@ miniagent --completion powershell
 | `/redo` | Reapply the last undone turn when possible |
 | `/help` | Show help |
 | `/commands [query]` | Show searchable slash command help |
+| `/keybindings` | Show keyboard shortcuts |
 | `/quit` | Exit |
 
 ## Keybindings
@@ -178,9 +179,11 @@ miniagent --completion powershell
 | Key | Action |
 |-----|--------|
 | `Tab` | Complete the active suggestion; otherwise switch between build and plan |
+| `Enter` | Submit the current prompt or confirm the active selection |
 | `Ctrl+C` | Stop a running agent; press twice while idle to exit |
 | `PgUp` / `PgDn` | Scroll the transcript |
 | `Esc` | Close the active panel or reject an approval prompt |
+| `a` / `d` | Allow or reject the same approval request for the current session |
 
 ## Built-In Tools
 

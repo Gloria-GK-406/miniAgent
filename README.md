@@ -488,6 +488,7 @@ and shell integration:
 | `/redo` | Reapply the last undone turn when possible |
 | `/help` | Show help |
 | `/commands [query]` | Show searchable slash command help |
+| `/keybindings` | Show keyboard shortcuts |
 | `/quit` | Exit |
 
 Keybindings: `Tab` completes the active suggestion or switches build/plan when

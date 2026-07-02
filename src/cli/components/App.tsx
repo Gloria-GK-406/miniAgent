@@ -181,6 +181,17 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
+const KEYBINDING_ROWS = [
+  ["Enter", "Submit prompt or confirm selection"],
+  ["Tab", "Complete suggestion or switch build/plan"],
+  ["Up / Down", "Navigate suggestions and input history"],
+  ["PgUp / PgDn", "Scroll the transcript"],
+  ["Home / End", "Jump transcript to oldest or latest"],
+  ["Esc", "Close panel or deny approval"],
+  ["Ctrl+C", "Stop running agent or arm exit"],
+  ["a / d", "Allow or deny approval for this session"],
+] as const;
+
 function defaultPermissionLabel(permission: CLIPermissionConfig): CLIPermissionDecision {
   const fallback = permission["*"];
   return fallback === "allow" || fallback === "deny" || fallback === "ask"
@@ -202,9 +213,9 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       </Text>
       {state.commandHelp.length === 0 ? (
         <>
-          <Text>/help /commands /status /config /history /context /references /tools</Text>
-          <Text>/models /sessions /activity /snapshots /permissions /system /agent build|plan /auto</Text>
-          <Text>/details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+          <Text>/help /commands /keybindings /status /config /history /context /references</Text>
+          <Text>/tools /models /sessions /activity /snapshots /permissions /system /agent build|plan</Text>
+          <Text>/auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
         <Text dimColor>{`No commands match "${query}"`}</Text>
@@ -222,6 +233,20 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       <Text dimColor>Tab build/plan | Ctrl+C stop/exit | PgUp/PgDn scroll</Text>
       {state.commandHelp.length === 0 && <Text dimColor>{state.commandSuggestions.join(" ")}</Text>}
       <Text dimColor>{state.mode} mode</Text>
+    </StaticPanelFrame>
+  );
+}
+
+function KeybindingsPanel({ runtime }: { runtime: CLIAppRuntime }) {
+  return (
+    <StaticPanelFrame onClose={() => closePanel(runtime)}>
+      <Text bold color="cyan">Keybindings</Text>
+      {KEYBINDING_ROWS.map(([key, action]) => (
+        <Text key={key}>
+          <Text color="cyan">{key}</Text>
+          <Text> - {action}</Text>
+        </Text>
+      ))}
     </StaticPanelFrame>
   );
 }
@@ -682,6 +707,10 @@ export function App({ runtime }: AppProps) {
 
   if (state.panel.type === "help") {
     return <HelpPanel runtime={runtime} />;
+  }
+
+  if (state.panel.type === "keybindings") {
+    return <KeybindingsPanel runtime={runtime} />;
   }
 
   if (state.panel.type === "status") {

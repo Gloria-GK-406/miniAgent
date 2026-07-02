@@ -19,6 +19,7 @@ const COMMANDS = [
   "/history",
   "/import",
   "/init",
+  "/keybindings",
   "/model",
   "/models",
   "/new",

@@ -373,6 +373,18 @@ describe("App", () => {
     expect(output).toContain(STATIC_PANEL_CLOSE_TEXT);
   });
 
+  it("renders keybindings panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({ panel: { type: "keybindings" } })} />,
+    );
+
+    expect(output).toContain("Keybindings");
+    expect(output).toContain("Enter");
+    expect(output).toContain("Tab");
+    expect(output).toContain("Ctrl+C");
+    expect(output).toContain("a / d");
+  });
+
   it("renders focused approval prompt instead of normal input when approval is pending", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

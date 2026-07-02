@@ -123,6 +123,7 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/redo` | 在可行时重新应用上一次撤销的 turn |
 | `/help` | 显示帮助 |
 | `/commands [query]` | 显示可搜索的 slash command 帮助 |
+| `/keybindings` | 显示键盘快捷键 |
 | `/quit` | 退出 |
 
 ## 快捷键
@@ -130,9 +131,11 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | 按键 | 动作 |
 |------|------|
 | `Tab` | 完成当前建议；没有建议时在 build/plan 之间切换 |
+| `Enter` | 提交当前提示或确认当前选择 |
 | `Ctrl+C` | 运行中停止 Agent；空闲时按两次退出 |
 | `PgUp` / `PgDn` | 滚动对话 transcript |
 | `Esc` | 关闭当前面板或拒绝审批 |
+| `a` / `d` | 在当前会话中允许或拒绝同一个审批请求 |
 
 ## 内置工具
 

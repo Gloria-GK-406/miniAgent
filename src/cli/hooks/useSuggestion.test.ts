@@ -153,6 +153,11 @@ describe("matchSuggestions", () => {
     expect(result).toEqual(["/commands"]);
   });
 
+  it("matches /ke to keybindings", () => {
+    const result = matchSuggestions("/ke");
+    expect(result).toEqual(["/keybindings"]);
+  });
+
   it("matches /ref to references", () => {
     const result = matchSuggestions("/ref");
     expect(result).toEqual(["/references"]);
