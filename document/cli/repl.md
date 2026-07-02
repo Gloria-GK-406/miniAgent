@@ -75,6 +75,7 @@ also accept `--json`.
 | Command | JSON | Description |
 |---------|------|-------------|
 | `--init [--force]` | Yes | Create `.cliagent/config.json` from the default project template |
+| `--init-instructions [--force]` | Yes | Create `AGENTS.md` project guidance from detected project metadata |
 | `--config-paths` | Yes | Print the resolved project and global config file paths without creating files |
 | `--show-config` | Yes | Print the merged effective CLI config without creating missing config files |
 | `--list-models` | Yes | List configured model selectors and mark the default model |
@@ -101,6 +102,7 @@ Examples:
 
 ```bash
 miniagent --init
+miniagent --init-instructions
 miniagent --list-models --json
 miniagent --list-commands --json
 miniagent --list-tools --agent plan --json

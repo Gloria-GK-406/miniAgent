@@ -11,6 +11,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--list-tools");
     expect(script).toContain("--set-permission");
     expect(script).toContain("--set-system-prompt");
+    expect(script).toContain("--init-instructions");
     expect(script).toContain("--completion");
     expect(script.endsWith("\n")).toBe(true);
   });

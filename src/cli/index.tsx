@@ -16,6 +16,7 @@ import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
 import { runPermissionUpdate } from "./permission-runner.js";
 import { runPrintPrompt } from "./print-runner.js";
+import { runProjectInstructionsInit } from "./project-instructions-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { runSessionDelete } from "./session-delete-runner.js";
@@ -75,6 +76,17 @@ async function main(): Promise<void> {
   }
   if (action.type === "init") {
     process.exitCode = await runInitConfig({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.force === true && { force: true }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "init-instructions") {
+    process.exitCode = await runProjectInstructionsInit({
       baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.force === true && { force: true }),
       ...(action.output !== undefined && { output: action.output }),

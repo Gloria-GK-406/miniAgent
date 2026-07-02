@@ -422,6 +422,7 @@ and shell integration:
 | Command | Description |
 |---------|-------------|
 | `--init [--force]` | Create project CLI config |
+| `--init-instructions [--force]` | Create AGENTS.md project guidance |
 | `--config-paths [--json]` | Print project/global config paths |
 | `--show-config [--json]` | Print merged runtime config |
 | `--list-models [--json]` | List configured model selectors |

@@ -341,6 +341,18 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("initializes project instructions without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--init-instructions"])).toEqual({
+      type: "init-instructions",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--init-instructions", "--force", "--json"])).toEqual({
+      type: "init-instructions",
+      cwd: "C:/repo",
+      force: true,
+      output: "json",
+    });
+  });
+
   it("updates permissions without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--set-permission", "write", "deny"])).toEqual({
       type: "permission-update",
@@ -648,9 +660,13 @@ describe("CLI entry args", () => {
       type: "error",
       message: "Unexpected prompt for --init",
     });
+    expect(parseCLIEntryArgs(["--init-instructions", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --init-instructions",
+    });
     expect(parseCLIEntryArgs(["--force"])).toEqual({
       type: "error",
-      message: "Cannot use --force without --init",
+      message: "Cannot use --force without --init or --init-instructions",
     });
   });
 
@@ -699,7 +715,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -727,6 +743,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--config-paths");
     expect(help).toContain("--show-config");
     expect(help).toContain("--init");
+    expect(help).toContain("--init-instructions");
     expect(help).toContain("--force");
     expect(help).toContain("--set-permission");
     expect(help).toContain("--unset-permission");

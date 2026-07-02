@@ -79,6 +79,7 @@ export type CLIEntryAction =
   | { type: "config-paths"; cwd?: string; output?: CLIEntryOutput }
   | { type: "show-config"; cwd?: string; output?: CLIEntryOutput }
   | { type: "init"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
+  | { type: "init-instructions"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
   | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-commands"; cwd?: string; output?: CLIEntryOutput }
   | {
@@ -139,6 +140,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let configPathsMode = false;
   let showConfigMode = false;
   let initMode = false;
+  let initInstructionsMode = false;
   let force = false;
   let completionShell: CLIEntryCompletionShell | undefined;
   let exportFormat: CLIEntryExportFormat | undefined;
@@ -179,6 +181,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--init") {
       initMode = true;
+      continue;
+    }
+    if (arg === "--init-instructions") {
+      initInstructionsMode = true;
       continue;
     }
     if (arg === "--list-sessions") {
@@ -423,8 +429,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (promptFile !== undefined && prompt.length > 0) {
     return { type: "error", message: "Cannot combine --prompt-file with a positional prompt" };
   }
-  if (force && !initMode) {
-    return { type: "error", message: "Cannot use --force without --init" };
+  if (force && !initMode && !initInstructionsMode) {
+    return { type: "error", message: "Cannot use --force without --init or --init-instructions" };
   }
   if (systemPrompt !== undefined && systemPromptFile !== undefined) {
     return { type: "error", message: "Cannot combine --set-system-prompt with --system-prompt-file" };
@@ -444,6 +450,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || configPathsMode
       || showConfigMode
       || initMode
+      || initInstructionsMode
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
@@ -477,6 +484,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || renameSessionMode
       || forkSessionMode
       || initMode
+      || initInstructionsMode
     )
   ) {
     return { type: "error", message: "Cannot combine --config-paths with another headless mode" };
@@ -500,6 +508,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || renameSessionMode
       || forkSessionMode
       || initMode
+      || initInstructionsMode
     )
   ) {
     return { type: "error", message: "Cannot combine --show-config with another headless mode" };
@@ -512,6 +521,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || diagnosticsMode
       || configPathsMode
       || showConfigMode
+      || initInstructionsMode
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
@@ -526,6 +536,30 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     )
   ) {
     return { type: "error", message: "Cannot combine --init with another headless mode" };
+  }
+  if (
+    initInstructionsMode
+    && (
+      printMode
+      || doctorMode
+      || diagnosticsMode
+      || configPathsMode
+      || showConfigMode
+      || initMode
+      || listSessionsMode
+      || listModelsMode
+      || listCommandsMode
+      || listToolsMode
+      || permissionAction !== undefined
+      || systemPromptAction !== undefined
+      || exportSessionMode
+      || importSessionMode
+      || deleteSessionMode
+      || renameSessionMode
+      || forkSessionMode
+    )
+  ) {
+    return { type: "error", message: "Cannot combine --init-instructions with another headless mode" };
   }
   if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
@@ -604,6 +638,17 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     return {
       type: "init",
+      ...(cwd !== undefined && { cwd }),
+      ...(force && { force: true }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (initInstructionsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --init-instructions" };
+    }
+    return {
+      type: "init-instructions",
       ...(cwd !== undefined && { cwd }),
       ...(force && { force: true }),
       ...(output !== undefined && { output }),
@@ -792,7 +837,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -843,6 +888,7 @@ export function formatCLIHelp(): string {
     "  --config-paths  Print resolved config file paths",
     "  --show-config   Print merged runtime config",
     "  --init          Create a project config template",
+    "  --init-instructions Create AGENTS.md project guidance",
     "  --force         Overwrite existing files for supported commands",
     "  --set-permission Set a project permission rule",
     "  --unset-permission Unset a project permission rule",

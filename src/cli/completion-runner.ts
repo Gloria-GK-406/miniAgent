@@ -27,6 +27,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--model", short: "-m", description: "Select a configured model" },
   { long: "--doctor", description: "Run setup checks headlessly" },
   { long: "--diagnostics", description: "Run configured diagnostics headlessly" },
+  { long: "--init-instructions", description: "Create AGENTS.md project guidance" },
   { long: "--json", description: "Emit JSON for supported headless modes" },
   { long: "--set-permission", description: "Set a project permission rule" },
   { long: "--unset-permission", description: "Unset a project permission rule" },
