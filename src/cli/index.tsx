@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { render } from "ink";
 import { App } from "./components/App.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
+import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   if (action.type === "print") {
     try {
       const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+      await applyCLIEntryRuntimeOptions(runtime, action);
       process.exitCode = await runPrintPrompt(runtime, action.prompt, {
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
@@ -53,6 +55,7 @@ async function main(): Promise<void> {
 
   try {
     const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+    await applyCLIEntryRuntimeOptions(runtime, action);
     render(<App runtime={runtime} />, { exitOnCtrlC: false });
     if (action.prompt !== undefined) {
       void runtime.submitInput(action.prompt);

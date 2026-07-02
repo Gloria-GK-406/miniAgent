@@ -1,12 +1,13 @@
 export type CLIEntryAction =
-  | { type: "tui"; cwd?: string; prompt?: string }
-  | { type: "print"; cwd?: string; prompt: string }
+  | { type: "tui"; cwd?: string; model?: string; prompt?: string }
+  | { type: "print"; cwd?: string; model?: string; prompt: string }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
 
 export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let cwd: string | undefined;
+  let model: string | undefined;
   let printMode = false;
   const promptParts: string[] = [];
 
@@ -31,6 +32,15 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       index++;
       continue;
     }
+    if (arg === "--model" || arg === "-m") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing selector after --model" };
+      }
+      model = next;
+      index++;
+      continue;
+    }
     if (arg.startsWith("-")) {
       return { type: "error", message: `Unknown argument: ${arg}` };
     }
@@ -46,6 +56,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     return {
       type: "print",
       ...(cwd !== undefined && { cwd }),
+      ...(model !== undefined && { model }),
       prompt,
     };
   }
@@ -53,6 +64,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   return {
     type: "tui",
     ...(cwd !== undefined && { cwd }),
+    ...(model !== undefined && { model }),
     ...(prompt.length > 0 && { prompt }),
   };
 }
@@ -68,6 +80,7 @@ export function formatCLIHelp(): string {
     "",
     "Options:",
     "  --cwd <path>    Open the TUI for a specific project directory",
+    "  -m, --model     Select a configured model by id or provider/id",
     "  -p, --print     Run one prompt headlessly and print the final response",
     "  -h, --help      Show this help text",
     "  -v, --version   Show package version",

@@ -13,6 +13,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("opens the TUI with an explicit model", () => {
+    expect(parseCLIEntryArgs(["--model", "openai/fast"])).toEqual({
+      type: "tui",
+      model: "openai/fast",
+    });
+    expect(parseCLIEntryArgs(["-m", "openai/fast"])).toEqual({
+      type: "tui",
+      model: "openai/fast",
+    });
+  });
+
   it("opens the TUI with an initial prompt", () => {
     expect(parseCLIEntryArgs(["explain", "the", "repo"])).toEqual({
       type: "tui",
@@ -21,9 +32,10 @@ describe("CLI entry args", () => {
   });
 
   it("opens an explicit working directory with an initial prompt", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--model", "openai/fast", "fix", "tests"])).toEqual({
       type: "tui",
       cwd: "C:/repo",
+      model: "openai/fast",
       prompt: "fix tests",
     });
   });
@@ -40,9 +52,10 @@ describe("CLI entry args", () => {
   });
 
   it("prints from an explicit working directory", () => {
-    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--print", "fix", "tests"])).toEqual({
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--model", "openai/fast", "--print", "fix", "tests"])).toEqual({
       type: "print",
       cwd: "C:/repo",
+      model: "openai/fast",
       prompt: "fix tests",
     });
   });
@@ -71,6 +84,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects model without a selector before starting the TUI", () => {
+    expect(parseCLIEntryArgs(["--model"])).toEqual({
+      type: "error",
+      message: "Missing selector after --model",
+    });
+  });
+
   it("rejects print mode without a prompt", () => {
     expect(parseCLIEntryArgs(["--print"])).toEqual({
       type: "error",
@@ -83,6 +103,7 @@ describe("CLI entry args", () => {
 
     expect(help).toContain("Usage: miniagent");
     expect(help).toContain("--cwd");
+    expect(help).toContain("--model");
     expect(help).toContain("--print");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");
