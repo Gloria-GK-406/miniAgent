@@ -976,6 +976,46 @@ describe("App", () => {
     expect(output).toContain("ASK shell");
   });
 
+  it("renders filtered tools panel from runtime state", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "tools",
+          query: "shell",
+          tools: [
+            {
+              name: "shell",
+              description: "Run shell commands",
+              parameters: z.object({}),
+              execute: vi.fn(async () => ""),
+            },
+          ],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Tools matching "shell" (1)');
+    expect(output).toContain("shell");
+    expect(output).toContain("Run shell commands");
+  });
+
+  it("renders empty filtered tools panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        panel: {
+          type: "tools",
+          query: "deploy",
+          tools: [],
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain('Tools matching "deploy" (0)');
+    expect(output).toContain("No tools found");
+  });
+
   it("renders plan-mode permission guards in the tools panel", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({

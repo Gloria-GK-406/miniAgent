@@ -426,7 +426,7 @@ npm run chat
 | `/models` | 打开模型选择器 |
 | `/model <id\|provider/id>` | 按解析后的模型 ID 切换活动模型 |
 | `/new [name]` | 创建并切换到新会话 |
-| `/tools` | 列出已注册的工具 |
+| `/tools [query]` | 列出或搜索已注册的工具 |
 | `/history` | 查看对话历史 |
 | `/input-history [query]` | 查看已提交 prompt 历史 |
 | `/context` | 预览发送给 LLM 的上下文 |

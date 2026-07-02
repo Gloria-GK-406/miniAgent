@@ -325,22 +325,30 @@ function ToolsPanel({
 
   return (
     <StaticPanelFrame onClose={() => closePanel(runtime)}>
-      <Text bold color="cyan">Tools ({panel.tools.length})</Text>
-      {panel.tools.map((tool) => {
-        const result = permissionService.resolve({
-          toolName: tool.name,
-          args: {},
-        }, state.autoApprove);
-        return (
-          <Text key={tool.name}>
-            <Text color={decisionColor(result.decision)}>{result.decision.toUpperCase()}</Text>
-            <Text> </Text>
-            <Text color="cyan">{tool.name}</Text>
-            <Text dimColor> {tool.description}</Text>
-            <Text dimColor> ({result.reason})</Text>
-          </Text>
-        );
-      })}
+      <Text bold color="cyan">
+        {panel.query === undefined
+          ? `Tools (${panel.tools.length})`
+          : `Tools matching "${panel.query}" (${panel.tools.length})`}
+      </Text>
+      {panel.tools.length === 0 ? (
+        <Text dimColor>No tools found</Text>
+      ) : (
+        panel.tools.map((tool) => {
+          const result = permissionService.resolve({
+            toolName: tool.name,
+            args: {},
+          }, state.autoApprove);
+          return (
+            <Text key={tool.name}>
+              <Text color={decisionColor(result.decision)}>{result.decision.toUpperCase()}</Text>
+              <Text> </Text>
+              <Text color="cyan">{tool.name}</Text>
+              <Text dimColor> {tool.description}</Text>
+              <Text dimColor> ({result.reason})</Text>
+            </Text>
+          );
+        })
+      )}
     </StaticPanelFrame>
   );
 }

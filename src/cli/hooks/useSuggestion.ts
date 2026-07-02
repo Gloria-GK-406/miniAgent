@@ -73,6 +73,7 @@ const COMMANDS_WITH_ARGS = new Set([
   "/sessions",
   "/find",
   "/system",
+  "/tools",
 ]);
 
 export function matchSuggestions(

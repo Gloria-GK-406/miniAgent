@@ -1,8 +1,9 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext, CLIInputHistoryPanelEntry } from "../runtime/types.js";
-import type { CLIPermissionDecision } from "../config.js";
+import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 import type { SessionMeta } from "../../core/session.js";
 import { MessageType, type Message, type MessageContent, type ToolCallMessage } from "../../core/types.js";
+import type { Tool } from "../../tool/types.js";
 import { formatConfigForDisplay } from "../config-display.js";
 import { formatConfigPaths, resolveConfigPaths } from "../config-paths-runner.js";
 import { readPackageVersion } from "../package-info.js";
@@ -10,6 +11,7 @@ import {
   buildEffectiveSystemPrompt,
   getBaseSystemPrompt,
 } from "../runtime/system-prompt.js";
+import { createModeAwarePermissionService, createPermissionService } from "../runtime/permission-service.js";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -111,6 +113,26 @@ function showInputHistoryPanel(ctx: CLICommandContext, args: string): void {
       ? { type: "input-history", entries }
       : { type: "input-history", query, entries },
   });
+}
+
+function filterTools(ctx: CLICommandContext, tools: Tool[], query: string): Tool[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return tools;
+  }
+  const state = ctx.getState();
+  const permission = state.config.permission ?? ({ "*": "ask" } satisfies CLIPermissionConfig);
+  const permissionService = createModeAwarePermissionService({
+    base: createPermissionService(permission),
+    getMode: () => state.mode,
+  });
+  return tools.filter((tool) =>
+    tool.name.toLowerCase().includes(normalized) ||
+    tool.description.toLowerCase().includes(normalized) ||
+    permissionService.resolve({
+      toolName: tool.name,
+      args: {},
+    }, state.autoApprove).decision.includes(normalized));
 }
 
 function parsePermissionDecision(value: string | undefined): CLIPermissionDecision | null {
@@ -362,9 +384,15 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
   registry.register({
     name: "tools",
     description: "List tools",
-    usage: "/tools",
-    execute: async (ctx) => {
-      ctx.updateState({ panel: { type: "tools", tools: await ctx.agent.getToolList() } });
+    usage: "/tools [query]",
+    execute: async (ctx, args) => {
+      const query = args.trim();
+      const tools = filterTools(ctx, await ctx.agent.getToolList(), query);
+      ctx.updateState({
+        panel: query.length === 0
+          ? { type: "tools", tools }
+          : { type: "tools", query, tools },
+      });
     },
   });
   registry.register({

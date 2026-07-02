@@ -361,6 +361,78 @@ describe("registerBuiltinCommands", () => {
     });
   });
 
+  it("opens a filtered tools panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    const tools = [
+      {
+        name: "read",
+        description: "Read files",
+        parameters: {} as never,
+        execute: vi.fn(async () => ""),
+      },
+      {
+        name: "shell",
+        description: "Run shell commands",
+        parameters: {} as never,
+        execute: vi.fn(async () => ""),
+      },
+      {
+        name: "write",
+        description: "Write files",
+        parameters: {} as never,
+        execute: vi.fn(async () => ""),
+      },
+    ];
+    commandCtx.agent.getToolList = vi.fn(async () => tools);
+
+    await registry.execute(commandCtx, "/tools shell");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "tools",
+      query: "shell",
+      tools: [tools[1]],
+    });
+  });
+
+  it("filters tools by resolved permission decision", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+    const tools = [
+      {
+        name: "read",
+        description: "Read files",
+        parameters: {} as never,
+        execute: vi.fn(async () => ""),
+      },
+      {
+        name: "write",
+        description: "Write files",
+        parameters: {} as never,
+        execute: vi.fn(async () => ""),
+      },
+    ];
+    commandCtx.agent.getToolList = vi.fn(async () => tools);
+    commandCtx.updateState({
+      config: CLIConfigSchema.parse({
+        permission: {
+          "*": "ask",
+          read: "allow",
+        },
+      }),
+    });
+
+    await registry.execute(commandCtx, "/tools allow");
+
+    expect(commandCtx.getState().panel).toEqual({
+      type: "tools",
+      query: "allow",
+      tools: [tools[0]],
+    });
+  });
+
   it("requests quit through the runtime without exiting directly", async () => {
     const registry = createCommandRegistry();
     registerBuiltinCommands(registry);

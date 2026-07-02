@@ -28,7 +28,7 @@ export type CLIViewPanel =
   | { type: "models" }
   | { type: "sessions"; sessions: SessionMeta[]; query?: string }
   | { type: "agents"; mode: CLIAgentMode; subagents: CLISubagentSummary[] }
-  | { type: "tools"; tools: Tool[] }
+  | { type: "tools"; tools: Tool[]; query?: string }
   | { type: "permissions"; permission: CLIConfig["permission"]; autoApprove: boolean }
   | { type: "system"; basePrompt: string; effectivePrompt: string }
   | { type: "config"; title: string; content: string }

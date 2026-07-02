@@ -476,7 +476,7 @@ and shell integration:
 | `/permissions` | Show the active allow/ask/deny policy |
 | `/system` | Show the base and effective system prompt |
 | `/new [name]` | Create and switch to a new session |
-| `/tools` | List registered tools |
+| `/tools [query]` | List or search registered tools |
 | `/history` | View conversation history |
 | `/input-history [query]` | Show submitted prompt history |
 | `/context` | Preview context sent to LLM |

@@ -365,6 +365,10 @@ describe("useSuggestion", () => {
     expect(applySuggestion("/fi", "/find")).toBe("/find ");
   });
 
+  it("adds a trailing space for tools query completion", () => {
+    expect(applySuggestion("/too", "/tools")).toBe("/tools ");
+  });
+
   it("adds a trailing space for input history completion", () => {
     expect(applySuggestion("/input-h", "/input-history")).toBe("/input-history ");
     expect(applySuggestion("/prom", "/prompts")).toBe("/prompts ");
