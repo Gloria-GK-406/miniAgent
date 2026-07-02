@@ -357,7 +357,7 @@ describe("App", () => {
       <App runtime={createMockRuntime({ panel: { type: "help" } })} />,
     );
 
-    expect(output).toContain("Tab build/plan");
+    expect(output).toContain("Tab build/plan | Ctrl+C stop/exit | PgUp/PgDn scroll");
   });
 
   it("exports Ctrl+C confirmation text for the idle exit prompt", () => {

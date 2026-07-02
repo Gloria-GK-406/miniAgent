@@ -299,7 +299,22 @@ describe("useSuggestion + CommandPalette integration", () => {
     );
     expect(scrolledOutput).toContain("/model");
     expect(scrolledOutput).toContain("/models");
-    expect(scrolledOutput).toContain("more");
+    expect(scrolledOutput).toContain("up more");
+    expect(scrolledOutput).toContain("down more");
+    expect(scrolledOutput).not.toContain("↑");
+    expect(scrolledOutput).not.toContain("↓");
+  });
+
+  it("uses ASCII markers for the selected suggestion", () => {
+    const output = renderToString(
+      <CommandPalette
+        suggestions={["/help", "/history"]}
+        selectedIndex={0}
+      />,
+    );
+
+    expect(output).toContain("> /help");
+    expect(output).not.toContain("›");
   });
 });
 

@@ -219,7 +219,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
           </Box>
         ))
       )}
-      <Text dimColor>Tab build/plan · Ctrl+C stop/exit · PgUp/PgDn scroll</Text>
+      <Text dimColor>Tab build/plan | Ctrl+C stop/exit | PgUp/PgDn scroll</Text>
       {state.commandHelp.length === 0 && <Text dimColor>{state.commandSuggestions.join(" ")}</Text>}
       <Text dimColor>{state.mode} mode</Text>
     </StaticPanelFrame>

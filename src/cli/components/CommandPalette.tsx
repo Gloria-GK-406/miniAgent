@@ -29,7 +29,7 @@ export function CommandPalette({
       marginBottom={1}
       paddingX={1}
     >
-      {startIndex > 0 && <Text dimColor>  ↑ more</Text>}
+      {startIndex > 0 && <Text dimColor>  up more</Text>}
       {visibleSuggestions.map((suggestion, index) => {
         const absoluteIndex = startIndex + index;
 
@@ -40,12 +40,12 @@ export function CommandPalette({
             inverse={absoluteIndex === selectedIndex}
             dimColor={absoluteIndex !== selectedIndex}
           >
-            {absoluteIndex === selectedIndex ? "› " : "  "}
+            {absoluteIndex === selectedIndex ? "> " : "  "}
             {suggestion}
           </Text>
         );
       })}
-      {endIndex < suggestions.length && <Text dimColor>  ↓ more</Text>}
+      {endIndex < suggestions.length && <Text dimColor>  down more</Text>}
     </Box>
   );
 }
