@@ -430,6 +430,8 @@ and shell integration:
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |
 | `--doctor [--json]` | Run setup checks |
 | `--diagnostics [--json]` | Run configured diagnostics |
+| `--set-permission <target> <allow|ask|deny>` | Persist a project permission rule |
+| `--unset-permission <target>` | Remove a project permission rule |
 | `--export-session`, `--import-session` | Move session transcripts in and out |
 | `--delete-session`, `--rename-session`, `--fork-session` | Manage sessions without opening the TUI |
 | `--completion bash|zsh|fish|powershell` | Generate shell completions |

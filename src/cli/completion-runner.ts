@@ -27,6 +27,8 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--doctor", description: "Run setup checks headlessly" },
   { long: "--diagnostics", description: "Run configured diagnostics headlessly" },
   { long: "--json", description: "Emit JSON for supported headless modes" },
+  { long: "--set-permission", description: "Set a project permission rule" },
+  { long: "--unset-permission", description: "Unset a project permission rule" },
   { long: "--print", short: "-p", description: "Run one prompt headlessly" },
   { long: "--prompt-file", description: "Read the initial prompt from a file" },
   { long: "--completion", description: "Generate shell completions", values: ["bash", "zsh", "fish", "powershell"] },

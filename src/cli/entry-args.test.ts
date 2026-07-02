@@ -319,6 +319,29 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("updates permissions without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--set-permission", "write", "deny"])).toEqual({
+      type: "permission-update",
+      action: "set",
+      target: "write",
+      decision: "deny",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--set-permission", "shell:npm *", "allow", "--json"])).toEqual({
+      type: "permission-update",
+      action: "set",
+      cwd: "C:/repo",
+      target: "shell:npm *",
+      decision: "allow",
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--unset-permission", "write", "--json"])).toEqual({
+      type: "permission-update",
+      action: "unset",
+      target: "write",
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -589,10 +612,33 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed permission update options", () => {
+    expect(parseCLIEntryArgs(["--set-permission"])).toEqual({
+      type: "error",
+      message: "Missing target after --set-permission",
+    });
+    expect(parseCLIEntryArgs(["--set-permission", "write"])).toEqual({
+      type: "error",
+      message: "Missing decision after --set-permission",
+    });
+    expect(parseCLIEntryArgs(["--set-permission", "write", "sometimes"])).toEqual({
+      type: "error",
+      message: "Invalid permission decision: sometimes",
+    });
+    expect(parseCLIEntryArgs(["--unset-permission"])).toEqual({
+      type: "error",
+      message: "Missing target after --unset-permission",
+    });
+    expect(parseCLIEntryArgs(["--unset-permission", "write", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --unset-permission",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -620,6 +666,8 @@ describe("CLI entry args", () => {
     expect(help).toContain("--show-config");
     expect(help).toContain("--init");
     expect(help).toContain("--force");
+    expect(help).toContain("--set-permission");
+    expect(help).toContain("--unset-permission");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");

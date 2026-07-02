@@ -14,6 +14,7 @@ import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runInitConfig } from "./init-runner.js";
 import { runModelList } from "./model-list-runner.js";
+import { runPermissionUpdate } from "./permission-runner.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
@@ -74,6 +75,19 @@ async function main(): Promise<void> {
     process.exitCode = await runInitConfig({
       baseDir: resolve(action.cwd ?? process.cwd()),
       ...(action.force === true && { force: true }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
+    return;
+  }
+  if (action.type === "permission-update") {
+    process.exitCode = await runPermissionUpdate({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      action: action.action,
+      target: action.target,
+      ...(action.decision !== undefined && { decision: action.decision }),
       ...(action.output !== undefined && { output: action.output }),
     }, {
       stdout: (text) => process.stdout.write(text),

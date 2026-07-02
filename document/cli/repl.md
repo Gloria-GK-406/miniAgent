@@ -86,6 +86,8 @@ also accept `--json`.
 | `--rename-session <id> --name <name>` | Yes | Rename a session |
 | `--fork-session <id> [--name <name>]` | Yes | Copy a session into a new branch session |
 | `--diagnostics` | Yes | Run configured or discovered diagnostic commands |
+| `--set-permission <target> <allow|ask|deny>` | Yes | Persist a project permission rule such as `write` or `shell:npm *` |
+| `--unset-permission <target>` | Yes | Remove a project permission rule |
 | `--doctor` | Yes | Run setup checks through the full runtime |
 | `--print <prompt>` | Yes | Run one prompt headlessly and print the final assistant response |
 | `--print --prompt-file <path>` | Yes | Read a headless prompt from a file |
@@ -97,6 +99,7 @@ Examples:
 miniagent --init
 miniagent --list-models --json
 miniagent --list-commands --json
+miniagent --set-permission "shell:npm *" allow
 miniagent --print --prompt-file task.md --json
 miniagent --diagnostics
 miniagent --export-session --format markdown --output exports/session.md

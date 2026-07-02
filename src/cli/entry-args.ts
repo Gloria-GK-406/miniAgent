@@ -2,6 +2,7 @@ export type CLIEntryAgentMode = "build" | "plan";
 export type CLIEntryOutput = "text" | "json";
 export type CLIEntryExportFormat = "json" | "markdown";
 export type CLIEntryCompletionShell = "bash" | "zsh" | "fish" | "powershell";
+export type CLIEntryPermissionDecision = "allow" | "ask" | "deny";
 
 export type CLIEntryAction =
   | {
@@ -80,6 +81,14 @@ export type CLIEntryAction =
   | { type: "init"; cwd?: string; force?: boolean; output?: CLIEntryOutput }
   | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-commands"; cwd?: string; output?: CLIEntryOutput }
+  | {
+    type: "permission-update";
+    action: "set" | "unset";
+    cwd?: string;
+    target: string;
+    decision?: CLIEntryPermissionDecision;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -97,6 +106,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let listSessionsMode = false;
   let listModelsMode = false;
   let listCommandsMode = false;
+  let permissionAction: "set" | "unset" | undefined;
+  let permissionTarget: string | undefined;
+  let permissionDecision: CLIEntryPermissionDecision | undefined;
   let exportSessionMode = false;
   let importSessionMode = false;
   let deleteSessionMode = false;
@@ -157,6 +169,34 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-commands") {
       listCommandsMode = true;
+      continue;
+    }
+    if (arg === "--set-permission") {
+      const target = args[index + 1];
+      if (target === undefined || target.trim().length === 0 || target.startsWith("-")) {
+        return { type: "error", message: "Missing target after --set-permission" };
+      }
+      const decision = args[index + 2];
+      if (decision === undefined || decision.trim().length === 0 || decision.startsWith("-")) {
+        return { type: "error", message: "Missing decision after --set-permission" };
+      }
+      if (decision !== "allow" && decision !== "ask" && decision !== "deny") {
+        return { type: "error", message: `Invalid permission decision: ${decision}` };
+      }
+      permissionAction = "set";
+      permissionTarget = target;
+      permissionDecision = decision;
+      index += 2;
+      continue;
+    }
+    if (arg === "--unset-permission") {
+      const target = args[index + 1];
+      if (target === undefined || target.trim().length === 0 || target.startsWith("-")) {
+        return { type: "error", message: "Missing target after --unset-permission" };
+      }
+      permissionAction = "unset";
+      permissionTarget = target;
+      index++;
       continue;
     }
     if (arg === "--export-session") {
@@ -354,6 +394,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || permissionAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -372,6 +413,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || permissionAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -392,6 +434,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || permissionAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -413,6 +456,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || permissionAction !== undefined
       || exportSessionMode
       || importSessionMode
       || deleteSessionMode
@@ -448,6 +492,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-commands with another headless mode" };
+  }
+  if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    return { type: "error", message: `Cannot combine --${permissionAction}-permission with another headless mode` };
   }
   if (completionShell !== undefined) {
     if (output !== undefined) {
@@ -489,6 +536,19 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       type: "init",
       ...(cwd !== undefined && { cwd }),
       ...(force && { force: true }),
+      ...(output !== undefined && { output }),
+    };
+  }
+  if (permissionAction !== undefined) {
+    if (prompt.length > 0) {
+      return { type: "error", message: `Unexpected prompt for --${permissionAction}-permission` };
+    }
+    return {
+      type: "permission-update",
+      action: permissionAction,
+      target: permissionTarget!,
+      ...(cwd !== undefined && { cwd }),
+      ...(permissionDecision !== undefined && { decision: permissionDecision }),
       ...(output !== undefined && { output }),
     };
   }
@@ -631,7 +691,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -682,6 +742,8 @@ export function formatCLIHelp(): string {
     "  --show-config   Print merged runtime config",
     "  --init          Create a project config template",
     "  --force         Overwrite existing files for supported commands",
+    "  --set-permission Set a project permission rule",
+    "  --unset-permission Unset a project permission rule",
     "  --completion     Generate shell completions: bash, zsh, fish, powershell",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
