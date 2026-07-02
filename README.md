@@ -410,13 +410,24 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 }
 ```
 
+Project config lives at `.cliagent/config.json`. Shared defaults can also live
+at `%APPDATA%/miniagent/config.json` on Windows or
+`$XDG_CONFIG_HOME/miniagent/config.json` / `~/.config/miniagent/config.json` on
+macOS/Linux. Project config overrides global config; arrays replace and objects
+are shallow-merged.
+
 ### CLI Commands
 
 | Command | Description |
 |---------|-------------|
+| `/activity` | Show recent tool and subagent activity |
 | `/agent [build\|plan]` | Show or switch the primary agent mode |
 | `/auto` | Toggle auto approval for requests that are not denied |
 | `/details` | Toggle expanded tool details |
+| `/diagnostics` | Run configured project diagnostics |
+| `/diff [path]` | Open a scrollable git diff panel |
+| `/editor [initial text]` | Compose the next prompt in an external editor |
+| `/git [status\|log]` | Show git status or recent log |
 | `/thinking` | Toggle reasoning visibility |
 | `/models` | Open the model selector |
 | `/model <id\|provider/id>` | Switch active model by resolved id |
@@ -436,8 +447,10 @@ On first run, a `.cliagent/config.json` template is generated. Configure your mo
 The CLI uses product-level permissions: read/search tools are allowed by default,
 mutating tools and shell commands ask by default, and explicit deny rules always
 win. Messages beginning with `!` run through the configured CLI shell service.
-Project custom commands can be added as `.cliagent/commands/*.md`; exports,
-imports, undo, and redo are project-local under `.cliagent/`.
+The agent also gets git-aware read tools and guarded `git_commit`; `/diff`,
+`/diagnostics`, `/activity`, and `/editor` provide local developer workflow
+panels. Project custom commands can be added as `.cliagent/commands/*.md`;
+exports, imports, undo, and redo are project-local under `.cliagent/`.
 
 → [Full CLI Documentation](./document/cli/repl.md)
 

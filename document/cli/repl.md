@@ -69,9 +69,14 @@ project-local `.cliagent/config.json` template.
 
 | Command | Description |
 |---------|-------------|
+| `/activity` | Show recent tool and subagent activity |
 | `/agent [build|plan]` | Show or switch the primary agent mode |
 | `/auto` | Toggle auto approval for requests that are not denied |
 | `/details` | Toggle expanded tool details |
+| `/diagnostics` | Run configured project diagnostics |
+| `/diff [path]` | Open a scrollable git diff panel |
+| `/editor [initial text]` | Compose the next prompt in an external editor |
+| `/git [status|log]` | Show git status or recent log |
 | `/thinking` | Toggle reasoning visibility |
 | `/models` | Open the model selector |
 | `/model <id|provider/id>` | Switch active model by resolved id |
@@ -102,6 +107,8 @@ needed:
 - **grep** - Search file contents.
 - **shell** - Execute shell commands through the CLI shell service.
 - **todo** - Task management (`todo_create`, `todo_update`, `todo_delete`).
+- **git_status**, **git_diff**, **git_log** - Read repository state.
+- **git_commit** - Commit staged changes after permission approval.
 
 When `.cliagent/config.json` includes `mcp`, `skill`, or `subagent` fields,
 those CLI convenience fields are copied into blueprint component config during
@@ -119,6 +126,24 @@ it never overrides a deny rule.
 Messages beginning with `!` run through the CLI shell service and are recorded
 as shell output in the conversation. On Windows the default shell is PowerShell;
 the config can switch to Git Bash, WSL, cmd, or an explicit executable.
+
+## Git, Editor, Diagnostics
+
+`/git status` and `/git log [limit]` open read-only git panels. `/diff [path]`
+opens a scrollable unified diff panel. The agent also receives read-only git
+tools plus guarded `git_commit`; the commit tool uses the `git_commit`
+permission key.
+
+`/editor [initial text]` writes a draft to a temporary file, opens the configured
+editor, then submits non-empty edited content through the normal input path.
+Configure it with `editor.executable`, `editor.args`, and `editor.wait`.
+
+`/diagnostics` runs configured commands or discovers `npm run typecheck`,
+`npm run lint`, and `npm test` from `package.json`. Configure it with
+`diagnostics.commands` and `diagnostics.timeoutMs`.
+
+`/activity` opens a compact timeline of recent tool and subagent-shaped tool
+calls.
 
 ## Sessions And Commands
 
@@ -168,6 +193,8 @@ Models are resolved from provider entries in `.cliagent/config.json`.
 | `defaultAgent` | No | `build` or `plan`; defaults to `build` |
 | `permission` | No | Product-level allow/ask/deny policy |
 | `shell` | No | Cross-platform shell settings |
+| `editor` | No | External editor executable, args, and wait preference |
+| `diagnostics` | No | Project diagnostic commands and timeout |
 | `tui` | No | TUI display preferences |
 | `generation.temperature` | No | Default `0.7` |
 | `generation.thinking` | No | `none`, `low`, `medium`, `high`, or `max`; unsupported levels downgrade inside the engine |

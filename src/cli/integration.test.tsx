@@ -274,8 +274,10 @@ describe("useSuggestion + CommandPalette integration", () => {
     expect(firstOutput).toContain("/auto");
     expect(firstOutput).not.toContain("/model");
 
+    const modelIndex = suggestions.indexOf("/model");
+    expect(modelIndex).toBeGreaterThan(0);
     const scrolledOutput = renderToString(
-      <CommandPalette suggestions={suggestions} selectedIndex={10} />,
+      <CommandPalette suggestions={suggestions} selectedIndex={modelIndex} />,
     );
     expect(scrolledOutput).toContain("/model");
     expect(scrolledOutput).toContain("/models");

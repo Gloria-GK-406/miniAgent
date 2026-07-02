@@ -82,6 +82,13 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/r")).toEqual(["/redo"]);
     expect(matchSuggestions("/comp")).toEqual(["/compact"]);
   });
+
+  it("matches Phase 3 commands", () => {
+    expect(matchSuggestions("/g")).toEqual(["/git"]);
+    expect(matchSuggestions("/di")).toEqual(["/diff", "/diagnostics"]);
+    expect(matchSuggestions("/ed")).toEqual(["/editor"]);
+    expect(matchSuggestions("/ac")).toEqual(["/activity"]);
+  });
 });
 
 describe("useSuggestion", () => {
