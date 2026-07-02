@@ -328,6 +328,7 @@ export function App({ runtime }: AppProps) {
     commandSuggestions: state.commandSuggestions,
     modelPaths: state.modelPaths,
     referencePaths: state.referencePaths,
+    sessionSuggestions: state.sessions.map((session) => session.id),
   });
   const { stdout } = useStdout();
   const [scrollFromBottom, setScrollFromBottom] = useState(0);

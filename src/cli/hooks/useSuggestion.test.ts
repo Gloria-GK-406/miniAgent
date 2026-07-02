@@ -58,6 +58,14 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/sessions sw")).toEqual(["switch"]);
   });
 
+  it("matches session ids after session management subcommands", () => {
+    const sessions = ["s1-alpha", "s2-beta"];
+    expect(matchSuggestions("/sessions switch s1", undefined, undefined, undefined, sessions)).toEqual([
+      "s1-alpha",
+    ]);
+    expect(matchSuggestions("/session delete ", undefined, undefined, undefined, sessions)).toEqual(sessions);
+  });
+
   it("matches /permissions subcommands and alias", () => {
     expect(matchSuggestions("/permissions")).toEqual(["set", "unset"]);
     expect(matchSuggestions("/permission se")).toEqual(["set"]);
@@ -265,6 +273,16 @@ describe("useSuggestion", () => {
       result.current.updateInput("/rep");
     });
     expect(result.current.suggestions).toEqual(["/repair"]);
+  });
+
+  it("uses session suggestions from options", () => {
+    const { result } = renderHook(() => useSuggestion({
+      sessionSuggestions: ["s1-alpha", "s2-beta"],
+    }));
+    act(() => {
+      result.current.updateInput("/sessions switch s2");
+    });
+    expect(result.current.suggestions).toEqual(["s2-beta"]);
   });
 
   it("applies selected command completion", () => {

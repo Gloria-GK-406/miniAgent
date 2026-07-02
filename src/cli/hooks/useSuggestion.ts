@@ -38,6 +38,7 @@ const EXPORT_FORMATS = ["json", "markdown"];
 const GIT_SUBS = ["status", "log"];
 const PERMISSION_SUBS = ["set", "unset"];
 const SESSION_SUBS = ["search", "new", "switch", "fork", "rename", "delete"];
+const SESSION_ID_SUBS = new Set(["switch", "fork", "rename", "delete"]);
 const SYSTEM_SUBS = ["set", "unset"];
 const COMMANDS_WITH_ARGS = new Set([
   "/agent",
@@ -60,6 +61,7 @@ export function matchSuggestions(
   modelPaths?: string[],
   referencePaths?: string[],
   commandSuggestions = COMMANDS,
+  sessionSuggestions: string[] = [],
 ): string[] {
   if (!input) return [];
   if (!input.startsWith("/")) {
@@ -76,6 +78,8 @@ export function matchSuggestions(
 
   if (parts.length >= 2) {
     const partial = parts[parts.length - 1] ?? "";
+    const subcommand = parts[1] ?? "";
+    const endsWithSpace = /\s$/.test(input);
 
     if (cmd === "/model") {
       return (modelPaths ?? []).filter((p) => p.startsWith(partial));
@@ -93,6 +97,9 @@ export function matchSuggestions(
       return PERMISSION_SUBS.filter((s) => s.startsWith(partial));
     }
     if (cmd === "/sessions" || cmd === "/session") {
+      if (SESSION_ID_SUBS.has(subcommand) && (parts.length >= 3 || endsWithSpace)) {
+        return sessionSuggestions.filter((s) => s.startsWith(partial));
+      }
       return SESSION_SUBS.filter((s) => s.startsWith(partial));
     }
     if (cmd === "/system") {
@@ -201,12 +208,14 @@ export interface UseSuggestionOptions {
   modelPaths?: string[];
   referencePaths?: string[];
   commandSuggestions?: string[];
+  sessionSuggestions?: string[];
 }
 
 export function useSuggestion(options?: UseSuggestionOptions) {
   const modelPaths = options?.modelPaths;
   const referencePaths = options?.referencePaths;
   const commandSuggestions = options?.commandSuggestions;
+  const sessionSuggestions = options?.sessionSuggestions;
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -233,9 +242,15 @@ export function useSuggestion(options?: UseSuggestionOptions) {
   }, []);
 
   const updateInput = useCallback((input: string): void => {
-    setSuggestions(matchSuggestions(input, modelPaths, referencePaths, commandSuggestions));
+    setSuggestions(matchSuggestions(
+      input,
+      modelPaths,
+      referencePaths,
+      commandSuggestions,
+      sessionSuggestions,
+    ));
     setSelectedIndex(0);
-  }, [commandSuggestions, modelPaths, referencePaths]);
+  }, [commandSuggestions, modelPaths, referencePaths, sessionSuggestions]);
 
   const applySelected = useCallback((input: string): string | null => {
     const suggestion = suggestions[selectedIndex];
