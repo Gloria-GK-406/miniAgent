@@ -82,6 +82,16 @@ export type CLIEntryAction =
   | { type: "list-models"; cwd?: string; output?: CLIEntryOutput }
   | { type: "list-commands"; cwd?: string; output?: CLIEntryOutput }
   | {
+    type: "list-tools";
+    agent?: CLIEntryAgentMode;
+    autoApprove?: boolean;
+    cwd?: string;
+    model?: string;
+    sessionId?: string;
+    newSession?: string;
+    output?: CLIEntryOutput;
+  }
+  | {
     type: "permission-update";
     action: "set" | "unset";
     cwd?: string;
@@ -114,6 +124,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let listSessionsMode = false;
   let listModelsMode = false;
   let listCommandsMode = false;
+  let listToolsMode = false;
   let permissionAction: "set" | "unset" | undefined;
   let permissionTarget: string | undefined;
   let permissionDecision: CLIEntryPermissionDecision | undefined;
@@ -180,6 +191,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--list-commands") {
       listCommandsMode = true;
+      continue;
+    }
+    if (arg === "--list-tools") {
+      listToolsMode = true;
       continue;
     }
     if (arg === "--set-permission") {
@@ -432,6 +447,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || listToolsMode
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -452,6 +468,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || listToolsMode
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -474,6 +491,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || listToolsMode
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -497,6 +515,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       || listSessionsMode
       || listModelsMode
       || listCommandsMode
+      || listToolsMode
       || permissionAction !== undefined
       || systemPromptAction !== undefined
       || exportSessionMode
@@ -508,13 +527,13 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   ) {
     return { type: "error", message: "Cannot combine --init with another headless mode" };
   }
-  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode)) {
+  if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
   }
-  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
+  if (renameSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --rename-session with another headless mode" };
   }
-  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
+  if (forkSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode)) {
     return { type: "error", message: "Cannot combine --fork-session with another headless mode" };
   }
   if (listSessionsMode && printMode) {
@@ -529,16 +548,19 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return { type: "error", message: "Cannot combine --import-session with another headless mode" };
   }
-  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listModelsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-models with another headless mode" };
   }
-  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listCommandsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: "Cannot combine --list-commands with another headless mode" };
   }
-  if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (listToolsMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || permissionAction !== undefined || systemPromptAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+    return { type: "error", message: "Cannot combine --list-tools with another headless mode" };
+  }
+  if (permissionAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     return { type: "error", message: `Cannot combine --${permissionAction}-permission with another headless mode` };
   }
-  if (systemPromptAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || permissionAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
+  if (systemPromptAction !== undefined && (printMode || doctorMode || diagnosticsMode || listSessionsMode || listModelsMode || listCommandsMode || listToolsMode || permissionAction !== undefined || exportSessionMode || importSessionMode || deleteSessionMode || renameSessionMode || forkSessionMode)) {
     const flag = systemPromptAction === "set"
       ? (systemPromptFile === undefined ? "--set-system-prompt" : "--system-prompt-file")
       : "--unset-system-prompt";
@@ -719,6 +741,21 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(output !== undefined && { output }),
     };
   }
+  if (listToolsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --list-tools" };
+    }
+    return {
+      type: "list-tools",
+      ...(agent !== undefined && { agent }),
+      ...(autoApprove && { autoApprove: true }),
+      ...(cwd !== undefined && { cwd }),
+      ...(model !== undefined && { model }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(newSession !== undefined && { newSession }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (doctorMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --doctor" };
@@ -755,7 +792,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -791,6 +828,7 @@ export function formatCLIHelp(): string {
     "  --list-sessions List sessions headlessly",
     "  --list-models   List configured models headlessly",
     "  --list-commands List slash commands headlessly",
+    "  --list-tools    List runtime tools headlessly",
     "  --export-session Export a session headlessly",
     "  --import-session Import a session export headlessly",
     "  --delete-session Delete a session headlessly",

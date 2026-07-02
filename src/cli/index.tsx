@@ -26,6 +26,7 @@ import { formatSessionList, formatSessionListJson } from "./session-list-runner.
 import { runSessionRename } from "./session-rename-runner.js";
 import { runShowConfig } from "./show-config-runner.js";
 import { runSystemPromptUpdate } from "./system-prompt-runner.js";
+import { runToolList } from "./tool-list-runner.js";
 
 function readPackageVersion(): string {
   const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
@@ -148,6 +149,31 @@ async function main(): Promise<void> {
       stdout: (text) => process.stdout.write(text),
       stderr: (text) => process.stderr.write(text),
     });
+    return;
+  }
+  if (action.type === "list-tools") {
+    let runtime: Awaited<ReturnType<typeof createCLIRuntime>> | undefined;
+    try {
+      runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+      await applyCLIEntryRuntimeOptions(runtime, action);
+      process.exitCode = await runToolList(
+        runtime,
+        {
+          stdout: (text) => process.stdout.write(text),
+          stderr: (text) => process.stderr.write(text),
+        },
+        {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      );
+      runtime = undefined;
+    } catch (e: unknown) {
+      if (runtime !== undefined) {
+        await runtime.destroy();
+      }
+      process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.exitCode = 1;
+    }
     return;
   }
   if (action.type === "export-session") {

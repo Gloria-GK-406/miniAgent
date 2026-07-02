@@ -470,6 +470,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     },
+    listTools: async () => await built.agent.getToolList(),
     showActivity: async () => {
       updateState({ panel: { type: "activity", entries: state.activity } });
     },

@@ -426,6 +426,7 @@ and shell integration:
 | `--show-config [--json]` | Print merged runtime config |
 | `--list-models [--json]` | List configured model selectors |
 | `--list-commands [--json]` | List built-in and project custom slash commands |
+| `--list-tools [--json]` | List runtime tools for the selected agent |
 | `--list-sessions [--json]` | List project sessions |
 | `--print <prompt>` / `--print --prompt-file <path>` | Run one prompt headlessly |
 | `--doctor [--json]` | Run setup checks |

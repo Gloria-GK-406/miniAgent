@@ -199,6 +199,28 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("lists tools without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--list-tools"])).toEqual({
+      type: "list-tools",
+    });
+    expect(parseCLIEntryArgs([
+      "--cwd",
+      "C:/repo",
+      "--agent",
+      "plan",
+      "--model",
+      "openai/fast",
+      "--list-tools",
+      "--json",
+    ])).toEqual({
+      type: "list-tools",
+      agent: "plan",
+      cwd: "C:/repo",
+      model: "openai/fast",
+      output: "json",
+    });
+  });
+
   it("exports a session without opening the TUI", () => {
     expect(parseCLIEntryArgs([
       "--export-session",
@@ -677,7 +699,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --set-permission, --unset-permission, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --list-sessions, --list-models, --list-commands, --list-tools, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     });
   });
 
@@ -694,6 +716,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--list-sessions");
     expect(help).toContain("--list-models");
     expect(help).toContain("--list-commands");
+    expect(help).toContain("--list-tools");
     expect(help).toContain("--diagnostics");
     expect(help).toContain("--export-session");
     expect(help).toContain("--import-session");

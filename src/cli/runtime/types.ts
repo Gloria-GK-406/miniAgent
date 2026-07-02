@@ -109,6 +109,7 @@ export interface CLIAppRuntime {
   openEditor(initialContent: string): Promise<string>;
   runDiagnostics(): Promise<void>;
   runDoctor(): Promise<void>;
+  listTools(): Promise<Tool[]>;
   showActivity(): Promise<void>;
   showAgents(): Promise<void>;
   initializeProjectInstructions(overwrite: boolean): Promise<ProjectInstructionsResult>;

@@ -79,6 +79,7 @@ also accept `--json`.
 | `--show-config` | Yes | Print the merged effective CLI config without creating missing config files |
 | `--list-models` | Yes | List configured model selectors and mark the default model |
 | `--list-commands` | Yes | List built-in and project custom slash commands |
+| `--list-tools` | Yes | List runtime tools for the selected agent |
 | `--list-sessions` | Yes | List project sessions and mark the active session |
 | `--export-session [id] --format json|markdown --output <path>` | Yes | Export a session transcript |
 | `--import-session <path> [--name <name>]` | Yes | Import a JSON session export as a new session |
@@ -102,6 +103,7 @@ Examples:
 miniagent --init
 miniagent --list-models --json
 miniagent --list-commands --json
+miniagent --list-tools --agent plan --json
 miniagent --set-permission "shell:npm *" allow
 miniagent --system-prompt-file .cliagent/system.md
 miniagent --print --prompt-file task.md --json

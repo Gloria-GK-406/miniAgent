@@ -8,6 +8,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("complete -F _miniagent_completion miniagent");
     expect(script).toContain("--print");
     expect(script).toContain("--list-commands");
+    expect(script).toContain("--list-tools");
     expect(script).toContain("--set-permission");
     expect(script).toContain("--set-system-prompt");
     expect(script).toContain("--completion");
