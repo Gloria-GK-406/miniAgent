@@ -213,7 +213,8 @@ describe("App component basic rendering", () => {
       <App runtime={createMockRuntime({ modelName: "anthropic/claude-sonnet-4" })} />,
     );
     expect(output).toContain("anthropic/claude-sonnet-4");
-    expect(output).toContain("❯");
+    expect(output).toContain(">");
+    expect(output).not.toContain("❯");
   });
 
   it("renders StatusBar with session name", () => {
@@ -360,7 +361,8 @@ describe("full component tree rendering", () => {
     expect(statusIndicator).toContain("Ready");
     expect(statusIndicator).toContain("Turn 3");
 
-    expect(inputBox).toContain("❯");
+    expect(inputBox).toContain(">");
+    expect(inputBox).not.toContain("❯");
   });
 
   it("renders all components with running state", () => {
@@ -398,7 +400,8 @@ describe("full component tree rendering", () => {
     expect(statusIndicator).toContain("Executing");
     expect(statusIndicator).toContain("bash");
 
-    expect(inputBox).toContain("❯");
+    expect(inputBox).toContain(">");
+    expect(inputBox).not.toContain("❯");
     expect(inputBox).toContain("Thinking...");
   });
 });

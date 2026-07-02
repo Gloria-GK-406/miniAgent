@@ -5,15 +5,16 @@ import type { Message } from "../../core/types.js";
 import { MessageType } from "../../core/types.js";
 
 describe("MessageItem", () => {
-  it("renders User message with arrow and text", () => {
+  it("renders User message with ASCII prompt and text", () => {
     const msg: Message = {
       id: "1",
       type: MessageType.User,
       content: "Hello world",
     };
     const output = renderToString(<MessageItem message={msg} />);
-    expect(output).toContain("❯");
+    expect(output).toContain(">");
     expect(output).toContain("Hello world");
+    expect(output).not.toContain("❯");
   });
 
   it("renders Assist message with content", () => {
@@ -64,7 +65,8 @@ describe("MessageItem", () => {
       <MessageItem message={msg} collapsed={true} />,
     );
     expect(output).toContain("read_file");
-    expect(output).toContain("⟳");
+    expect(output).toContain("$");
+    expect(output).not.toContain("⟳");
   });
 
   it("renders ToolCall expanded with arguments", () => {
@@ -83,7 +85,7 @@ describe("MessageItem", () => {
     expect(output).toContain("path");
   });
 
-  it("renders ToolResult with arrow", () => {
+  it("renders ToolResult with ASCII output marker", () => {
     const msg: Message = {
       id: "5",
       type: MessageType.ToolResult,
@@ -91,8 +93,9 @@ describe("MessageItem", () => {
       toolCallId: "tc-1",
     };
     const output = renderToString(<MessageItem message={msg} />);
-    expect(output).toContain("→");
+    expect(output).toContain("<");
     expect(output).toContain("file contents here");
+    expect(output).not.toContain("→");
   });
 
   it("renders ToolResult collapsed shows only first line", () => {

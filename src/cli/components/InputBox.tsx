@@ -131,12 +131,12 @@ export function InputBox({
   const before = value.slice(0, cursor);
   const after = value.slice(cursor);
 
-  const cursorChar = focused ? "█" : "▯";
+  const cursorChar = focused ? "|" : " ";
 
   if (disabled) {
     return (
       <Box>
-        <Text color="cyan">❯ </Text>
+        <Text color="cyan">&gt; </Text>
         <Text dimColor>{placeholder ?? ""}</Text>
       </Box>
     );
@@ -144,7 +144,7 @@ export function InputBox({
 
   return (
     <Box>
-      <Text color="cyan">❯ </Text>
+      <Text color="cyan">&gt; </Text>
       <Text>{before}</Text>
       <Text>{cursorChar}</Text>
       <Text>{after}</Text>

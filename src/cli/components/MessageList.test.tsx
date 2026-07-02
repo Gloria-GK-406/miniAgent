@@ -99,8 +99,14 @@ describe("MessageList", () => {
     const output = renderToString(
       <MessageList messages={messages} />,
     );
+    expect(output).toContain("> Read the file");
+    expect(output).toContain("$ read");
+    expect(output).toContain("< file contents here");
     expect(output).toContain("read");
     expect(output).toContain("file contents here");
+    expect(output).not.toContain("❯");
+    expect(output).not.toContain("⟳");
+    expect(output).not.toContain("→");
   });
 
   it("truncates tool result to the first line preview", () => {
@@ -143,7 +149,7 @@ describe("MessageList", () => {
       "streaming reasoning",
       80,
       { showReasoning: true },
-    ).map((line) => line.text).join("\n")).toContain("streaming reasoning");
+    ).map((line) => line.text).join("\n")).toContain("? streaming reasoning");
   });
 
   it("hides tool details until detail visibility is enabled", () => {

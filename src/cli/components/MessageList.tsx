@@ -165,7 +165,7 @@ function messageToLines(
   switch (message.type) {
     case MessageType.User:
       return wrapBlock(getContentText(message.content), width, {
-        firstPrefix: "❯ ",
+        firstPrefix: "> ",
         restPrefix: "  ",
       }).map((text, index) => ({
         key: `${message.id}:user:${index}`,
@@ -183,11 +183,11 @@ function messageToLines(
 
       const reasoning = (options.showReasoning ?? false) ? [
         ...(message.reasoningContent ? wrapBlock(message.reasoningContent, width, {
-          firstPrefix: "· ",
+          firstPrefix: "? ",
           restPrefix: "  ",
         }) : []),
         ...(options.reasoningText ? wrapBlock(options.reasoningText, width, {
-          firstPrefix: "· ",
+          firstPrefix: "? ",
           restPrefix: "  ",
         }) : []),
       ] : [];
@@ -219,7 +219,7 @@ function messageToLines(
         : "";
       lines.push(
         ...wrapBlock(`${message.toolName}${argText}`, width, {
-          firstPrefix: "⟳ ",
+          firstPrefix: "$ ",
           restPrefix: "  ",
         }).map((text, index) => ({
           key: `${message.id}:toolcall:${index}`,
@@ -236,7 +236,7 @@ function messageToLines(
         ? resultText
         : summarizeToolResult(resultText);
       return wrapBlock(renderedText, width, {
-        firstPrefix: "→ ",
+        firstPrefix: "< ",
         restPrefix: "  ",
       }).map((text, index) => ({
         key: `${message.id}:toolresult:${index}`,

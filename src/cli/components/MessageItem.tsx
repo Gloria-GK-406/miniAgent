@@ -26,7 +26,7 @@ export function MessageItem({
     case MessageType.User:
       return (
         <Box>
-          <Text color="green">❯ </Text>
+          <Text color="green">&gt; </Text>
           <Text>{getContentText(message.content)}</Text>
         </Box>
       );
@@ -51,7 +51,7 @@ export function MessageItem({
         : `(${JSON.stringify(message.arguments)})`;
       return (
         <Text color="yellow">
-          ⟳ {message.toolName}
+          $ {message.toolName}
           {argsText}
         </Text>
       );
@@ -61,7 +61,7 @@ export function MessageItem({
       const displayText = collapsed
         ? (fullText.split("\n")[0] ?? "")
         : fullText;
-      return <Text dimColor>→ {displayText}</Text>;
+      return <Text dimColor>&lt; {displayText}</Text>;
     }
     case MessageType.System:
       return (
