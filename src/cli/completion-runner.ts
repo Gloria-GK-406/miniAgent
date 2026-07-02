@@ -19,6 +19,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--list-models", description: "List configured models headlessly" },
   { long: "--list-commands", description: "List slash commands headlessly" },
   { long: "--list-tools", description: "List runtime tools headlessly" },
+  { long: "--list-todos", description: "List agent todo items headlessly" },
   { long: "--list-agents", description: "List primary and configured agents headlessly" },
   { long: "--preview-context", description: "Preview assembled runtime context headlessly" },
   { long: "--show-history", description: "Show session history headlessly" },

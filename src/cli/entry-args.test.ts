@@ -335,6 +335,19 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("lists agent todos without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--list-todos"])).toEqual({
+      type: "list-todos",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--session", "s2", "--list-todos", "tests", "--json"])).toEqual({
+      type: "list-todos",
+      cwd: "C:/repo",
+      sessionId: "s2",
+      query: "tests",
+      output: "json",
+    });
+  });
+
   it("lists workspace snapshots without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--list-snapshots"])).toEqual({
       type: "list-snapshots",
@@ -776,6 +789,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects prompted todo listing mode", () => {
+    expect(parseCLIEntryArgs(["--list-todos", "tests", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --list-todos",
+    });
+    expect(parseCLIEntryArgs(["--status", "--list-todos"])).toEqual({
+      type: "error",
+      message: "Cannot combine --status with another headless mode",
+    });
+  });
+
   it("rejects prompted snapshot listing mode", () => {
     expect(parseCLIEntryArgs(["--list-snapshots", "prompt"])).toEqual({
       type: "error",
@@ -1038,7 +1062,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --overview, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --overview, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-todos, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
       output: "json",
     });
   });
@@ -1072,6 +1096,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--list-models");
     expect(help).toContain("--list-commands");
     expect(help).toContain("--list-tools");
+    expect(help).toContain("--list-todos");
     expect(help).toContain("--list-agents");
     expect(help).toContain("--preview-context");
     expect(help).toContain("--show-history");

@@ -92,6 +92,7 @@ also accept `--json`.
 | `--list-models` | Yes | List configured model selectors and mark the default model |
 | `--list-commands` | Yes | List built-in and project custom slash commands |
 | `--list-tools` | Yes | List runtime tools for the selected agent |
+| `--list-todos [query]` | Yes | List or filter agent todo items |
 | `--list-agents` | Yes | List primary mode and configured subagents |
 | `--overview` | Yes | Print workspace, session, git, todo, and activity summary |
 | `--preview-context` | Yes | Preview the assembled runtime context for the selected session and agent |
@@ -129,6 +130,7 @@ miniagent --init-instructions
 miniagent --list-models --json
 miniagent --list-commands --json
 miniagent --list-tools --agent plan --json
+miniagent --list-todos pending --json
 miniagent --list-agents --json
 miniagent --overview --json
 miniagent --preview-context --json

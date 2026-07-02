@@ -40,6 +40,7 @@ import { runSnapshotList } from "./snapshot-list-runner.js";
 import { runRuntimeStatus } from "./status-runner.js";
 import { runSystemPromptShow } from "./system-prompt-show-runner.js";
 import { runSystemPromptUpdate } from "./system-prompt-runner.js";
+import { runTodoList } from "./todo-list-runner.js";
 import { runToolList } from "./tool-list-runner.js";
 
 async function main(): Promise<void> {
@@ -237,6 +238,22 @@ async function main(): Promise<void> {
         runtime,
         streams,
         {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      ),
+    });
+    return;
+  }
+  if (action.type === "list-todos") {
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runTodoList(
+        runtime,
+        streams,
+        {
+          ...(action.query !== undefined && { query: action.query }),
           ...(action.output !== undefined && { output: action.output }),
         },
       ),

@@ -71,6 +71,19 @@ describe("applyCLIEntryRuntimeOptions", () => {
     expect(runtime.switchSession).toHaveBeenCalledWith("s2");
   });
 
+  it("accepts todo listing actions with a startup session", async () => {
+    const runtime = {
+      switchSession: vi.fn(async () => undefined),
+    } as unknown as CLIAppRuntime;
+
+    await applyCLIEntryRuntimeOptions(runtime, {
+      type: "list-todos",
+      sessionId: "s2",
+    });
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("s2");
+  });
+
   it("accepts snapshot restore actions with a startup session", async () => {
     const runtime = {
       switchSession: vi.fn(async () => undefined),

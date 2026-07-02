@@ -438,6 +438,7 @@ and shell integration:
 | `--list-models [--json]` | List configured model selectors |
 | `--list-commands [--json]` | List built-in and project custom slash commands |
 | `--list-tools [--json]` | List runtime tools for the selected agent |
+| `--list-todos [query] [--json]` | List or filter agent todo items |
 | `--list-agents [--json]` | List primary mode and configured subagents |
 | `--overview [--json]` | Print workspace, session, git, todo, and activity summary |
 | `--preview-context [--json]` | Preview the assembled runtime context |

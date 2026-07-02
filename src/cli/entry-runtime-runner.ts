@@ -11,6 +11,7 @@ type RuntimeBackedCLIEntryActionType =
   | "status"
   | "overview"
   | "list-tools"
+  | "list-todos"
   | "list-agents"
   | "preview-context"
   | "show-history"
