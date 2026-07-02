@@ -90,6 +90,25 @@ function getCommandHelpItems(
     }));
 }
 
+function getCommandRegistrationNames(command: CLICommand): string[] {
+  return [command.name, ...(command.aliases ?? [])]
+    .map((name) => name.startsWith("/") ? name.slice(1) : name);
+}
+
+function findRegisteredCommandNameConflict(
+  command: CLICommand,
+  registeredCommandNames: Set<string>,
+): string | undefined {
+  const commandNames = new Set<string>();
+  for (const name of getCommandRegistrationNames(command)) {
+    if (registeredCommandNames.has(name) || commandNames.has(name)) {
+      return name;
+    }
+    commandNames.add(name);
+  }
+  return undefined;
+}
+
 interface RedoEntry {
   sessionId: string;
   turnId: string;
@@ -234,21 +253,22 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
   const registry = createCommandRegistry();
   registerBuiltinCommands(registry);
   const builtinCommands = registry.list();
-  const registeredCommandNames = new Set(builtinCommands.flatMap((command) => [
-    command.name,
-    ...(command.aliases ?? []),
-  ]));
+  const registeredCommandNames = new Set(builtinCommands.flatMap(getCommandRegistrationNames));
   const customCommands: CLICommand[] = [];
   for (const command of await loadCustomCommands(baseDir)) {
-    if (registeredCommandNames.has(command.name)) {
-      emit({ type: "notice", level: "warn", message: `Custom command /${command.name} conflicts with a built-in command` });
+    const conflict = findRegisteredCommandNameConflict(command, registeredCommandNames);
+    if (conflict !== undefined) {
+      emit({
+        type: "notice",
+        level: "warn",
+        message: `Custom command /${command.name} conflicts with existing command or alias /${conflict}`,
+      });
       continue;
     }
     registry.register(command);
     customCommands.push(command);
-    registeredCommandNames.add(command.name);
-    for (const alias of command.aliases ?? []) {
-      registeredCommandNames.add(alias);
+    for (const name of getCommandRegistrationNames(command)) {
+      registeredCommandNames.add(name);
     }
   }
   updateState({

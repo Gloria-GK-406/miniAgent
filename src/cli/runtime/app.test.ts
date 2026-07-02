@@ -601,6 +601,49 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("skips project custom commands whose aliases conflict with built-in commands", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-custom-command-alias-conflict-"));
+    await writeConfig(baseDir);
+    await mkdir(join(baseDir, ".cliagent", "commands"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "commands", "shortcut.md"), [
+      "---",
+      "description: Open help",
+      "aliases:",
+      "  - h",
+      "---",
+      "",
+      "/help",
+    ].join("\n"), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+
+    expect(runtime.getState().commandSuggestions).not.toContain("/shortcut");
+    expect(runtime.getState().commandHelp).not.toContainEqual(expect.objectContaining({
+      name: "shortcut",
+    }));
+    await runtime.destroy();
+  });
+
+  it("skips project custom commands whose aliases duplicate their names", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-custom-command-self-alias-"));
+    await writeConfig(baseDir);
+    await mkdir(join(baseDir, ".cliagent", "commands"), { recursive: true });
+    await writeFile(join(baseDir, ".cliagent", "commands", "shortcut.md"), [
+      "---",
+      "description: Open help",
+      "aliases:",
+      "  - shortcut",
+      "---",
+      "",
+      "/help",
+    ].join("\n"), "utf-8");
+
+    const runtime = await createCLIRuntime(baseDir);
+
+    expect(runtime.getState().commandSuggestions).not.toContain("/shortcut");
+    await runtime.destroy();
+  });
+
   it("restores session agent and model after custom command frontmatter overrides", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-custom-command-overrides-"));
     await writeConfig(baseDir, {

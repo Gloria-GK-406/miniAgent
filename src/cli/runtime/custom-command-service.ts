@@ -7,6 +7,7 @@ import type { CLICommand } from "./types.js";
 
 const CustomCommandFrontmatterSchema = z.object({
   description: z.string().optional(),
+  aliases: z.array(z.string()).optional(),
   agent: CLIAgentModeSchema.optional(),
   model: z.string().optional(),
 }).passthrough();
@@ -67,6 +68,7 @@ export async function loadCustomCommands(baseDir: string): Promise<CLICommand[]>
     const parsed = parseCommandFile(await readFile(join(commandDir, entry), "utf-8"));
     commands.push({
       name,
+      ...(parsed.frontmatter.aliases !== undefined && { aliases: parsed.frontmatter.aliases }),
       description: parsed.frontmatter.description ?? `Custom command: ${name}`,
       usage: `/${name} [args]`,
       execute: async (ctx, args) => {

@@ -91,6 +91,27 @@ describe("loadCustomCommands", () => {
     expect(submitInput).toHaveBeenCalledWith("Review this: src/core");
   });
 
+  it("loads aliases from frontmatter", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-custom-command-aliases-"));
+    await writeCommand(baseDir, "review", [
+      "---",
+      "description: Review changes",
+      "aliases:",
+      "  - rv",
+      "  - audit",
+      "---",
+      "",
+      "Review this: {{args}}",
+    ].join("\n"));
+
+    const [command] = await loadCustomCommands(baseDir);
+
+    expect(command).toMatchObject({
+      name: "review",
+      aliases: ["rv", "audit"],
+    });
+  });
+
   it("passes agent and model frontmatter as scoped input overrides", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-custom-command-overrides-"));
     await writeCommand(baseDir, "review", [
