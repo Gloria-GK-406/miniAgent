@@ -26,7 +26,7 @@ import { createCLISessionService } from "./session-service.js";
 import { createSnapshotService } from "./snapshot-service.js";
 import { createSubagentService } from "./subagent-service.js";
 import { createSystemPromptConfigService } from "./system-prompt-config-service.js";
-import type { CLIAppRuntime, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
+import type { CLIAppRuntime, CLICommand, CLICommandContext, CLIEvent, CLIRuntimeSubscriber, CLIState } from "./types.js";
 
 function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
   const current = agent.getCurrentResolvedModel();
@@ -35,6 +35,15 @@ function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICo
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function getCommandSuggestions(commands: CLICommand[]): string[] {
+  return commands
+    .filter((command) => command.hidden !== true)
+    .flatMap((command) => [
+      `/${command.name}`,
+      ...(command.aliases ?? []).map((alias) => `/${alias}`),
+    ]);
 }
 
 interface RedoEntry {
@@ -109,6 +118,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     mode: activeMode,
     modelName: formatCurrentModel(built.agent),
     modelPaths: getResolvedModelPaths(built.agent),
+    commandSuggestions: [],
     referencePaths: await referenceService.listReferenceCandidates(),
     inputHistory: await inputHistoryService.list(),
     sessionId: session.id,
@@ -147,6 +157,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       registeredCommandNames.add(alias);
     }
   }
+  updateState({ commandSuggestions: getCommandSuggestions(registry.list()) });
   const router = createInputRouter({
     commandRegistry: registry,
     permissionService,

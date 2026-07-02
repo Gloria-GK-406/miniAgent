@@ -54,6 +54,7 @@ export interface CLIState {
   mode: CLIAgentMode;
   modelName: string;
   modelPaths: string[];
+  commandSuggestions: string[];
   referencePaths: string[];
   inputHistory: string[];
   sessionId: string;

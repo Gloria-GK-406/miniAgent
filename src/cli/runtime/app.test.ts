@@ -300,6 +300,8 @@ describe("createCLIRuntime", () => {
     ].join("\n"), "utf-8");
 
     const runtime = await createCLIRuntime(baseDir);
+    expect(runtime.getState().commandSuggestions).toContain("/shortcut");
+
     await runtime.submitInput("/shortcut");
 
     expect(runtime.getState().panel).toEqual({ type: "help" });

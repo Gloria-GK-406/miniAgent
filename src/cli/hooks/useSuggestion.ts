@@ -59,6 +59,7 @@ export function matchSuggestions(
   input: string,
   modelPaths?: string[],
   referencePaths?: string[],
+  commandSuggestions = COMMANDS,
 ): string[] {
   if (!input) return [];
   if (!input.startsWith("/")) {
@@ -100,7 +101,7 @@ export function matchSuggestions(
     return [];
   }
 
-  const matches = COMMANDS.filter((c) => c.startsWith(cmd));
+  const matches = commandSuggestions.filter((c) => c.startsWith(cmd));
 
   if (matches.length === 1 && matches[0] === cmd) {
     if (cmd === "/agent") return AGENT_SUBS;
@@ -199,11 +200,13 @@ export function applySuggestion(input: string, suggestion: string): string {
 export interface UseSuggestionOptions {
   modelPaths?: string[];
   referencePaths?: string[];
+  commandSuggestions?: string[];
 }
 
 export function useSuggestion(options?: UseSuggestionOptions) {
   const modelPaths = options?.modelPaths;
   const referencePaths = options?.referencePaths;
+  const commandSuggestions = options?.commandSuggestions;
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -230,9 +233,9 @@ export function useSuggestion(options?: UseSuggestionOptions) {
   }, []);
 
   const updateInput = useCallback((input: string): void => {
-    setSuggestions(matchSuggestions(input, modelPaths, referencePaths));
+    setSuggestions(matchSuggestions(input, modelPaths, referencePaths, commandSuggestions));
     setSelectedIndex(0);
-  }, [modelPaths, referencePaths]);
+  }, [commandSuggestions, modelPaths, referencePaths]);
 
   const applySelected = useCallback((input: string): string | null => {
     const suggestion = suggestions[selectedIndex];

@@ -325,6 +325,7 @@ export function App({ runtime }: AppProps) {
     selectPrev,
     applySelected,
   } = useSuggestion({
+    commandSuggestions: state.commandSuggestions,
     modelPaths: state.modelPaths,
     referencePaths: state.referencePaths,
   });

@@ -11,6 +11,7 @@ function state(): CLIState {
     mode: "build",
     modelName: "openai/fast",
     modelPaths: ["openai/fast"],
+    commandSuggestions: [],
     referencePaths: [],
     inputHistory: [],
     sessionId: "s1",

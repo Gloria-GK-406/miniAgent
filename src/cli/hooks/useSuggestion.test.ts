@@ -144,6 +144,12 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/do")).toEqual(["/doctor"]);
     expect(matchSuggestions("/perm")).toEqual(["/permission", "/permissions"]);
   });
+
+  it("matches command names supplied by the runtime", () => {
+    expect(matchSuggestions("/rev", undefined, undefined, ["/review", "/repair"])).toEqual([
+      "/review",
+    ]);
+  });
 });
 
 describe("useSuggestion", () => {
@@ -249,6 +255,16 @@ describe("useSuggestion", () => {
       result.current.updateInput("/model ant");
     });
     expect(result.current.suggestions).toEqual(["anthropic/claude"]);
+  });
+
+  it("uses command suggestions from options", () => {
+    const { result } = renderHook(() => useSuggestion({
+      commandSuggestions: ["/review", "/repair"],
+    }));
+    act(() => {
+      result.current.updateInput("/rep");
+    });
+    expect(result.current.suggestions).toEqual(["/repair"]);
   });
 
   it("applies selected command completion", () => {
