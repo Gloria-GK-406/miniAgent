@@ -75,6 +75,7 @@ export type CLIEntryAction =
     output?: CLIEntryOutput;
   }
   | { type: "completion"; shell: CLIEntryCompletionShell }
+  | { type: "config-paths"; cwd?: string; output?: CLIEntryOutput }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -95,6 +96,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let deleteSessionMode = false;
   let renameSessionMode = false;
   let forkSessionMode = false;
+  let configPathsMode = false;
   let completionShell: CLIEntryCompletionShell | undefined;
   let exportFormat: CLIEntryExportFormat | undefined;
   let outputPath: string | undefined;
@@ -122,6 +124,10 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--diagnostics") {
       diagnosticsMode = true;
+      continue;
+    }
+    if (arg === "--config-paths") {
+      configPathsMode = true;
       continue;
     }
     if (arg === "--list-sessions") {
@@ -310,6 +316,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       printMode
       || doctorMode
       || diagnosticsMode
+      || configPathsMode
       || listSessionsMode
       || exportSessionMode
       || importSessionMode
@@ -319,6 +326,22 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     )
   ) {
     return { type: "error", message: "Cannot combine --completion with another headless mode" };
+  }
+  if (
+    configPathsMode
+    && (
+      printMode
+      || doctorMode
+      || diagnosticsMode
+      || listSessionsMode
+      || exportSessionMode
+      || importSessionMode
+      || deleteSessionMode
+      || renameSessionMode
+      || forkSessionMode
+    )
+  ) {
+    return { type: "error", message: "Cannot combine --config-paths with another headless mode" };
   }
   if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
@@ -351,6 +374,16 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     return {
       type: "completion",
       shell: completionShell,
+    };
+  }
+  if (configPathsMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --config-paths" };
+    }
+    return {
+      type: "config-paths",
+      ...(cwd !== undefined && { cwd }),
+      ...(output !== undefined && { output }),
     };
   }
   if (diagnosticsMode) {
@@ -472,7 +505,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --list-sessions, --export-session, --import-session, --delete-session, --rename-session, or --fork-session",
     };
   }
 
@@ -517,6 +550,7 @@ export function formatCLIHelp(): string {
     "  -m, --model     Select a configured model by id or provider/id",
     "  --doctor        Run setup checks headlessly",
     "  --diagnostics   Run configured diagnostics headlessly",
+    "  --config-paths  Print resolved config file paths",
     "  --completion     Generate shell completions: bash, zsh, fish, powershell",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
