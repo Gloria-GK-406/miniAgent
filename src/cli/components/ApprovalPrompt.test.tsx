@@ -34,8 +34,11 @@ describe("ApprovalPrompt", () => {
         onDecision={() => {}}
       />,
     );
+    expect(output).toContain("Approval required");
     expect(output).toContain("[y]es");
     expect(output).toContain("[n]o");
+    expect(output).toContain("Enter");
+    expect(output).toContain("Esc");
     expect(output).not.toContain("[a]lways");
   });
 

@@ -10,18 +10,28 @@ export function ApprovalPrompt({ toolName, args, onDecision }: ApprovalPromptPro
   const argsStr = JSON.stringify(args, null, 2);
   const display = argsStr.length > 500 ? `${argsStr.slice(0, 497)}...` : argsStr;
 
-  useInput((input) => {
+  useInput((input, keypress) => {
+    if (keypress.return) {
+      onDecision(true);
+      return;
+    }
+    if (keypress.escape) {
+      onDecision(false);
+      return;
+    }
     const key = input.toLowerCase();
     if (key === "y") onDecision(true);
     else if (key === "n") onDecision(false);
   });
 
   return (
-    <Box flexDirection="column">
-      <Text color="yellow">[HITL] Tool call: </Text>
-      <Text bold>{toolName}</Text>
+    <Box borderStyle="single" borderColor="yellow" flexDirection="column" paddingX={1}>
+      <Text bold color="yellow">Approval required</Text>
+      <Text>
+        Tool: <Text bold>{toolName}</Text>
+      </Text>
       <Text dimColor>{display}</Text>
-      <Text color="yellow">Approve? [y]es / [n]o: </Text>
+      <Text color="yellow">Approve? [y]es / [n]o / Enter yes / Esc no</Text>
     </Box>
   );
 }

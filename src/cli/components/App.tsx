@@ -13,6 +13,7 @@ import { ModelSelectView } from "./ModelSelectView.js";
 import { PanelView } from "./PanelView.js";
 import { DiffView } from "./DiffView.js";
 import { ActivityView } from "./ActivityView.js";
+import { ApprovalPrompt } from "./ApprovalPrompt.js";
 
 export interface AppProps {
   runtime: CLIAppRuntime;
@@ -239,6 +240,14 @@ export function App({ runtime }: AppProps) {
     return applySelected(text);
   }, [applySelected]);
 
+  const handleApprovalDecision = useCallback((decision: boolean) => {
+    const approvalId = state.approval?.id;
+    if (approvalId === undefined) {
+      return;
+    }
+    runtime.answerApproval(approvalId, decision);
+  }, [runtime, state.approval?.id]);
+
   if (state.panel.type === "history" || state.panel.type === "context") {
     return (
       <PanelView
@@ -295,6 +304,35 @@ export function App({ runtime }: AppProps) {
         content={state.panel.content}
         onClose={() => closePanel(runtime)}
       />
+    );
+  }
+
+  if (state.approval !== null) {
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="column" height={messageAreaHeight} overflow="hidden">
+          {paddedVisibleLines.map((line) => (
+            <Text
+              key={line.key}
+              {...(line.color !== undefined && { color: line.color })}
+              {...(line.dimColor === true && { dimColor: true })}
+            >
+              {line.text}
+            </Text>
+          ))}
+        </Box>
+        <StatusIndicator
+          isRunning={state.isRunning}
+          currentTool={state.currentTool}
+          turnCount={state.turnCount}
+          error={state.error}
+        />
+        <ApprovalPrompt
+          toolName={state.approval.toolName}
+          args={state.approval.args}
+          onDecision={handleApprovalDecision}
+        />
+      </Box>
     );
   }
 

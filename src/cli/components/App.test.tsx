@@ -150,6 +150,26 @@ describe("App", () => {
     expect(output).toContain("/help for commands");
   });
 
+  it("renders focused approval prompt instead of normal input when approval is pending", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({
+        approval: {
+          id: "approval-1",
+          toolName: "write",
+          args: { path: "src/index.ts", content: "hello" },
+          decision: "pending",
+        },
+      })}
+      />,
+    );
+
+    expect(output).toContain("Approval required");
+    expect(output).toContain("write");
+    expect(output).toContain("src/index.ts");
+    expect(output).toContain("[y]es");
+    expect(output).not.toContain("/help for commands");
+  });
+
   it("renders history panel from runtime state", () => {
     const output = renderToString(
       <App runtime={createMockRuntime({
