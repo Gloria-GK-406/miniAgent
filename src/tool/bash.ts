@@ -26,7 +26,8 @@ function bashExecute(args: Record<string, unknown>, signal?: AbortSignal): Promi
             child = spawn("bash", ["-c", parsed.command], {
                 cwd: parsed.workdir,
                 env: process.env,
-                stdio: ["pipe", "pipe", "pipe"],
+                stdio: ["ignore", "pipe", "pipe"],
+                windowsHide: true,
             });
         } catch (e: unknown) {
             resolve(e instanceof Error ? e.message : String(e));
