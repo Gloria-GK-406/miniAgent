@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderToString } from "ink";
-import { InputBox } from "./InputBox.js";
+import { InputBox, resolveTabInputAction } from "./InputBox.js";
 
 describe("InputBox", () => {
   it("renders prompt symbol", () => {
@@ -30,5 +30,14 @@ describe("InputBox", () => {
   it("renders enabled state with prompt", () => {
     const output = renderToString(<InputBox onSubmit={() => {}} />);
     expect(output).toContain("❯");
+  });
+  it("uses Tab for completion before mode switching", () => {
+    expect(resolveTabInputAction("/he", () => "/help ")).toEqual({
+      type: "complete",
+      value: "/help ",
+    });
+    expect(resolveTabInputAction("plain", () => null)).toEqual({
+      type: "toggle-mode",
+    });
   });
 });

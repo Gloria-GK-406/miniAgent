@@ -15,6 +15,22 @@ interface InputBoxProps {
   onSuggestionNext?: () => void;
   onSuggestionPrev?: () => void;
   onSuggestionComplete?: (currentValue: string) => string | null;
+  onModeToggle?: () => void;
+}
+
+export type TabInputAction =
+  | { type: "complete"; value: string }
+  | { type: "toggle-mode" };
+
+export function resolveTabInputAction(
+  currentValue: string,
+  complete?: (currentValue: string) => string | null,
+): TabInputAction {
+  const completedValue = complete?.(currentValue) ?? null;
+  if (completedValue !== null) {
+    return { type: "complete", value: completedValue };
+  }
+  return { type: "toggle-mode" };
 }
 
 export function InputBox({
@@ -30,6 +46,7 @@ export function InputBox({
   onSuggestionNext,
   onSuggestionPrev,
   onSuggestionComplete,
+  onModeToggle,
 }: InputBoxProps) {
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -53,6 +70,15 @@ export function InputBox({
       return;
     }
     if (disabled) return;
+    if (key.tab) {
+      const action = resolveTabInputAction(value, onSuggestionComplete);
+      if (action.type === "complete") {
+        updateValue(action.value, action.value.length);
+        return;
+      }
+      onModeToggle?.();
+      return;
+    }
     if (key.return) {
       const completedValue = onSuggestionComplete?.(value) ?? null;
       if (completedValue !== null) {

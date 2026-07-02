@@ -437,6 +437,10 @@ npm run chat
 | `/help` | 显示帮助 |
 | `/quit` | 退出 |
 
+快捷键：`Tab` 会完成当前建议；没有建议时在 build/plan 之间切换。
+`Ctrl+C` 会停止运行中的 Agent，空闲时按两次退出；`PgUp`/`PgDn`
+滚动对话，`Esc` 关闭面板或拒绝审批。
+
 CLI 使用产品级权限策略：读/搜索工具默认允许，写入、编辑和 Shell
 命令默认询问，显式拒绝规则始终生效。以 `!` 开头的消息会通过配置的 CLI
 shell service 执行。项目自定义命令可以放在 `.cliagent/commands/*.md`；

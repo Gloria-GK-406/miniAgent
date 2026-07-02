@@ -6,6 +6,7 @@ import {
   EXIT_CONFIRM_TEXT,
   STATIC_PANEL_CLOSE_TEXT,
   getMessageWindow,
+  nextAgentMode,
   padMessageWindow,
   resolveCtrlCAction,
   resolveMessageScrollAction,
@@ -110,6 +111,11 @@ describe("App", () => {
     expect(resolveCtrlCAction(true, false)).toBe("stop");
     expect(resolveCtrlCAction(false, false)).toBe("arm-exit");
     expect(resolveCtrlCAction(false, true)).toBe("exit");
+  });
+
+  it("toggles between build and plan modes", () => {
+    expect(nextAgentMode("build")).toBe("plan");
+    expect(nextAgentMode("plan")).toBe("build");
   });
 
   it("routes message scrolling to paging keys so arrows remain available for input", () => {
@@ -254,6 +260,14 @@ describe("App", () => {
     );
 
     expect(output).toContain("/shortcut");
+  });
+
+  it("renders mode switch keybinding in the help panel", () => {
+    const output = renderToString(
+      <App runtime={createMockRuntime({ panel: { type: "help" } })} />,
+    );
+
+    expect(output).toContain("Tab build/plan");
   });
 
   it("exports Ctrl+C confirmation text for the idle exit prompt", () => {

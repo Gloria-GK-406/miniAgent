@@ -17,7 +17,7 @@ import { ApprovalPrompt } from "./ApprovalPrompt.js";
 import { PermissionsView } from "./PermissionsView.js";
 import { SystemPromptView } from "./SystemPromptView.js";
 import { createPermissionService } from "../runtime/permission-service.js";
-import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
+import type { CLIAgentMode, CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 
 export interface AppProps {
   runtime: CLIAppRuntime;
@@ -29,6 +29,10 @@ export const EXIT_CONFIRM_TEXT = "Press Ctrl+C again to exit";
 export const STATIC_PANEL_CLOSE_TEXT = "ESC close";
 
 export type CtrlCAction = "stop" | "arm-exit" | "exit";
+
+export function nextAgentMode(mode: CLIAgentMode): CLIAgentMode {
+  return mode === "build" ? "plan" : "build";
+}
 
 function formatTokenCount(count: number): string {
   if (count >= 1000) {
@@ -157,6 +161,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
       <Text>/help /history /context /tools /models /sessions /activity</Text>
       <Text>/permissions /system /agent build|plan /auto /details</Text>
       <Text>/thinking /git /diff /editor /diagnostics /doctor /quit</Text>
+      <Text dimColor>Tab build/plan · Ctrl+C stop/exit · PgUp/PgDn scroll</Text>
       <Text dimColor>{state.commandSuggestions.join(" ")}</Text>
       <Text dimColor>{state.mode} mode</Text>
     </StaticPanelFrame>
@@ -462,6 +467,10 @@ export function App({ runtime }: AppProps) {
     void runtime.rememberInputHistory(text);
   }, [runtime]);
 
+  const handleModeToggle = useCallback(() => {
+    void runtime.runCommand("agent", nextAgentMode(state.mode));
+  }, [runtime, state.mode]);
+
   const handleApprovalDecision = useCallback((decision: boolean) => {
     const approvalId = state.approval?.id;
     if (approvalId === undefined) {
@@ -631,6 +640,7 @@ export function App({ runtime }: AppProps) {
           onSuggestionNext={selectNext}
           onSuggestionPrev={selectPrev}
           onSuggestionComplete={handleSuggestionComplete}
+          onModeToggle={handleModeToggle}
           {...(state.isRunning && { placeholder: "Thinking..." })}
         />
         <Text>

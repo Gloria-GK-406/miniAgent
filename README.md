@@ -485,6 +485,10 @@ and shell integration:
 | `/help` | Show help |
 | `/quit` | Exit |
 
+Keybindings: `Tab` completes the active suggestion or switches build/plan when
+there is no suggestion, `Ctrl+C` stops a run or exits when idle, `PgUp`/`PgDn`
+scroll the transcript, and `Esc` closes panels or rejects approval.
+
 The CLI uses product-level permissions: read/search tools are allowed by default,
 mutating tools and shell commands ask by default, and explicit deny rules always
 win. Messages beginning with `!` run through the configured CLI shell service.

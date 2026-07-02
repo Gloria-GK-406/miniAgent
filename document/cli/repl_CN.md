@@ -119,6 +119,15 @@ ID；当 ID 有歧义时使用 `provider/id`。`generation.thinking` 接受 `non
 | `/help` | 显示帮助 |
 | `/quit` | 退出 |
 
+## 快捷键
+
+| 按键 | 动作 |
+|------|------|
+| `Tab` | 完成当前建议；没有建议时在 build/plan 之间切换 |
+| `Ctrl+C` | 运行中停止 Agent；空闲时按两次退出 |
+| `PgUp` / `PgDn` | 滚动对话 transcript |
+| `Esc` | 关闭当前面板或拒绝审批 |
+
 ## 内置工具
 
 CLI Agent 通过语义蓝图组装。默认蓝图始终包含：

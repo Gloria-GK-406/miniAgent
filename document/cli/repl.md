@@ -165,6 +165,15 @@ miniagent --completion powershell
 | `/help` | Show help |
 | `/quit` | Exit |
 
+## Keybindings
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Complete the active suggestion; otherwise switch between build and plan |
+| `Ctrl+C` | Stop a running agent; press twice while idle to exit |
+| `PgUp` / `PgDn` | Scroll the transcript |
+| `Esc` | Close the active panel or reject an approval prompt |
+
 ## Built-In Tools
 
 The CLI runtime injects workspace-aware tools over the default blueprint where
