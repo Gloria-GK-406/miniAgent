@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ThinkingLevel } from "../core/config.js";
 import {
   CLIConfigSchema,
+  ConfigTemplateCreatedError,
   getGlobalConfigPath,
   loadConfig,
   parseDefaultModel,
@@ -458,5 +459,33 @@ describe("CLI config provider mode", () => {
       providers: [provider("bom")],
       defaultModel: "bom",
     });
+  });
+
+  it("creates a missing config template by throwing a first-run signal", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-config-first-run-"));
+    const configPath = join(baseDir, ".cliagent", "config.json");
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: string | number | null) => {
+      throw new Error(`exit ${String(code)}`);
+    }) as never);
+    let caught: unknown;
+
+    try {
+      await loadConfig(baseDir, {
+        platform: "linux",
+        env: {},
+        homeDir: baseDir,
+      });
+    } catch (error: unknown) {
+      caught = error;
+    } finally {
+      log.mockRestore();
+      exit.mockRestore();
+    }
+
+    expect(caught).toBeInstanceOf(ConfigTemplateCreatedError);
+    expect((caught as ConfigTemplateCreatedError).configPath).toBe(configPath);
+    expect(log).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
   });
 });

@@ -25,6 +25,13 @@ export interface LoadConfigOptions {
   createTemplateIfMissing?: boolean;
 }
 
+export class ConfigTemplateCreatedError extends Error {
+  constructor(public readonly configPath: string) {
+    super(`Config template created at ${configPath}`);
+    this.name = "ConfigTemplateCreatedError";
+  }
+}
+
 export const CLIProviderSchema = z
   .object({
     engine: z.string().min(1),
@@ -302,9 +309,7 @@ export async function loadConfig(baseDir: string, options: LoadConfigOptions = {
     }
     await mkdir(dir, { recursive: true });
     await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");
-    console.log(`Config template created at ${configPath}`);
-    console.log("Please add your provider configurations and run again.");
-    process.exit(0);
+    throw new ConfigTemplateCreatedError(configPath);
   }
 
   return parseConfig(mergeConfigObjects(globalConfig ?? {}, projectConfig ?? {}));

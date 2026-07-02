@@ -11,7 +11,7 @@ import { App } from "./components/App.js";
 import { runHeadlessDiagnostics } from "./diagnostics-runner.js";
 import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
-import { writeCLIEntryFatal } from "./entry-fatal.js";
+import { writeCLIEntryError } from "./entry-fatal.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runContextPreview } from "./context-preview-runner.js";
@@ -143,11 +143,10 @@ async function main(): Promise<void> {
           : formatSessionList(sessions, activeSessionId),
       );
     } catch (e: unknown) {
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -205,11 +204,10 @@ async function main(): Promise<void> {
       if (runtime !== undefined) {
         await runtime.destroy();
       }
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -233,11 +231,10 @@ async function main(): Promise<void> {
       if (runtime !== undefined) {
         await runtime.destroy();
       }
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -261,11 +258,10 @@ async function main(): Promise<void> {
       if (runtime !== undefined) {
         await runtime.destroy();
       }
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -289,11 +285,10 @@ async function main(): Promise<void> {
       if (runtime !== undefined) {
         await runtime.destroy();
       }
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -382,11 +377,10 @@ async function main(): Promise<void> {
         },
       );
     } catch (e: unknown) {
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -411,11 +405,10 @@ async function main(): Promise<void> {
         },
       );
     } catch (e: unknown) {
-      writeCLIEntryFatal({
+      process.exitCode = writeCLIEntryError({
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
       }, e, action.output ?? "text");
-      process.exitCode = 1;
     }
     return;
   }
@@ -439,8 +432,10 @@ async function main(): Promise<void> {
     }
   } catch (e: unknown) {
     process.stdout.write("\x1b[?1049l");
-    process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
-    process.exit(1);
+    process.exit(writeCLIEntryError({
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    }, e, "text"));
   }
 }
 

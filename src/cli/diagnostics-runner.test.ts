@@ -1,3 +1,6 @@
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   formatDiagnosticsJson,
@@ -110,5 +113,23 @@ describe("runHeadlessDiagnostics", () => {
 
     expect(stdout).toHaveBeenCalledWith("{\n  \"ok\": false,\n  \"error\": \"diagnostics unavailable\"\n}\n");
     expect(stderr).not.toHaveBeenCalled();
+  });
+
+  it("prints first-run config creation as json when config is missing", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-diagnostics-first-run-"));
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+
+    await expect(runHeadlessDiagnostics({
+      baseDir,
+      output: "json",
+    }, { stdout, stderr })).resolves.toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"ok\": true"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"created\": true"));
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining("\"configPath\""));
+    expect(stderr).not.toHaveBeenCalled();
+    await expect(readFile(join(baseDir, ".cliagent", "config.json"), "utf-8"))
+      .resolves.toContain("\"defaultAgent\": \"build\"");
   });
 });

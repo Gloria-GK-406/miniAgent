@@ -1,4 +1,5 @@
-import { loadConfig } from "./config.js";
+import { ConfigTemplateCreatedError, loadConfig } from "./config.js";
+import { writeCLIEntryConfigTemplateCreated } from "./entry-fatal.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createDiagnosticsService, type DiagnosticResult, type DiagnosticsService } from "./runtime/diagnostics-service.js";
@@ -69,6 +70,10 @@ export async function runHeadlessDiagnostics(
     );
     return results.every(diagnosticPassed) ? 0 : 1;
   } catch (error: unknown) {
+    if (error instanceof ConfigTemplateCreatedError) {
+      writeCLIEntryConfigTemplateCreated(streams, error.configPath, output);
+      return 0;
+    }
     writeHeadlessError(streams, errorMessage(error), output);
     return 1;
   }
