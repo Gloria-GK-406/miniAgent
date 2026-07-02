@@ -63,6 +63,16 @@ describe("matchSuggestions", () => {
     expect(matchSuggestions("/permission se")).toEqual(["set"]);
   });
 
+  it("matches /git subcommands", () => {
+    expect(matchSuggestions("/git")).toEqual(["status", "log"]);
+    expect(matchSuggestions("/git l")).toEqual(["log"]);
+  });
+
+  it("matches /export formats", () => {
+    expect(matchSuggestions("/export")).toEqual(["json", "markdown"]);
+    expect(matchSuggestions("/export m")).toEqual(["markdown"]);
+  });
+
   it("matches /system subcommands", () => {
     expect(matchSuggestions("/system")).toEqual(["set", "unset"]);
     expect(matchSuggestions("/system un")).toEqual(["unset"]);

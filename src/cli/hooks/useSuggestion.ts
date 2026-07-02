@@ -34,6 +34,8 @@ const COMMANDS = [
 ];
 
 const AGENT_SUBS = ["list", "build", "plan"];
+const EXPORT_FORMATS = ["json", "markdown"];
+const GIT_SUBS = ["status", "log"];
 const PERMISSION_SUBS = ["set", "unset"];
 const SESSION_SUBS = ["search", "new", "switch", "fork", "rename", "delete"];
 const SYSTEM_SUBS = ["set", "unset"];
@@ -80,6 +82,12 @@ export function matchSuggestions(
     if (cmd === "/agent") {
       return AGENT_SUBS.filter((s) => s.startsWith(partial));
     }
+    if (cmd === "/export") {
+      return EXPORT_FORMATS.filter((s) => s.startsWith(partial));
+    }
+    if (cmd === "/git") {
+      return GIT_SUBS.filter((s) => s.startsWith(partial));
+    }
     if (cmd === "/permissions" || cmd === "/permission") {
       return PERMISSION_SUBS.filter((s) => s.startsWith(partial));
     }
@@ -96,6 +104,8 @@ export function matchSuggestions(
 
   if (matches.length === 1 && matches[0] === cmd) {
     if (cmd === "/agent") return AGENT_SUBS;
+    if (cmd === "/export") return EXPORT_FORMATS;
+    if (cmd === "/git") return GIT_SUBS;
     if (cmd === "/permissions" || cmd === "/permission") return PERMISSION_SUBS;
     if (cmd === "/sessions" || cmd === "/session") return SESSION_SUBS;
     if (cmd === "/system") return SYSTEM_SUBS;
