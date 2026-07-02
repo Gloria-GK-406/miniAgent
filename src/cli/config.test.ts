@@ -80,7 +80,7 @@ describe("CLI config provider mode", () => {
       generation: { temperature: 0.6, thinking: "medium" },
     });
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       providers: [
         {
           engine: "openai",
@@ -89,13 +89,77 @@ describe("CLI config provider mode", () => {
         },
       ],
       defaultModel: "fast",
+      defaultAgent: "build",
       generation: { temperature: 0.6, thinking: ThinkingLevel.Medium },
+      permission: {
+        "*": "ask",
+        read: "allow",
+        glob: "allow",
+        grep: "allow",
+      },
+      shell: {
+        windows: "powershell",
+        timeoutMs: 120000,
+      },
+      tui: {
+        showReasoning: false,
+        showToolDetails: false,
+      },
     });
     expect(parseDefaultModel(config)).toEqual({ id: "fast" });
     expect(toAgentGenerationConfig(config)).toEqual({
       temperature: 0.6,
       thinking: ThinkingLevel.Medium,
     });
+  });
+
+  it("parses product runtime config defaults", () => {
+    const config = CLIConfigSchema.parse({});
+
+    expect(config).toMatchObject({
+      providers: [],
+      defaultModel: "",
+      defaultAgent: "build",
+      permission: {
+        "*": "ask",
+        read: "allow",
+        glob: "allow",
+        grep: "allow",
+      },
+      shell: {
+        windows: "powershell",
+        timeoutMs: 120000,
+      },
+      tui: {
+        showReasoning: false,
+        showToolDetails: false,
+      },
+    });
+  });
+
+  it("parses nested shell permission patterns", () => {
+    const config = CLIConfigSchema.parse({
+      permission: {
+        "*": "ask",
+        shell: {
+          "*": "ask",
+          "npm *": "allow",
+          "rm *": "deny",
+        },
+      },
+    });
+
+    expect(config.permission.shell).toEqual({
+      "*": "ask",
+      "npm *": "allow",
+      "rm *": "deny",
+    });
+  });
+
+  it("rejects invalid agent and permission values", () => {
+    expect(CLIConfigSchema.safeParse({ defaultAgent: "review" }).success).toBe(false);
+    expect(CLIConfigSchema.safeParse({ permission: { read: "sometimes" } }).success).toBe(false);
+    expect(CLIConfigSchema.safeParse({ shell: { windows: "fish" } }).success).toBe(false);
   });
 
   it("converts CLI engine providers to agent provider configs", () => {

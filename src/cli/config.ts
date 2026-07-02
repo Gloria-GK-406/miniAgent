@@ -29,10 +29,56 @@ export const CLIProviderSchema = z
 
 export type CLIProvider = z.infer<typeof CLIProviderSchema>;
 
+export const CLIAgentModeSchema = z.enum(["build", "plan"]);
+export type CLIAgentMode = z.infer<typeof CLIAgentModeSchema>;
+
+export const CLIPermissionDecisionSchema = z.enum(["allow", "ask", "deny"]);
+export type CLIPermissionDecision = z.infer<typeof CLIPermissionDecisionSchema>;
+
+export const CLIPermissionConfigSchema = z
+  .record(z.union([CLIPermissionDecisionSchema, z.record(CLIPermissionDecisionSchema)]))
+  .default({
+    "*": "ask",
+    read: "allow",
+    glob: "allow",
+    grep: "allow",
+  });
+export type CLIPermissionConfig = z.infer<typeof CLIPermissionConfigSchema>;
+
+export const CLIShellConfigSchema = z
+  .object({
+    windows: z.enum(["powershell", "git-bash", "wsl", "cmd"]).default("powershell"),
+    executable: z.string().min(1).optional(),
+    args: z.array(z.string()).optional(),
+    timeoutMs: z.number().int().positive().max(600000).default(120000),
+  })
+  .strict()
+  .default({
+    windows: "powershell",
+    timeoutMs: 120000,
+  });
+export type CLIShellConfig = z.infer<typeof CLIShellConfigSchema>;
+
+export const CLITUIConfigSchema = z
+  .object({
+    showReasoning: z.boolean().default(false),
+    showToolDetails: z.boolean().default(false),
+  })
+  .strict()
+  .default({
+    showReasoning: false,
+    showToolDetails: false,
+  });
+export type CLITUIConfig = z.infer<typeof CLITUIConfigSchema>;
+
 export const CLIConfigSchema = z
   .object({
     providers: z.array(CLIProviderSchema).default([]),
     defaultModel: z.string().default(""),
+    defaultAgent: CLIAgentModeSchema.default("build"),
+    permission: CLIPermissionConfigSchema,
+    shell: CLIShellConfigSchema,
+    tui: CLITUIConfigSchema,
     generation: GenerationConfigSchema.partial().optional(),
     systemPrompt: z.string().optional(),
     mcp: McpPluginConfigSchema.optional(),
@@ -91,6 +137,21 @@ export async function loadConfig(baseDir: string): Promise<CLIConfig> {
     const template: CLIConfig = {
       providers: [],
       defaultModel: "",
+      defaultAgent: "build",
+      permission: {
+        "*": "ask",
+        read: "allow",
+        glob: "allow",
+        grep: "allow",
+      },
+      shell: {
+        windows: "powershell",
+        timeoutMs: 120000,
+      },
+      tui: {
+        showReasoning: false,
+        showToolDetails: false,
+      },
       systemPrompt: "You are a helpful assistant.",
       mcp: {
         servers: {
