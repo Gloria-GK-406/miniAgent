@@ -11,6 +11,7 @@ import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
 import { createCLISessionService } from "./runtime/session-service.js";
+import { runSessionExport } from "./session-export-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
 
 function readPackageVersion(): string {
@@ -53,6 +54,19 @@ async function main(): Promise<void> {
       process.stderr.write(`Fatal: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exitCode = 1;
     }
+    return;
+  }
+  if (action.type === "export-session") {
+    process.exitCode = await runSessionExport({
+      baseDir: resolve(action.cwd ?? process.cwd()),
+      ...(action.sessionId !== undefined && { sessionId: action.sessionId }),
+      ...(action.format !== undefined && { format: action.format }),
+      ...(action.outputPath !== undefined && { outputPath: action.outputPath }),
+      ...(action.output !== undefined && { output: action.output }),
+    }, {
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+    });
     return;
   }
   if (action.type === "doctor") {

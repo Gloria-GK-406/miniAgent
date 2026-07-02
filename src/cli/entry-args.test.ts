@@ -166,6 +166,24 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("exports a session without opening the TUI", () => {
+    expect(parseCLIEntryArgs([
+      "--export-session",
+      "s1",
+      "--format",
+      "json",
+      "--output",
+      "exports/session.json",
+      "--json",
+    ])).toEqual({
+      type: "export-session",
+      sessionId: "s1",
+      format: "json",
+      outputPath: "exports/session.json",
+      output: "json",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -292,10 +310,25 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed export session options", () => {
+    expect(parseCLIEntryArgs(["--export-session", "--format", "xml"])).toEqual({
+      type: "error",
+      message: "Invalid export format: xml",
+    });
+    expect(parseCLIEntryArgs(["--export-session", "--output"])).toEqual({
+      type: "error",
+      message: "Missing path after --output",
+    });
+    expect(parseCLIEntryArgs(["--export-session", "s1", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --export-session",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, or --list-sessions",
+      message: "Cannot use --json without --print, --doctor, --list-sessions, or --export-session",
     });
   });
 
@@ -310,6 +343,9 @@ describe("CLI entry args", () => {
     expect(help).toContain("--session");
     expect(help).toContain("--new-session");
     expect(help).toContain("--list-sessions");
+    expect(help).toContain("--export-session");
+    expect(help).toContain("--format");
+    expect(help).toContain("--output");
     expect(help).toContain("--doctor");
     expect(help).toContain("--json");
     expect(help).toContain("--print");

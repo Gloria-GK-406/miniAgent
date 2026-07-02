@@ -1,5 +1,6 @@
 export type CLIEntryAgentMode = "build" | "plan";
 export type CLIEntryOutput = "text" | "json";
+export type CLIEntryExportFormat = "json" | "markdown";
 
 export type CLIEntryAction =
   | {
@@ -36,6 +37,14 @@ export type CLIEntryAction =
     output?: CLIEntryOutput;
   }
   | { type: "list-sessions"; cwd?: string; output?: CLIEntryOutput }
+  | {
+    type: "export-session";
+    cwd?: string;
+    sessionId?: string;
+    format?: CLIEntryExportFormat;
+    outputPath?: string;
+    output?: CLIEntryOutput;
+  }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -50,6 +59,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let printMode = false;
   let doctorMode = false;
   let listSessionsMode = false;
+  let exportSessionMode = false;
+  let exportFormat: CLIEntryExportFormat | undefined;
+  let outputPath: string | undefined;
   let output: CLIEntryOutput | undefined;
   let promptFile: string | undefined;
   const promptParts: string[] = [];
@@ -74,8 +86,38 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       listSessionsMode = true;
       continue;
     }
+    if (arg === "--export-session") {
+      exportSessionMode = true;
+      const next = args[index + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        sessionId = next;
+        index++;
+      }
+      continue;
+    }
     if (arg === "--json") {
       output = "json";
+      continue;
+    }
+    if (arg === "--format") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing format after --format" };
+      }
+      if (next !== "json" && next !== "markdown") {
+        return { type: "error", message: `Invalid export format: ${next}` };
+      }
+      exportFormat = next;
+      index++;
+      continue;
+    }
+    if (arg === "--output") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing path after --output" };
+      }
+      outputPath = next;
+      index++;
       continue;
     }
     if (arg === "--prompt-file") {
@@ -162,6 +204,22 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (listSessionsMode && doctorMode) {
     return { type: "error", message: "Cannot use --list-sessions with --doctor" };
   }
+  if (exportSessionMode && (printMode || doctorMode || listSessionsMode)) {
+    return { type: "error", message: "Cannot combine --export-session with another headless mode" };
+  }
+  if (exportSessionMode) {
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --export-session" };
+    }
+    return {
+      type: "export-session",
+      ...(cwd !== undefined && { cwd }),
+      ...(sessionId !== undefined && { sessionId }),
+      ...(exportFormat !== undefined && { format: exportFormat }),
+      ...(outputPath !== undefined && { outputPath }),
+      ...(output !== undefined && { output }),
+    };
+  }
   if (listSessionsMode) {
     if (prompt.length > 0) {
       return { type: "error", message: "Unexpected prompt for --list-sessions" };
@@ -208,7 +266,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (output !== undefined) {
     return {
       type: "error",
-      message: "Cannot use --json without --print, --doctor, or --list-sessions",
+      message: "Cannot use --json without --print, --doctor, --list-sessions, or --export-session",
     };
   }
 
@@ -242,6 +300,9 @@ export function formatCLIHelp(): string {
     "  -s, --session   Resume a session by id",
     "  --new-session   Create and start in a named session",
     "  --list-sessions List sessions headlessly",
+    "  --export-session Export a session headlessly",
+    "  --format         Set export format: json or markdown",
+    "  --output         Set export output path",
     "  -m, --model     Select a configured model by id or provider/id",
     "  --doctor        Run setup checks headlessly",
     "  --json          Emit JSON for supported headless modes",
