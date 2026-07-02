@@ -6,6 +6,7 @@ import { render } from "ink";
 import { App } from "./components/App.js";
 import { runDoctorChecks } from "./doctor-runner.js";
 import { formatCLIHelp, parseCLIEntryArgs } from "./entry-args.js";
+import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import { runPrintPrompt } from "./print-runner.js";
 import { createCLIRuntime } from "./runtime/app.js";
@@ -76,11 +77,16 @@ async function main(): Promise<void> {
   }
   if (action.type === "print") {
     try {
-      const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+      const cwd = resolve(action.cwd ?? process.cwd());
+      const runtime = await createCLIRuntime(cwd);
       await applyCLIEntryRuntimeOptions(runtime, action);
+      const prompt = await loadEntryPrompt(action, cwd);
+      if (prompt === undefined) {
+        throw new Error("Missing prompt for --print");
+      }
       process.exitCode = await runPrintPrompt(
         runtime,
-        action.prompt,
+        prompt,
         {
           stdout: (text) => process.stdout.write(text),
           stderr: (text) => process.stderr.write(text),
@@ -105,11 +111,13 @@ async function main(): Promise<void> {
   process.on("exit", cleanup);
 
   try {
-    const runtime = await createCLIRuntime(resolve(action.cwd ?? process.cwd()));
+    const cwd = resolve(action.cwd ?? process.cwd());
+    const runtime = await createCLIRuntime(cwd);
     await applyCLIEntryRuntimeOptions(runtime, action);
     render(<App runtime={runtime} />, { exitOnCtrlC: false });
-    if (action.prompt !== undefined) {
-      void runtime.submitInput(action.prompt);
+    const prompt = await loadEntryPrompt(action, cwd);
+    if (prompt !== undefined) {
+      void runtime.submitInput(prompt);
     }
   } catch (e: unknown) {
     process.stdout.write("\x1b[?1049l");

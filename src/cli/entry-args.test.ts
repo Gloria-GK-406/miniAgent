@@ -67,6 +67,13 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("opens the TUI with an initial prompt file", () => {
+    expect(parseCLIEntryArgs(["--prompt-file", "task.md"])).toEqual({
+      type: "tui",
+      promptFile: "task.md",
+    });
+  });
+
   it("opens an explicit working directory with an initial prompt", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -107,6 +114,13 @@ describe("CLI entry args", () => {
       type: "print",
       output: "json",
       prompt: "hello",
+    });
+  });
+
+  it("prints from a prompt file without a positional prompt", () => {
+    expect(parseCLIEntryArgs(["--print", "--prompt-file", "task.md"])).toEqual({
+      type: "print",
+      promptFile: "task.md",
     });
   });
 
@@ -241,6 +255,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects missing or conflicting prompt file input", () => {
+    expect(parseCLIEntryArgs(["--prompt-file"])).toEqual({
+      type: "error",
+      message: "Missing path after --prompt-file",
+    });
+    expect(parseCLIEntryArgs(["--prompt-file", "task.md", "inline"])).toEqual({
+      type: "error",
+      message: "Cannot combine --prompt-file with a positional prompt",
+    });
+  });
+
   it("rejects conflicting or prompted doctor mode", () => {
     expect(parseCLIEntryArgs(["--doctor", "--print", "hello"])).toEqual({
       type: "error",
@@ -288,6 +313,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--doctor");
     expect(help).toContain("--json");
     expect(help).toContain("--print");
+    expect(help).toContain("--prompt-file");
     expect(help).toContain("[prompt]");
     expect(help).toContain("--help");
     expect(help).toContain("--version");

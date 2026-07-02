@@ -10,6 +10,7 @@ export type CLIEntryAction =
     model?: string;
     sessionId?: string;
     newSession?: string;
+    promptFile?: string;
     prompt?: string;
   }
   | {
@@ -21,7 +22,8 @@ export type CLIEntryAction =
     sessionId?: string;
     newSession?: string;
     output?: CLIEntryOutput;
-    prompt: string;
+    prompt?: string;
+    promptFile?: string;
   }
   | {
     type: "doctor";
@@ -49,6 +51,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let doctorMode = false;
   let listSessionsMode = false;
   let output: CLIEntryOutput | undefined;
+  let promptFile: string | undefined;
   const promptParts: string[] = [];
 
   for (let index = 0; index < args.length; index++) {
@@ -73,6 +76,15 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     }
     if (arg === "--json") {
       output = "json";
+      continue;
+    }
+    if (arg === "--prompt-file") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0) {
+        return { type: "error", message: "Missing path after --prompt-file" };
+      }
+      promptFile = next;
+      index++;
       continue;
     }
     if (arg === "--auto-approve" || arg === "-y") {
@@ -138,6 +150,9 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (sessionId !== undefined && newSession !== undefined) {
     return { type: "error", message: "Cannot use --session with --new-session" };
   }
+  if (promptFile !== undefined && prompt.length > 0) {
+    return { type: "error", message: "Cannot combine --prompt-file with a positional prompt" };
+  }
   if (doctorMode && printMode) {
     return { type: "error", message: "Cannot use --doctor with --print" };
   }
@@ -174,7 +189,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
 
   if (printMode) {
-    if (prompt.length === 0) {
+    if (prompt.length === 0 && promptFile === undefined) {
       return { type: "error", message: "Missing prompt for --print" };
     }
     return {
@@ -186,7 +201,8 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       ...(sessionId !== undefined && { sessionId }),
       ...(newSession !== undefined && { newSession }),
       ...(output !== undefined && { output }),
-      prompt,
+      ...(prompt.length > 0 && { prompt }),
+      ...(promptFile !== undefined && { promptFile }),
     };
   }
   if (output !== undefined) {
@@ -204,6 +220,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
     ...(model !== undefined && { model }),
     ...(sessionId !== undefined && { sessionId }),
     ...(newSession !== undefined && { newSession }),
+    ...(promptFile !== undefined && { promptFile }),
     ...(prompt.length > 0 && { prompt }),
   };
 }
@@ -229,6 +246,7 @@ export function formatCLIHelp(): string {
     "  --doctor        Run setup checks headlessly",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
+    "  --prompt-file   Read the initial prompt from a file",
     "  -h, --help      Show this help text",
     "  -v, --version   Show package version",
   ].join("\n");
