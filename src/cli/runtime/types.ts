@@ -1,0 +1,99 @@
+import type { MiniAgent } from "../../core/agent.js";
+import type {
+  Message,
+  TokenCount,
+  ToolCallMessage,
+  ToolResultMessage,
+} from "../../core/types.js";
+import type { Tool } from "../../tool/types.js";
+import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
+
+export type CLIViewPanel =
+  | { type: "none" }
+  | { type: "help" }
+  | { type: "history"; messages: Message[] }
+  | { type: "context"; messages: Message[] }
+  | { type: "models" }
+  | { type: "sessions" }
+  | { type: "tools"; tools: Tool[] }
+  | { type: "error"; message: string };
+
+export interface CLIApprovalRequest {
+  id: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  decision: "pending";
+}
+
+export interface CLIState {
+  baseDir: string;
+  config: CLIConfig;
+  mode: CLIAgentMode;
+  modelName: string;
+  modelPaths: string[];
+  sessionId: string;
+  sessionName: string;
+  autoApprove: boolean;
+  showReasoning: boolean;
+  showToolDetails: boolean;
+  isRunning: boolean;
+  currentTool: string | null;
+  messages: Message[];
+  streamingText: string;
+  reasoningText: string;
+  turnCount: number;
+  tokenUsage: TokenCount;
+  panel: CLIViewPanel;
+  approval: CLIApprovalRequest | null;
+  error: string | null;
+}
+
+export type CLIEvent =
+  | { type: "state"; state: CLIState }
+  | { type: "notice"; level: "info" | "warn" | "error"; message: string }
+  | { type: "tool:start"; toolCall: ToolCallMessage }
+  | { type: "tool:result"; toolCall: ToolCallMessage; result: ToolResultMessage };
+
+export interface CLIRuntimeSubscriber {
+  (event: CLIEvent): void;
+}
+
+export interface CLIAppRuntime {
+  getState(): CLIState;
+  subscribe(listener: CLIRuntimeSubscriber): () => void;
+  submitInput(input: string): Promise<void>;
+  runCommand(name: string, args: string): Promise<void>;
+  selectModel(path: string): Promise<void>;
+  answerApproval(id: string, decision: boolean): void;
+  stop(): void;
+  rebuildAgent(reason: string): Promise<void>;
+  destroy(): Promise<void>;
+}
+
+export interface CLICommandContext {
+  runtime: CLIAppRuntime;
+  agent: MiniAgent;
+  getState: () => CLIState;
+  updateState: (patch: Partial<CLIState>) => void;
+  notice: (level: "info" | "warn" | "error", message: string) => void;
+}
+
+export interface CLICommand {
+  name: string;
+  aliases?: string[];
+  description: string;
+  usage: string;
+  hidden?: boolean;
+  execute(ctx: CLICommandContext, args: string): Promise<void>;
+  complete?(ctx: CLICommandContext, args: string): Promise<string[]>;
+}
+
+export interface CLIPermissionRequest {
+  toolName: string;
+  args: Record<string, unknown>;
+}
+
+export interface CLIPermissionResult {
+  decision: CLIPermissionDecision;
+  reason: string;
+}
