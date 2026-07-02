@@ -1,6 +1,7 @@
 export type CLIEntryAgentMode = "build" | "plan";
 export type CLIEntryOutput = "text" | "json";
 export type CLIEntryExportFormat = "json" | "markdown";
+export type CLIEntryCompletionShell = "bash" | "zsh" | "fish" | "powershell";
 
 export type CLIEntryAction =
   | {
@@ -73,6 +74,7 @@ export type CLIEntryAction =
     name?: string;
     output?: CLIEntryOutput;
   }
+  | { type: "completion"; shell: CLIEntryCompletionShell }
   | { type: "help" }
   | { type: "version" }
   | { type: "error"; message: string };
@@ -93,6 +95,7 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let deleteSessionMode = false;
   let renameSessionMode = false;
   let forkSessionMode = false;
+  let completionShell: CLIEntryCompletionShell | undefined;
   let exportFormat: CLIEntryExportFormat | undefined;
   let outputPath: string | undefined;
   let importInputPath: string | undefined;
@@ -151,6 +154,18 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
       }
       deleteSessionMode = true;
       sessionId = next;
+      index++;
+      continue;
+    }
+    if (arg === "--completion") {
+      const next = args[index + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        return { type: "error", message: "Missing shell after --completion" };
+      }
+      if (next !== "bash" && next !== "zsh" && next !== "fish" && next !== "powershell") {
+        return { type: "error", message: `Invalid completion shell: ${next}` };
+      }
+      completionShell = next;
       index++;
       continue;
     }
@@ -289,6 +304,22 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   if (diagnosticsMode && (printMode || doctorMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --diagnostics with another headless mode" };
   }
+  if (
+    completionShell !== undefined
+    && (
+      printMode
+      || doctorMode
+      || diagnosticsMode
+      || listSessionsMode
+      || exportSessionMode
+      || importSessionMode
+      || deleteSessionMode
+      || renameSessionMode
+      || forkSessionMode
+    )
+  ) {
+    return { type: "error", message: "Cannot combine --completion with another headless mode" };
+  }
   if (deleteSessionMode && (printMode || doctorMode || diagnosticsMode || listSessionsMode || exportSessionMode || importSessionMode)) {
     return { type: "error", message: "Cannot combine --delete-session with another headless mode" };
   }
@@ -309,6 +340,18 @@ export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   }
   if (importSessionMode && (printMode || doctorMode || listSessionsMode || exportSessionMode)) {
     return { type: "error", message: "Cannot combine --import-session with another headless mode" };
+  }
+  if (completionShell !== undefined) {
+    if (output !== undefined) {
+      return { type: "error", message: "Cannot use --json with --completion" };
+    }
+    if (prompt.length > 0) {
+      return { type: "error", message: "Unexpected prompt for --completion" };
+    }
+    return {
+      type: "completion",
+      shell: completionShell,
+    };
   }
   if (diagnosticsMode) {
     if (prompt.length > 0) {
@@ -474,6 +517,7 @@ export function formatCLIHelp(): string {
     "  -m, --model     Select a configured model by id or provider/id",
     "  --doctor        Run setup checks headlessly",
     "  --diagnostics   Run configured diagnostics headlessly",
+    "  --completion     Generate shell completions: bash, zsh, fish, powershell",
     "  --json          Emit JSON for supported headless modes",
     "  -p, --print     Run one prompt headlessly and print the final response",
     "  --prompt-file   Read the initial prompt from a file",

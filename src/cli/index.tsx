@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render } from "ink";
+import { formatCompletionScript } from "./completion-runner.js";
 import { App } from "./components/App.js";
 import { runHeadlessDiagnostics } from "./diagnostics-runner.js";
 import { runDoctorChecks } from "./doctor-runner.js";
@@ -38,6 +39,10 @@ async function main(): Promise<void> {
   if (action.type === "error") {
     process.stderr.write(`${action.message}\n\n${formatCLIHelp()}\n`);
     process.exitCode = 1;
+    return;
+  }
+  if (action.type === "completion") {
+    process.stdout.write(formatCompletionScript(action.shell));
     return;
   }
   if (action.type === "list-sessions") {

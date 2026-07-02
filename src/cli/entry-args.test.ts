@@ -252,6 +252,17 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("generates shell completion scripts without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--completion", "bash"])).toEqual({
+      type: "completion",
+      shell: "bash",
+    });
+    expect(parseCLIEntryArgs(["--completion", "powershell"])).toEqual({
+      type: "completion",
+      shell: "powershell",
+    });
+  });
+
   it("prints from an explicit working directory", () => {
     expect(parseCLIEntryArgs([
       "--cwd",
@@ -464,6 +475,25 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed completion options", () => {
+    expect(parseCLIEntryArgs(["--completion"])).toEqual({
+      type: "error",
+      message: "Missing shell after --completion",
+    });
+    expect(parseCLIEntryArgs(["--completion", "xonsh"])).toEqual({
+      type: "error",
+      message: "Invalid completion shell: xonsh",
+    });
+    expect(parseCLIEntryArgs(["--completion", "bash", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --completion",
+    });
+    expect(parseCLIEntryArgs(["--completion", "bash", "--json"])).toEqual({
+      type: "error",
+      message: "Cannot use --json with --completion",
+    });
+  });
+
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
@@ -488,6 +518,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--delete-session");
     expect(help).toContain("--rename-session");
     expect(help).toContain("--fork-session");
+    expect(help).toContain("--completion");
     expect(help).toContain("--name");
     expect(help).toContain("--format");
     expect(help).toContain("--output");
