@@ -15,6 +15,7 @@ type RuntimeBackedCLIEntryActionType =
   | "list-agents"
   | "preview-context"
   | "show-history"
+  | "search-all"
   | "list-snapshots"
   | "snapshot-action";
 

@@ -34,6 +34,7 @@ import { runSessionFork } from "./session-fork-runner.js";
 import { runSessionImport } from "./session-import-runner.js";
 import { formatSessionList, formatSessionListJson } from "./session-list-runner.js";
 import { runSessionRename } from "./session-rename-runner.js";
+import { runSessionSearch } from "./session-search-runner.js";
 import { runShowConfig } from "./show-config-runner.js";
 import { runSnapshotAction } from "./snapshot-action-runner.js";
 import { runSnapshotList } from "./snapshot-list-runner.js";
@@ -329,6 +330,22 @@ async function main(): Promise<void> {
         runtime,
         streams,
         {
+          ...(action.output !== undefined && { output: action.output }),
+        },
+      ),
+    });
+    return;
+  }
+  if (action.type === "search-all") {
+    process.exitCode = await runRuntimeBackedCLIEntry({
+      action,
+      createRuntime: createCLIRuntime,
+      streams,
+      run: async (runtime) => await runSessionSearch(
+        runtime,
+        streams,
+        {
+          query: action.query,
           ...(action.output !== undefined && { output: action.output }),
         },
       ),

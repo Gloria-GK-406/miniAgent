@@ -299,6 +299,20 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("searches all sessions without opening the TUI", () => {
+    expect(parseCLIEntryArgs(["--search-all", "cache"])).toEqual({
+      type: "search-all",
+      query: "cache",
+    });
+    expect(parseCLIEntryArgs(["--cwd", "C:/repo", "--session", "s2", "--search-all", "cache", "--json"])).toEqual({
+      type: "search-all",
+      cwd: "C:/repo",
+      sessionId: "s2",
+      query: "cache",
+      output: "json",
+    });
+  });
+
   it("lists file reference candidates without opening the TUI", () => {
     expect(parseCLIEntryArgs(["--list-references"])).toEqual({
       type: "list-references",
@@ -800,6 +814,26 @@ describe("CLI entry args", () => {
     });
   });
 
+  it("rejects malformed session search mode", () => {
+    expect(parseCLIEntryArgs(["--search-all"])).toEqual({
+      type: "error",
+      message: "Missing query after --search-all",
+    });
+    expect(parseCLIEntryArgs(["--search-all", "--json"])).toEqual({
+      type: "error",
+      message: "Missing query after --search-all",
+      output: "json",
+    });
+    expect(parseCLIEntryArgs(["--search-all", "cache", "prompt"])).toEqual({
+      type: "error",
+      message: "Unexpected prompt for --search-all",
+    });
+    expect(parseCLIEntryArgs(["--status", "--search-all", "cache"])).toEqual({
+      type: "error",
+      message: "Cannot combine --status with another headless mode",
+    });
+  });
+
   it("rejects prompted snapshot listing mode", () => {
     expect(parseCLIEntryArgs(["--list-snapshots", "prompt"])).toEqual({
       type: "error",
@@ -1062,7 +1096,7 @@ describe("CLI entry args", () => {
   it("rejects json output for interactive TUI mode", () => {
     expect(parseCLIEntryArgs(["--json"])).toEqual({
       type: "error",
-      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --overview, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-todos, --list-agents, --preview-context, --show-history, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
+      message: "Cannot use --json without --print, --doctor, --diagnostics, --config-paths, --show-config, --init, --init-instructions, --show-permissions, --set-permission, --unset-permission, --show-system-prompt, --set-system-prompt, --system-prompt-file, --unset-system-prompt, --status, --overview, --git-status, --git-log, --git-diff, --list-sessions, --list-models, --list-commands, --list-tools, --list-todos, --list-agents, --preview-context, --show-history, --search-all, --list-references, --list-snapshots, --restore-snapshot, --reapply-snapshot, --export-session, --import-session, --delete-session, --clear-session, --rename-session, or --fork-session",
       output: "json",
     });
   });
@@ -1100,6 +1134,7 @@ describe("CLI entry args", () => {
     expect(help).toContain("--list-agents");
     expect(help).toContain("--preview-context");
     expect(help).toContain("--show-history");
+    expect(help).toContain("--search-all");
     expect(help).toContain("--list-references");
     expect(help).toContain("--list-snapshots");
     expect(help).toContain("--restore-snapshot");

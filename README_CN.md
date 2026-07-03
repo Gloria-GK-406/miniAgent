@@ -519,7 +519,7 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 ## CLI Phase 3 补充
 
 - 项目配置位于 `.cliagent/config.json`；全局默认配置可放在 `%APPDATA%/miniagent/config.json`、`$XDG_CONFIG_HOME/miniagent/config.json` 或 `~/.config/miniagent/config.json`。项目配置覆盖全局配置，数组整体替换，对象浅合并。
-- 新增命令：`/git [status|log]`、`/diff [--staged] [path]`、`/editor [initial text]`、`/diagnostics`、`/activity`、`/permissions`、`/system`、`/references`、`/init [--force]`；headless 支持 `--overview [--json]`、`--list-todos [query] [--json]`、`--list-references [--json]`、`--list-snapshots [--json]`、`--restore-snapshot <turnId> [--json]`、`--reapply-snapshot <turnId> [--json]`、`--show-permissions [--json]` 和 `--show-system-prompt [--json]`。
+- 新增命令：`/git [status|log]`、`/diff [--staged] [path]`、`/editor [initial text]`、`/diagnostics`、`/activity`、`/permissions`、`/system`、`/references`、`/init [--force]`；headless 支持 `--overview [--json]`、`--list-todos [query] [--json]`、`--search-all <query> [--json]`、`--list-references [--json]`、`--list-snapshots [--json]`、`--restore-snapshot <turnId> [--json]`、`--reapply-snapshot <turnId> [--json]`、`--show-permissions [--json]` 和 `--show-system-prompt [--json]`。
 - CLI Agent 现在包含 git-aware 只读工具和受权限保护的 `git_commit`，并提供 diff、诊断、外部编辑器和活动面板。
 
 ## License

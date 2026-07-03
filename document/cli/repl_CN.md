@@ -11,6 +11,7 @@
 - `/references`：查看可用于 `@file` 引用补全的文件。
 - `--overview [--json]`：以 headless 方式查看工作区、会话、git、todo 和活动摘要。
 - `--list-todos [query] [--json]`：以 headless 方式查看或过滤 Agent todo 列表。
+- `--search-all <query> [--json]`：以 headless 方式搜索所有会话 transcript。
 - `--list-references [--json]`：以 headless 方式查看可用于 `@file` 引用补全的文件。
 - `--list-snapshots [--json]`：以 headless 方式查看 turn 文件快照。
 - `--restore-snapshot <turnId> [--json]`：以 headless 方式恢复指定 turn 的文件快照。

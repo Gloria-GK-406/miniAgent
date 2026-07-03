@@ -97,6 +97,7 @@ also accept `--json`.
 | `--overview` | Yes | Print workspace, session, git, todo, and activity summary |
 | `--preview-context` | Yes | Preview the assembled runtime context for the selected session and agent |
 | `--show-history` | Yes | Show current session messages |
+| `--search-all <query>` | Yes | Search all session transcripts |
 | `--list-references` | Yes | List files available to `@file` reference autocomplete |
 | `--list-snapshots` | Yes | List workspace file snapshots by turn |
 | `--restore-snapshot <turnId>` | Yes | Restore workspace files from a turn snapshot |
@@ -135,6 +136,7 @@ miniagent --list-agents --json
 miniagent --overview --json
 miniagent --preview-context --json
 miniagent --show-history --json
+miniagent --search-all cache --json
 miniagent --list-references --json
 miniagent --list-snapshots --json
 miniagent --restore-snapshot turn-1

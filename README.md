@@ -443,6 +443,7 @@ and shell integration:
 | `--overview [--json]` | Print workspace, session, git, todo, and activity summary |
 | `--preview-context [--json]` | Preview the assembled runtime context |
 | `--show-history [--json]` | Show current session messages |
+| `--search-all <query> [--json]` | Search all session transcripts |
 | `--list-references [--json]` | List files available to `@file` references |
 | `--list-snapshots [--json]` | List workspace file snapshots by turn |
 | `--restore-snapshot <turnId> [--json]` | Restore workspace files from a turn snapshot |

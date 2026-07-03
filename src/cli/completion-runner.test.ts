@@ -13,6 +13,7 @@ describe("formatCompletionScript", () => {
       "--force",
       "--staged",
       "--list-todos",
+      "--search-all",
       "--list-references",
       "--list-snapshots",
       "--restore-snapshot",
@@ -46,6 +47,7 @@ describe("formatCompletionScript", () => {
     expect(script).toContain("--overview");
     expect(script).toContain("--preview-context");
     expect(script).toContain("--show-history");
+    expect(script).toContain("--search-all");
     expect(script).toContain("--list-references");
     expect(script).toContain("--list-snapshots");
     expect(script).toContain("--restore-snapshot");

@@ -23,6 +23,7 @@ const COMPLETION_OPTIONS: CompletionOption[] = [
   { long: "--list-agents", description: "List primary and configured agents headlessly" },
   { long: "--preview-context", description: "Preview assembled runtime context headlessly" },
   { long: "--show-history", description: "Show session history headlessly" },
+  { long: "--search-all", description: "Search all session transcripts headlessly" },
   { long: "--list-references", description: "List file reference candidates headlessly" },
   { long: "--list-snapshots", description: "Show workspace snapshots headlessly" },
   { long: "--restore-snapshot", description: "Restore workspace files from a turn snapshot" },
