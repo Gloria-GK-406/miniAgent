@@ -41,6 +41,7 @@ import {
   createSessionPermissionService,
 } from "./permission-service.js";
 import { createPermissionConfigService } from "./permission-config-service.js";
+import { createProviderConfigService } from "./provider-config-service.js";
 import { createProjectInstructionsService } from "./project-instructions-service.js";
 import { createReferenceService } from "./reference-service.js";
 import { createReferenceTurnContextAppender } from "./reference-turn-context.js";
@@ -61,6 +62,7 @@ import type {
   CLIInputOverrides,
   CLIOverviewGitInfo,
   CLIOverviewInfo,
+  CLIProviderConnection,
   CLISessionSearchHit,
   CLIRuntimeSubscriber,
   CLIState,
@@ -227,13 +229,14 @@ function sessionPermissionDecision(answer: CLIApprovalAnswer): "allow" | "deny" 
 }
 
 export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> {
-  let config = await loadConfig(baseDir);
+  let config = await loadConfig(baseDir, { createTemplateIfMissing: false });
   const sessionService = await createCLISessionService(baseDir);
   const session = await sessionService.ensureActiveSession();
   const sessionRuntimeMetadata = await sessionService.readSessionRuntimeMetadata(session.id);
   const exportService = createExportService({ baseDir, sessionService });
   const projectInstructionsService = createProjectInstructionsService(baseDir);
   const permissionConfigService = createPermissionConfigService(baseDir);
+  const providerConfigService = createProviderConfigService(baseDir);
   const systemPromptConfigService = createSystemPromptConfigService(baseDir);
   const subagentService = createSubagentService(baseDir, () => config);
   const editorService = createEditorService({ config: config.editor });
@@ -410,6 +413,11 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         },
       });
     }
+  }
+
+  async function connectProvider(connection: CLIProviderConnection): Promise<void> {
+    applyConfig(await providerConfigService.connectProvider(connection, state.config));
+    await rebuildCurrentAgent();
   }
 
   async function rebuildCurrentAgent(): Promise<void> {
@@ -740,6 +748,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
         sessions: sessionService.listSessions(),
       });
     },
+    connectProvider,
     setAgentMode: async (mode) => {
       await sessionService.updateSessionMode(state.sessionId, mode);
       updateState({

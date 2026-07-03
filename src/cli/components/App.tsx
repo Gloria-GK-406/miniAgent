@@ -15,6 +15,7 @@ import { buildRenderableLines } from "./MessageList.js";
 import type { RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
 import { CommandPalette } from "./CommandPalette.js";
+import { ConnectProviderView } from "./ConnectProviderView.js";
 import { InputBox } from "./InputBox.js";
 import { ModelSelectView } from "./ModelSelectView.js";
 import { PanelView } from "./PanelView.js";
@@ -224,7 +225,7 @@ function HelpPanel({ runtime }: { runtime: CLIAppRuntime }) {
         <>
           <Text>/about /overview /help /commands /keybindings /status /config /history</Text>
           <Text>/input-history /context /search /search-all /todos /references /tools</Text>
-          <Text>/models /sessions /activity /snapshots /permissions /system /agent build|plan</Text>
+          <Text>/models /connect /sessions /activity /snapshots /permissions /system /agent build|plan</Text>
           <Text>/restore /reapply /auto /details /thinking /git /diff /editor /diagnostics /doctor /quit</Text>
         </>
       ) : visibleCommandHelp.length === 0 ? (
@@ -911,6 +912,15 @@ export function App({ runtime }: AppProps) {
         modelPaths={state.modelPaths}
         currentModelPath={state.modelName}
         onSelect={runtime.selectModel}
+        onClose={() => closePanel(runtime)}
+      />
+    );
+  }
+
+  if (state.panel.type === "connect") {
+    return (
+      <ConnectProviderView
+        onConnect={runtime.connectProvider}
         onClose={() => closePanel(runtime)}
       />
     );

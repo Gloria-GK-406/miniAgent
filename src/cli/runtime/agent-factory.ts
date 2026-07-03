@@ -226,7 +226,7 @@ export function resolveSubagentSessionId(
 export async function createCLIAgentFactory(
   options: CLIAgentFactoryOptions,
 ): Promise<CLIAgentFactory> {
-  const config = await loadConfig(options.baseDir);
+  const config = await loadConfig(options.baseDir, { createTemplateIfMissing: false });
   const sessionManager = new SessionManager(join(options.baseDir, CLIAGENT_DIR));
   await sessionManager.load();
 

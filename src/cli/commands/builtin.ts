@@ -584,6 +584,14 @@ export function registerBuiltinCommands(registry: CommandRegistry): void {
     },
   });
   registry.register({
+    name: "connect",
+    description: "Connect a model provider",
+    usage: "/connect",
+    execute: async (ctx) => {
+      ctx.updateState({ panel: { type: "connect" } });
+    },
+  });
+  registry.register({
     name: "sessions",
     aliases: ["session"],
     description: "Show or manage sessions",

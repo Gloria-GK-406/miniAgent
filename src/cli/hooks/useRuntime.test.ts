@@ -50,6 +50,7 @@ describe("useRuntime", () => {
       submitInputWithOverrides: vi.fn(),
       runCommand: vi.fn(),
       selectModel: vi.fn(),
+      connectProvider: vi.fn(),
       setAgentMode: vi.fn(),
       rememberInputHistory: vi.fn(),
       answerApproval: vi.fn(),

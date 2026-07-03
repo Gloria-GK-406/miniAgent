@@ -88,6 +88,7 @@ function createMockRuntime(overrides: Partial<CLIState> = {}): CLIAppRuntime {
     requestExit: vi.fn(async () => undefined),
     rebuildAgent: vi.fn(async () => undefined),
     showOverview: vi.fn(async () => undefined),
+    connectProvider: vi.fn(async () => undefined),
     createSession: vi.fn(async () => undefined),
     switchSession: vi.fn(async () => undefined),
     renameSession: vi.fn(async () => undefined),

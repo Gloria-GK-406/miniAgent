@@ -87,6 +87,7 @@ describe("registerBuiltinCommands", () => {
       "snapshots",
       "tools",
       "models",
+      "connect",
       "new",
       "clear",
       "sessions",
@@ -138,6 +139,16 @@ describe("registerBuiltinCommands", () => {
     await registry.execute(commandCtx, "/status");
 
     expect(commandCtx.getState().panel).toEqual({ type: "status" });
+  });
+
+  it("opens provider connection panel", async () => {
+    const registry = createCommandRegistry();
+    registerBuiltinCommands(registry);
+    const commandCtx = ctx();
+
+    await registry.execute(commandCtx, "/connect");
+
+    expect(commandCtx.getState().panel).toEqual({ type: "connect" });
   });
 
   it("opens overview panel", async () => {

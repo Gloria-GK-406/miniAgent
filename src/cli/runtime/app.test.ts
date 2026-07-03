@@ -65,6 +65,58 @@ describe("createCLIRuntime", () => {
     await runtime.destroy();
   });
 
+  it("opens without a project config so providers can be connected in the TUI", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-first-connect-"));
+
+    const runtime = await createCLIRuntime(baseDir);
+
+    expect(runtime.getState().modelName).toBe("(none)");
+    expect(runtime.getState().modelPaths).toEqual([]);
+    await expect(readFile(join(baseDir, ".cliagent", "config.json"), "utf-8")).rejects.toThrow();
+
+    await runtime.submitInput("/connect");
+
+    expect(runtime.getState().panel).toEqual({ type: "connect" });
+    await runtime.destroy();
+  });
+
+  it("connects a provider, writes project config, and rebuilds available models", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-connect-provider-"));
+    const runtime = await createCLIRuntime(baseDir);
+
+    await runtime.connectProvider({
+      engine: "openai",
+      key: "sk-connected",
+      models: [
+        {
+          id: "fast",
+          name: "gpt-4o-mini",
+          thinkingLevels: [ThinkingLevel.None],
+        },
+      ],
+      defaultModel: "openai/fast",
+    });
+
+    expect(runtime.getState().config.providers).toEqual([
+      {
+        engine: "openai",
+        key: "sk-connected",
+        models: [
+          {
+            id: "fast",
+            name: "gpt-4o-mini",
+            thinkingLevels: [ThinkingLevel.None],
+          },
+        ],
+      },
+    ]);
+    expect(runtime.getState().modelName).toBe("openai/fast");
+    expect(runtime.getState().modelPaths).toEqual(["openai/fast"]);
+    await expect(readFile(join(baseDir, ".cliagent", "config.json"), "utf-8"))
+      .resolves.toContain('"key": "sk-connected"');
+    await runtime.destroy();
+  });
+
   it("emits an exit request state for the TUI host", async () => {
     const baseDir = await mkdtemp(join(tmpdir(), "miniagent-runtime-exit-request-"));
     await writeConfig(baseDir);

@@ -1,4 +1,5 @@
 import type { MiniAgent } from "../../core/agent.js";
+import type { ModelPreset } from "../../core/config.js";
 import type { SessionMeta } from "../../core/session.js";
 import type {
   Message,
@@ -30,6 +31,7 @@ export type CLIViewPanel =
   | { type: "search-all"; query: string; hits: CLISessionSearchHit[] }
   | { type: "references"; references: string[] }
   | { type: "models" }
+  | { type: "connect" }
   | { type: "sessions"; sessions: SessionMeta[]; query?: string }
   | { type: "agents"; mode: CLIAgentMode; subagents: CLISubagentSummary[] }
   | { type: "tools"; tools: Tool[]; query?: string }
@@ -182,6 +184,14 @@ export interface CLIInputOverrides {
   model?: string;
 }
 
+export interface CLIProviderConnection {
+  engine: string;
+  key: string;
+  baseURL?: string;
+  models: ModelPreset[];
+  defaultModel: string;
+}
+
 export interface CLIDiffOptions {
   staged?: boolean;
 }
@@ -204,6 +214,7 @@ export interface CLIAppRuntime {
   runCommand(name: string, args: string): Promise<void>;
   showOverview(): Promise<void>;
   selectModel(path: string): Promise<void>;
+  connectProvider(connection: CLIProviderConnection): Promise<void>;
   setAgentMode(mode: CLIAgentMode): Promise<void>;
   rememberInputHistory(input: string): Promise<void>;
   createSession(name?: string): Promise<void>;

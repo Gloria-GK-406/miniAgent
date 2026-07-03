@@ -305,7 +305,7 @@ export async function loadConfig(baseDir: string, options: LoadConfigOptions = {
   if (projectConfig === null && globalConfig === null) {
     const template = createDefaultConfigTemplate(baseDir);
     if (options.createTemplateIfMissing === false) {
-      return template;
+      return parseConfig({});
     }
     await mkdir(dir, { recursive: true });
     await writeFile(configPath, JSON.stringify(template, null, 2), "utf-8");
