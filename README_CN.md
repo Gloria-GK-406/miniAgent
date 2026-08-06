@@ -27,14 +27,6 @@ llm.register(new OpenAIEngine());
 const agent = new MiniAgent({
   llm,
   config: {
-    providers: [
-      {
-        provider: "openai",
-        key: process.env.OPENAI_API_KEY!,
-        models: [{ id: "fast", name: "gpt-4o-mini" }],
-      },
-    ],
-    defaultModel: { id: "fast", provider: "openai" },
     generation: {
       temperature: 0.7,
       thinking: "medium",
@@ -43,7 +35,11 @@ const agent = new MiniAgent({
   },
 });
 
-console.log(agent.getModels().map((model) => model.id));
+agent.setModel({
+  provider: "openai",
+  key: process.env.OPENAI_API_KEY!,
+  model: { name: "gpt-4o-mini", thinkingLevels: ["none"] },
+});
 agent.setGenerationConfig({ temperature: 0.2, thinking: "none" });
 
 // 3. 打印流式输出
@@ -200,11 +196,11 @@ const processor = {
 
 ## LLMRequest 和 LLMEngine
 
-MiniAgent 将 LLM 交互分为两层：
+MiniAgent 通过 `setModel()`原子持有一个模型运行时；模型目录和别名由调用方或 CLI 管理。
 
 - **`LLMRequest`** — Agent 调用的接口：`streamInvoke(request)`。
-- **`LLMEngine`** — 引擎实现的接口，暴露 `name`、`getModels()` 和 `streamGenerate(request)`。
-- **`LLMEngineManager`** — 默认的 `LLMRequest` 实现。注册引擎实例，并按已解析的模型请求路由。
+- **`LLMEngine`** — 引擎实现的接口，暴露 `name` 和 `streamGenerate(request)`。
+- **`LLMEngineManager`** — 默认的 `LLMRequest` 实现，按运行时 Provider 路由请求。
 
 ```
   MiniAgent ──调用──► LLMRequest (接口)
@@ -234,12 +230,11 @@ engines.register(new GLMEngine());
 engines.register(new GLMCodePlanEngine());
 ```
 
-Provider-mode 引擎暴露模型目录，并接收包含 provider、model 和 generation 的请求对象：
+引擎在每次请求中接收当前 `ModelRuntime` 与生成配置：
 
 ```typescript
 interface LLMEngine {
   readonly name: string;
-  getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 ```
@@ -498,9 +493,8 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 | `getToolList()` | 获取当前所有可用工具 |
 | `previewContext()` | 预览将发送给 LLM 的上下文 |
 | `setDiscardBefore(id)` | 设置水位线，丢弃指定 ID 之前的消息 |
-| `getModels()` / `getResolvedModels()` | 获取已解析的 provider 限定模型列表 |
-| `getCurrentResolvedModel()` | 获取当前活动模型 |
-| `setResolvedModel(selector)` | 通过 `{ id }` 或 `{ provider, model }` 切换活动模型 |
+| `getModel()` | 获取不含凭证的当前模型运行时 |
+| `setModel(runtime)` | 原子替换当前 Provider、凭证、Endpoint 和模型 |
 | `getGenerationConfig()` | 获取 temperature、thinking 等生成配置 |
 | `setGenerationConfig(update)` | 更新生成配置，不切换活动模型 |
 | `getConfig()` | 获取当前 Agent 配置 |

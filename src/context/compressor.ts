@@ -1,20 +1,13 @@
-import type { Message, ContextProvider, LLMRequest, LLMRequire } from "../core/types.js";
-import { LLMStreamChunkType, MessageType } from "../core/types.js";
-import {
-    AgentConfigSchema,
-    ThinkingLevel,
-    normalizeGenerationConfig,
-} from "../core/config.js";
 import type {
-    AgentConfig,
-    GenerationConfig,
-    LLMGenerateRequest,
-    ModelProviderConfig,
-    NormalizedAgentConfig,
-    ResolvedModel,
-} from "../core/config.js";
-import { cloneProviderConfig } from "../core/model-config-utils.js";
-import { resolveModelsFromProviders, selectResolvedModel } from "../core/model-resolution.js";
+    AgentRuntimeAccess,
+    AgentRuntimeRequire,
+    ContextProvider,
+    LLMRequest,
+    LLMRequire,
+    Message,
+} from "../core/types.js";
+import { LLMStreamChunkType, MessageType } from "../core/types.js";
+import type { LLMGenerateRequest } from "../core/config.js";
 
 const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the following conversation into a concise summary that preserves:
 1. Key decisions made
@@ -24,11 +17,6 @@ const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the follo
 5. Current task state
 
 Be concise but complete. Write in third person.`;
-
-const DEFAULT_GENERATION_CONFIG = {
-    temperature: 0.7,
-    thinking: ThinkingLevel.Medium,
-} satisfies GenerationConfig;
 
 function extractText(content: Message["content"]): string {
     if (typeof content === "string") return content;
@@ -49,34 +37,31 @@ export interface CompressionConfig {
     keepRecent: number;
 }
 
-export type ContextCompressorOptions = Partial<CompressionConfig> & (
-    | { agentConfig: AgentConfig; getAgentConfig?: never }
-    | { getAgentConfig: () => AgentConfig; agentConfig?: never }
-);
+export type ContextCompressorOptions = Partial<CompressionConfig>;
 
-export class ContextCompressor implements ContextProvider, LLMRequire {
+export class ContextCompressor implements ContextProvider, LLMRequire, AgentRuntimeRequire {
     priority = -1000;
     private llm: LLMRequest | null = null;
-    private readonly getAgentConfig: () => AgentConfig;
+    private runtimeAccess: AgentRuntimeAccess | null = null;
     private config: CompressionConfig;
     private messages: Message[] = [];
     private summary: string | null = null;
     private compressedCount = 0;
 
     constructor(config: ContextCompressorOptions);
-    constructor(config?: ContextCompressorOptions) {
-        if (config?.agentConfig === undefined && config?.getAgentConfig === undefined) {
-            throw new Error("ContextCompressor requires agentConfig or getAgentConfig");
-        }
+    constructor(config: ContextCompressorOptions = {}) {
         this.config = {
             maxMessages: config.maxMessages ?? 50,
             keepRecent: config.keepRecent ?? 10,
         };
-        this.getAgentConfig = config.getAgentConfig ?? (() => config.agentConfig);
     }
 
     async setLLMRequest(llm: LLMRequest): Promise<void> {
         this.llm = llm;
+    }
+
+    setAgentRuntimeAccess(access: AgentRuntimeAccess): void {
+        this.runtimeAccess = access;
     }
 
     getCompressedCount(): number {
@@ -102,17 +87,10 @@ export class ContextCompressor implements ContextProvider, LLMRequire {
     }
 
     private async compress(messages: Message[]): Promise<void> {
-        if (!this.llm) return;
-
-        const agentConfig = AgentConfigSchema.parse(this.getAgentConfig());
-        const generationConfig = normalizeGenerationConfig(
-            agentConfig.generation ?? DEFAULT_GENERATION_CONFIG,
-        );
-        const selectedModel = this.selectSummaryModel(agentConfig);
-        if (!selectedModel) return;
-
-        const provider = this.getProviderConfigForModel(agentConfig, selectedModel);
-        if (!provider) return;
+        if (!this.llm || !this.runtimeAccess) return;
+        const runtime = this.runtimeAccess.getModelRuntime();
+        if (!runtime) return;
+        const generationConfig = this.runtimeAccess.getGenerationConfig();
 
         const conversationText = messages
             .map((m) => {
@@ -128,8 +106,7 @@ export class ContextCompressor implements ContextProvider, LLMRequire {
 
         try {
             const request: LLMGenerateRequest = {
-                provider,
-                model: selectedModel,
+                runtime,
                 messages: [
                     { id: "compress-system", type: MessageType.System, content: SUMMARIZE_PROMPT },
                     summarizeRequest,
@@ -152,20 +129,6 @@ export class ContextCompressor implements ContextProvider, LLMRequire {
             this.summary = buildFallbackSummary(messages);
             this.compressedCount += messages.length;
         }
-    }
-
-    private selectSummaryModel(config: NormalizedAgentConfig): ResolvedModel | undefined {
-        if (!this.llm) return undefined;
-        const resolvedModels = resolveModelsFromProviders(config.providers, this.llm);
-        return selectResolvedModel(resolvedModels, config.defaultModel);
-    }
-
-    private getProviderConfigForModel(
-        config: NormalizedAgentConfig,
-        model: ResolvedModel,
-    ): ModelProviderConfig | undefined {
-        const provider = config.providers.find((entry) => entry.provider === model.provider);
-        return provider ? cloneProviderConfig(provider) : undefined;
     }
 
     async collect(): Promise<Message[]> {

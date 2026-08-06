@@ -6,10 +6,8 @@ import {
     LLMRequestSchema,
     LLMStreamChunkType,
     ModelPresetSchema,
-    ModelProviderConfigSchema,
-    ModelSelectorSchema,
-    ProviderModelOverridesSchema,
-    ResolvedModelSchema,
+    ModelRuntimeSchema,
+    PublicModelRuntimeSchema,
     ThinkingLevel,
     ThinkingLevelSchema,
     normalizeGenerationConfig,
@@ -18,10 +16,7 @@ import {
     type LLMGenerateRequest,
     type LLMRequest,
     type ModelPreset,
-    type ModelProviderConfig,
-    type ModelSelector,
-    type ProviderModelOverrides,
-    type ResolvedModel,
+    type ModelRuntime,
 } from "./index.js";
 
 describe("root exports", () => {
@@ -31,23 +26,13 @@ describe("root exports", () => {
             name: "public-model-name",
             thinkingLevels: [ThinkingLevel.None],
         });
-        const overrides: ProviderModelOverrides = ProviderModelOverridesSchema.parse({
-            add: [preset],
-        });
-        const provider: ModelProviderConfig = ModelProviderConfigSchema.parse({
+        const runtime: ModelRuntime = ModelRuntimeSchema.parse({
             provider: "test-provider",
             key: "key",
-            models: [preset],
-        });
-        const resolvedModel: ResolvedModel = ResolvedModelSchema.parse({
-            id: "test-model",
-            provider: "test-provider",
-            name: "public-model-name",
-            thinkingLevels: [ThinkingLevel.None],
-        });
-        const selector: ModelSelector = ModelSelectorSchema.parse({
-            id: "test-model",
-            provider: "test-provider",
+            model: {
+                name: preset.name,
+                thinkingLevels: preset.thinkingLevels,
+            },
         });
         const generationInput: GenerationConfigInput = {
             thinking: ThinkingLevel.Medium,
@@ -56,12 +41,10 @@ describe("root exports", () => {
         const request: LLMGenerateRequest = LLMGenerateRequestSchema.parse({
             messages: [],
             tools: [],
-            provider,
-            model: resolvedModel,
+            runtime,
             generation,
         });
         const requestInvoker: LLMRequest = LLMRequestSchema.parse({
-            getEngineModels: () => [resolvedModel],
             streamInvoke: async function* () {
                 yield { type: LLMStreamChunkType.TextDelta, text: "not used" };
             },
@@ -69,10 +52,12 @@ describe("root exports", () => {
 
         expect(ThinkingLevelSchema.parse("none")).toBe(ThinkingLevel.None);
         expect(GenerationConfigSchema.parse({}).temperature).toBe(0.7);
-        expect(overrides.add).toEqual([preset]);
-        expect(selector).toEqual({ id: "test-model", provider: "test-provider" });
-        expect(request.model.name).toBe("public-model-name");
-        expect(requestInvoker.getEngineModels("test-provider")).toEqual([resolvedModel]);
+        expect(PublicModelRuntimeSchema.parse({
+            provider: runtime.provider,
+            model: runtime.model,
+        }).model.name).toBe("public-model-name");
+        expect(request.runtime.model.name).toBe("public-model-name");
+        expect(requestInvoker.streamInvoke).toBeTypeOf("function");
     });
 
     it("does not export retired model config runtime schemas", () => {

@@ -189,14 +189,14 @@ function mapGLMReasoningEffort(
 export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
   const effectiveThinking = selectSupportedThinkingLevel(
     request.generation.thinking,
-    request.model.thinkingLevels,
+    request.runtime.model.thinkingLevels,
   );
-  const supportsThinking = request.model.thinkingLevels.some(
+  const supportsThinking = request.runtime.model.thinkingLevels.some(
     (level) => level !== ThinkingLevel.None,
   );
 
   return {
-    model: request.model.name,
+    model: request.runtime.model.name,
     messages: convertMessages(request.messages),
     tools: convertTools(request.tools),
     ...(supportsThinking
@@ -216,10 +216,10 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
     }),
     ...(effectiveThinking !== undefined
       && effectiveThinking !== ThinkingLevel.None
-      && supportsReasoningEffort(request.model.name) && {
+      && supportsReasoningEffort(request.runtime.model.name) && {
         reasoning_effort: mapGLMReasoningEffort(
           effectiveThinking,
-          request.model.provider,
+          request.runtime.provider,
         ),
       }),
   };

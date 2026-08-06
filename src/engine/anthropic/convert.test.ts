@@ -84,20 +84,18 @@ function request(
   return {
     messages: overrides.messages ?? [userMsg("hi")],
     tools: overrides.tools ?? [],
-    provider: {
+    runtime: {
       provider: "anthropic",
       key: "test-key",
       baseUrl: "https://example.invalid",
-    },
-    model: {
-      id: "anthropic/claude-sonnet-4-5",
-      provider: "anthropic",
-      name: "claude-sonnet-4-5",
-      thinkingLevels: overrides.thinkingLevels ?? [
-        ThinkingLevel.None,
-        ThinkingLevel.Low,
-        ThinkingLevel.Medium,
-      ],
+      model: {
+        name: "claude-sonnet-4-5",
+        thinkingLevels: overrides.thinkingLevels ?? [
+          ThinkingLevel.None,
+          ThinkingLevel.Low,
+          ThinkingLevel.Medium,
+        ],
+      },
     },
     generation: {
       temperature: 0.7,

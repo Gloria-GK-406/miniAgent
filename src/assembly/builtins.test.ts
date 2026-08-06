@@ -10,41 +10,13 @@ import {
     createDefaultBlueprint,
     registerBuiltinBlueprintImpls,
 } from "./builtins.js";
-import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest, type ModelPreset } from "../core/config.js";
+import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest } from "../core/config.js";
 import { LLMStreamChunkType, MessageType, type Message, type MessageChunk, type ToolCallMessage } from "../core/types.js";
 import type { LLMEngine } from "../core/llm.js";
 import type { ConfiguredSubagentFactory } from "../tool/subagent.js";
 
-function createConfig(sessiondir: string, key = "test-key"): AgentConfig {
+function createConfig(sessiondir: string): AgentConfig {
     return {
-        providers: [{
-            provider: "openai",
-            key,
-            models: [],
-        }],
-        defaultModel: {
-            provider: "openai",
-            model: "gpt-4o",
-        },
-        paths: { sessiondir },
-    };
-}
-
-function createSummaryConfig(sessiondir: string, key = "initial-key"): AgentConfig {
-    return {
-        providers: [{
-            provider: "test",
-            key,
-            models: [{
-                id: "test-model",
-                name: "test-model",
-                thinkingLevels: [ThinkingLevel.None],
-            }],
-        }],
-        defaultModel: {
-            provider: "test",
-            model: "test-model",
-        },
         paths: { sessiondir },
     };
 }
@@ -58,13 +30,6 @@ function createSubagentFactory(): ConfiguredSubagentFactory {
 function createTestEngine(onInvoke: (request: LLMGenerateRequest) => void): LLMEngine {
     return {
         name: "test",
-        getModels(): ModelPreset[] {
-            return [{
-                id: "test-model",
-                name: "test-model",
-                thinkingLevels: [ThinkingLevel.None],
-            }];
-        },
         async *streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
             onInvoke(request);
             yield {
@@ -116,7 +81,6 @@ describe("registerBuiltinBlueprintImpls", () => {
 
         registerBuiltinBlueprintImpls(manager, {
             subagentFactory: createSubagentFactory(),
-            getAgentConfig: () => createConfig(testDir),
         });
 
         expect(manager.listImpls("engine")).toEqual([
@@ -153,7 +117,6 @@ describe("registerBuiltinBlueprintImpls", () => {
 
         registerBuiltinBlueprintImpls(manager, {
             subagentFactory: createSubagentFactory(),
-            getAgentConfig: () => config,
         });
 
         const agent = await manager.assemble({
@@ -191,12 +154,10 @@ describe("registerBuiltinBlueprintImpls", () => {
 
         registerBuiltinBlueprintImpls(hitlManager, {
             subagentFactory: createSubagentFactory(),
-            getAgentConfig: () => createConfig(testDir),
             getHITL: () => true,
         });
         registerBuiltinBlueprintImpls(noHitlManager, {
             subagentFactory: createSubagentFactory(),
-            getAgentConfig: () => createConfig(testDir),
             getHITL: () => false,
         });
 
@@ -261,15 +222,14 @@ describe("registerBuiltinBlueprintImpls", () => {
             .toEqual({ prompt: "Use the workspace." });
     });
 
-    it("uses the live getAgentConfig provider for summary compression", async () => {
+    it("uses the live agent model runtime for summary compression", async () => {
         const manager = new BlueprintManager();
-        let currentConfig = createSummaryConfig(testDir);
+        const config = createConfig(testDir);
         const seenProviderKeys: string[] = [];
         const compressors: CompressorProbe[] = [];
 
         registerBuiltinBlueprintImpls(manager, {
             subagentFactory: createSubagentFactory(),
-            getAgentConfig: () => currentConfig,
             onCompressor: (compressor) => {
                 compressors.push(compressor);
             },
@@ -277,11 +237,11 @@ describe("registerBuiltinBlueprintImpls", () => {
         manager.registerEngineImpl("test", {
             configSchema: z.object({}).strict(),
             create: () => createTestEngine((request) => {
-                seenProviderKeys.push(request.provider.key);
+                seenProviderKeys.push(request.runtime.key);
             }),
         });
 
-        await manager.assemble({
+        const agent = await manager.assemble({
             blueprint: {
                 engines: [{ use: "test" }],
                 compression: {
@@ -289,10 +249,14 @@ describe("registerBuiltinBlueprintImpls", () => {
                     config: { maxMessages: 3, keepRecent: 1 },
                 },
             },
-            config: currentConfig,
+            config,
         });
 
-        currentConfig = createSummaryConfig(testDir, "updated-key");
+        agent.setModel({
+            provider: "test",
+            key: "updated-key",
+            model: { name: "test-model", thinkingLevels: [ThinkingLevel.None] },
+        });
         expect(compressors).toHaveLength(1);
         const compressor = compressors[0]!;
         compressor.updateMessages(createMessages(4));

@@ -5,16 +5,10 @@ import type {
   LLMStreamChunk,
   LLMStreamHandle,
 } from "./types.js";
-import type {
-  LLMGenerateRequest,
-  ModelPreset,
-  ResolvedModel,
-} from "./config.js";
-import { ThinkingLevel } from "./config.js";
+import type { LLMGenerateRequest } from "./config.js";
 
 export interface LLMEngine {
   readonly name: string;
-  getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 
@@ -104,33 +98,15 @@ function assertLLMEngine(engine: unknown): asserts engine is LLMEngine {
 
   const candidate = engine as {
     name?: unknown;
-    getModels?: unknown;
     streamGenerate?: unknown;
   };
 
   if (typeof candidate.name !== "string" || candidate.name.trim() === "") {
     throw new Error("Expected an LLM engine instance with a non-empty name");
   }
-  if (typeof candidate.getModels !== "function") {
-    throw new Error("Expected an LLM engine instance with getModels()");
-  }
   if (typeof candidate.streamGenerate !== "function") {
     throw new Error("Expected an LLM engine instance with streamGenerate()");
   }
-}
-
-function resolveModel(engineName: string, model: ModelPreset): ResolvedModel {
-  return {
-    id: model.id,
-    provider: engineName,
-    name: model.name,
-    ...(model.displayName !== undefined && { displayName: model.displayName }),
-    ...(model.contextSize !== undefined && { contextSize: model.contextSize }),
-    ...(model.maxOutputTokens !== undefined && { maxOutputTokens: model.maxOutputTokens }),
-    thinkingLevels: [...(model.thinkingLevels ?? [ThinkingLevel.None])],
-    ...(model.capabilities !== undefined && { capabilities: structuredClone(model.capabilities) }),
-    ...(model.metadata !== undefined && { metadata: structuredClone(model.metadata) }),
-  };
 }
 
 export class LLMEngineManager implements LLMRequest {
@@ -144,18 +120,10 @@ export class LLMEngineManager implements LLMRequest {
     this.engines.set(engine.name, engine);
   }
 
-  getEngineModels(engineName: string): ResolvedModel[] {
-    const engine = this.engines.get(engineName);
-    if (!engine) {
-      return [];
-    }
-    return engine.getModels().map((model) => resolveModel(engine.name, model));
-  }
-
   streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
-    const engine = this.engines.get(request.model.provider);
+    const engine = this.engines.get(request.runtime.provider);
     if (!engine) {
-      throw new Error(`No LLM engine registered for provider: ${request.model.provider}`);
+      throw new Error(`No LLM engine registered for provider: ${request.runtime.provider}`);
     }
     return engine.streamGenerate(request);
   }

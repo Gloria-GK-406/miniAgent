@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import { MiniAgent } from "./agent.js";
-import { DefaultLLMEngineRegister } from "./llm.js";
 import { LLMStreamChunkType, MessageType } from "./types.js";
 import type {
   AgentContextControl,
@@ -19,10 +18,7 @@ import { ThinkingLevel } from "./config.js";
 import type {
   AgentConfig,
   LLMGenerateRequest,
-  ModelPreset,
-  ResolvedModel,
 } from "./config.js";
-import type { LLMEngine } from "./llm.js";
 import type { Tool } from "../tool/types.js";
 
 function userMessage(id = "user-1"): Message {
@@ -42,41 +38,17 @@ function chunkText(text: string): MessageChunk {
 
 function createConfig(sessiondir: string, overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
-    providers: [
-      {
-        provider: "test",
-        key: "test-key",
-        models: [{ id: "test-model", name: "test-model" }],
-      },
-    ],
     paths: { sessiondir },
     ...overrides,
   };
 }
 
-function cloneResolvedModel(model: ResolvedModel): ResolvedModel {
-  return {
-    ...model,
-    thinkingLevels: [...model.thinkingLevels],
-    ...(model.capabilities !== undefined && {
-      capabilities: structuredClone(model.capabilities),
-    }),
-    ...(model.metadata !== undefined && {
-      metadata: structuredClone(model.metadata),
-    }),
-  };
-}
-
 function createLLM(options: {
-  models?: Record<string, ResolvedModel[]>;
   chunks?: MessageChunk[];
   responses?: MessageChunk[][];
   onRequest?: (request: LLMGenerateRequest) => void;
 } = {}): LLMRequest {
   return {
-    getEngineModels(engineName: string): ResolvedModel[] {
-      return options.models?.[engineName]?.map(cloneResolvedModel) ?? [];
-    },
     async *streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
       options.onRequest?.(request);
       const chunks = options.responses?.shift() ?? options.chunks ?? [chunkText("done")];
@@ -85,6 +57,17 @@ function createLLM(options: {
       }
     },
   };
+}
+
+function setTestModel(agent: MiniAgent): void {
+  agent.setModel({
+    provider: "test",
+    key: "test-key",
+    model: {
+      name: "test-model",
+      thinkingLevels: [ThinkingLevel.None],
+    },
+  });
 }
 
 function deferred<T = void>(): {
@@ -98,26 +81,6 @@ function deferred<T = void>(): {
   return { promise, resolve };
 }
 
-function fakeEngine(
-  name: string,
-  models: ModelPreset[],
-  options: {
-    chunks?: MessageChunk[];
-    onRequest?: (request: LLMGenerateRequest) => void;
-  } = {},
-): LLMEngine {
-  return {
-    name,
-    getModels: () => models,
-    async *streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
-      options.onRequest?.(request);
-      for (const chunk of options.chunks ?? [chunkText(request.model.name)]) {
-        yield chunk;
-      }
-    },
-  };
-}
-
 describe("MiniAgent", () => {
   let testDir: string;
 
@@ -127,276 +90,6 @@ describe("MiniAgent", () => {
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
-  });
-
-  it("aggregates resolved models from registered engines and provider overrides", () => {
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      {
-        id: "gpt-4o-mini",
-        name: "gpt-4o-mini",
-        contextSize: 128000,
-        maxOutputTokens: 16384,
-        thinkingLevels: [ThinkingLevel.None],
-      },
-    ]));
-
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [
-          {
-            provider: "openai",
-            key: "test-key",
-            models: [
-              {
-                id: "fast",
-                name: "gpt-4o-mini",
-                contextSize: 64000,
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    expect(agent.getModels()).toEqual([
-      expect.objectContaining({
-        id: "fast",
-        provider: "openai",
-        name: "gpt-4o-mini",
-        contextSize: 64000,
-        maxOutputTokens: 16384,
-      }),
-    ]);
-  });
-
-  it("setResolvedModel only changes the selected model and leaves default generation config", () => {
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
-      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-    ]));
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [{ provider: "openai", key: "test-key" }],
-        defaultModel: { id: "slow" },
-      }),
-    });
-
-    agent.setResolvedModel({ id: "fast" });
-
-    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
-      id: "fast",
-      name: "gpt-4o-mini",
-    }));
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.7,
-      thinking: ThinkingLevel.Medium,
-    });
-  });
-
-  it("setGenerationConfig only changes generation config", () => {
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-    ]));
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [{ provider: "openai", key: "test-key" }],
-        defaultModel: { id: "fast" },
-      }),
-    });
-
-    agent.setGenerationConfig({
-      temperature: 0.1,
-      thinking: ThinkingLevel.High,
-    });
-
-    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
-      id: "fast",
-      name: "gpt-4o-mini",
-    }));
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.1,
-      thinking: ThinkingLevel.High,
-    });
-  });
-
-  it("setGenerationConfig merges partial updates over the current generation config", () => {
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-    ]));
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [{ provider: "openai", key: "test-key" }],
-        defaultModel: { id: "fast" },
-        generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
-      }),
-    });
-
-    agent.setGenerationConfig({ topP: 0.8 });
-
-    expect(agent.getGenerationConfig()).toEqual({
-      temperature: 0.2,
-      topP: 0.8,
-      thinking: ThinkingLevel.Low,
-    });
-    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
-      id: "fast",
-      name: "gpt-4o-mini",
-    }));
-  });
-
-  it("does not expose legacy model APIs", () => {
-    const agent = new MiniAgent({
-      llm: createLLM(),
-      config: createConfig(testDir),
-    });
-    const exposed = agent as unknown as Record<string, unknown>;
-    const removedMethods = [
-      "set" + "Model",
-      "get" + "Current" + "Model",
-      "get" + "ModelList",
-      "set" + "ModelByPath",
-    ];
-
-    for (const name of removedMethods) {
-      expect(exposed[name]).toBeUndefined();
-    }
-  });
-
-  it("runs with a request-mode LLMGenerateRequest containing model and generation", async () => {
-    const seenRequests: LLMGenerateRequest[] = [];
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      {
-        id: "gpt-4o-mini",
-        name: "gpt-4o-mini",
-        contextSize: 128000,
-        maxOutputTokens: 16384,
-        thinkingLevels: [ThinkingLevel.None],
-      },
-    ], {
-      chunks: [chunkText("done")],
-      onRequest: (request) => {
-        seenRequests.push(request);
-      },
-    }));
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [
-          {
-            provider: "openai",
-            key: "test-key",
-            models: [{ id: "fast", name: "gpt-4o-mini" }],
-          },
-        ],
-        defaultModel: { id: "fast" },
-        generation: { temperature: 0.2, thinking: ThinkingLevel.Low },
-      }),
-    });
-
-    const messages = await agent.run(userMessage());
-
-    expect(seenRequests).toHaveLength(1);
-    expect(seenRequests[0]).toEqual(expect.objectContaining({
-      provider: expect.objectContaining({
-        provider: "openai",
-        key: "test-key",
-      }),
-      model: expect.objectContaining({
-        id: "fast",
-        provider: "openai",
-        name: "gpt-4o-mini",
-        maxOutputTokens: 16384,
-      }),
-      generation: {
-        temperature: 0.2,
-        thinking: ThinkingLevel.Low,
-      },
-    }));
-    expect(seenRequests[0]!.messages.map((message) => message.id)).toEqual(["user-1"]);
-    expect(messages.map((message) => message.content)).toEqual(["hello", "done"]);
-  });
-
-  it("throws before generation when no model is available", async () => {
-    const seenRequests: LLMGenerateRequest[] = [];
-    const agent = new MiniAgent({
-      llm: createLLM({
-        onRequest: (request) => {
-          seenRequests.push(request);
-        },
-      }),
-      config: createConfig(testDir, {
-        providers: [],
-      }),
-    });
-
-    await expect(agent.run(userMessage())).rejects.toThrow(
-      "No model is available. Configure providers or register engine models first.",
-    );
-    expect(seenRequests).toEqual([]);
-  });
-
-  it("updates provider-only config snapshots when selecting a resolved model", () => {
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      { id: "slow", name: "gpt-4o", thinkingLevels: [ThinkingLevel.None] },
-      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-    ]));
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [{ provider: "openai", key: "test-key" }],
-        defaultModel: { id: "slow" },
-      }),
-    });
-
-    agent.setResolvedModel({ id: "fast" });
-
-    const latest = agent.getConfig() as AgentConfig & Record<string, unknown>;
-    expect(latest.defaultModel).toEqual({
-      id: "fast",
-      provider: "openai",
-    });
-    expect(latest.providers).toEqual([
-      expect.objectContaining({ provider: "openai", key: "test-key" }),
-    ]);
-    expect(latest["model"]).toBeUndefined();
-    expect(latest["models"]).toBeUndefined();
-    expect(latest["plugins"]).toBeUndefined();
-  });
-
-  it("preserves aliased resolved model ids in config snapshots", () => {
-    const llm = new DefaultLLMEngineRegister();
-    llm.register(fakeEngine("openai", [
-      { id: "fast", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-      { id: "balanced", name: "gpt-4o-mini", thinkingLevels: [ThinkingLevel.None] },
-    ]));
-    const agent = new MiniAgent({
-      llm,
-      config: createConfig(testDir, {
-        providers: [{ provider: "openai", key: "test-key" }],
-        defaultModel: { id: "fast", provider: "openai" },
-      }),
-    });
-
-    agent.setResolvedModel({ id: "balanced", provider: "openai" });
-
-    expect(agent.getCurrentResolvedModel()).toEqual(expect.objectContaining({
-      id: "balanced",
-      name: "gpt-4o-mini",
-    }));
-    expect(agent.getConfig().defaultModel).toEqual({
-      id: "balanced",
-      provider: "openai",
-    });
   });
 
   it("does not treat setConfig-only objects as registrable modules", () => {
@@ -446,7 +139,6 @@ describe("MiniAgent", () => {
     const streamStarted = deferred<void>();
     const releaseStream = deferred<void>();
     const llm: LLMRequest = {
-      getEngineModels: () => [],
       async *streamInvoke(): AsyncGenerator<MessageChunk> {
         streamStarted.resolve();
         await releaseStream.promise;
@@ -465,6 +157,7 @@ describe("MiniAgent", () => {
       },
     });
 
+    setTestModel(agent);
     const runPromise = agent.run(userMessage()).finally(() => {
       runSettled = true;
     });
@@ -546,6 +239,7 @@ describe("MiniAgent", () => {
       },
     });
 
+    setTestModel(agent);
     const messages = await agent.run(userMessage());
 
     expect(seenContexts).toHaveLength(1);
@@ -575,6 +269,7 @@ describe("MiniAgent", () => {
       ],
     });
 
+    setTestModel(agent);
     await agent.run(userMessage());
 
     expect((await agent.getMessages()).map((message) => message.content)).toEqual([
@@ -631,6 +326,7 @@ describe("MiniAgent", () => {
       seenResults.push(result);
     });
 
+    setTestModel(agent);
     const messages = await agent.run(userMessage());
 
     expect(seenResults).toHaveLength(1);
@@ -663,6 +359,7 @@ describe("MiniAgent", () => {
       },
     });
 
+    setTestModel(agent);
     const messages = await agent.run(userMessage());
 
     expect(seenControl).toBeDefined();

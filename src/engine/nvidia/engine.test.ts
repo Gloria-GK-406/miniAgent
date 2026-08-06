@@ -54,15 +54,13 @@ function request(): LLMGenerateRequest {
   return {
     messages,
     tools: [],
-    provider: {
+    runtime: {
       provider: "nvidia",
       key: "nvidia-key",
-    },
-    model: {
-      id: "nvidia/meta-llama-3-3-70b-instruct",
-      provider: "nvidia",
+      model: {
       name: "meta/llama-3.3-70b-instruct",
       thinkingLevels: [ThinkingLevel.None],
+      },
     },
     generation: {
       temperature: 0.6,

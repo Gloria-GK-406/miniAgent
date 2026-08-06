@@ -54,13 +54,10 @@ function request(): LLMGenerateRequest {
   return {
     messages,
     tools: [],
-    provider: {
+    runtime: {
       provider: "glm-codeplan",
       key: "codeplan-key",
-    },
-    model: {
-      id: "glm-codeplan/glm-5.2",
-      provider: "glm-codeplan",
+      model: {
       name: "glm-5.2",
       thinkingLevels: [
         ThinkingLevel.None,
@@ -69,6 +66,7 @@ function request(): LLMGenerateRequest {
         ThinkingLevel.High,
         ThinkingLevel.Max,
       ],
+      },
     },
     generation: {
       temperature: 0.5,

@@ -87,21 +87,19 @@ function request(
   return {
     messages: [userMsg("hi")],
     tools: overrides.tools ?? [],
-    provider: {
+    runtime: {
       provider,
       key: "test-key",
       baseUrl: "https://example.invalid/v1",
-    },
-    model: {
-      id: `${provider}/${model}`,
-      provider,
-      name: model,
-      thinkingLevels: overrides.thinkingLevels ?? [
-        ThinkingLevel.None,
-        ThinkingLevel.Low,
-        ThinkingLevel.Medium,
-        ThinkingLevel.High,
-      ],
+      model: {
+        name: model,
+        thinkingLevels: overrides.thinkingLevels ?? [
+          ThinkingLevel.None,
+          ThinkingLevel.Low,
+          ThinkingLevel.Medium,
+          ThinkingLevel.High,
+        ],
+      },
     },
     generation: {
       temperature: 0.7,

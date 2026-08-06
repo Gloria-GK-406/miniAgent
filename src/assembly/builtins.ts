@@ -29,7 +29,7 @@ import {
 import { FileMessageSource } from "../store/message-source.js";
 import { FileStore } from "../store/file-store.js";
 import { MessageType, type ContextProvider } from "../core/types.js";
-import { type AgentConfig, type JsonValue } from "../core/config.js";
+import type { JsonValue } from "../core/config.js";
 import type { BlueprintManager } from "./manager.js";
 import type { AgentBlueprint, BlueprintUse } from "./blueprint.js";
 
@@ -66,7 +66,6 @@ type AgentContextConfig = z.output<typeof AgentContextConfigSchema>;
 
 export interface RegisterBuiltinBlueprintImplsOptions {
     subagentFactory: ConfiguredSubagentFactory;
-    getAgentConfig: () => AgentConfig;
     getHITL?: () => boolean;
     onCompressor?: (compressor: ContextCompressor) => void;
 }
@@ -173,7 +172,6 @@ export function registerBuiltinBlueprintImpls(
             const compressor = new ContextCompressor({
                 maxMessages: config.maxMessages,
                 keepRecent: config.keepRecent,
-                getAgentConfig: options.getAgentConfig,
             });
             options.onCompressor?.(compressor);
             return compressor;

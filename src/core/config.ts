@@ -50,51 +50,29 @@ export const ModelPresetSchema = z
 
 export type ModelPreset = z.infer<typeof ModelPresetSchema>;
 
-export const ProviderModelOverridesSchema = z
-    .object({
-        add: z.array(ModelPresetSchema).optional(),
-        override: z.record(ModelPresetSchema.partial().omit({ id: true, name: true })).optional(),
+export const ModelSchema = ModelPresetSchema
+    .omit({ id: true })
+    .extend({
+        thinkingLevels: z.array(ThinkingLevelSchema).min(1).default([ThinkingLevel.None]),
     })
     .strict();
 
-export type ProviderModelOverrides = z.infer<typeof ProviderModelOverridesSchema>;
+export type Model = z.infer<typeof ModelSchema>;
 
-export const ModelProviderConfigSchema = z
+export const ModelRuntimeSchema = z
     .object({
         provider: z.string().min(1),
         key: z.string().min(1),
         baseUrl: z.string().optional(),
-        models: z.array(ModelPresetSchema).default([]),
+        model: ModelSchema,
     })
     .strict();
 
-export type ModelProviderConfig = z.input<typeof ModelProviderConfigSchema>;
+export type ModelRuntime = z.infer<typeof ModelRuntimeSchema>;
 
-export const ResolvedModelSchema = z
-    .object({
-        id: z.string().min(1),
-        provider: z.string().min(1),
-        name: z.string().min(1),
-        displayName: z.string().optional(),
-        contextSize: z.number().int().positive().optional(),
-        maxOutputTokens: z.number().int().positive().optional(),
-        thinkingLevels: z.array(ThinkingLevelSchema).min(1),
-        capabilities: z.record(JsonValueSchema).optional(),
-        metadata: z.record(JsonValueSchema).optional(),
-    })
-    .strict();
+export const PublicModelRuntimeSchema = ModelRuntimeSchema.omit({ key: true });
 
-export type ResolvedModel = z.infer<typeof ResolvedModelSchema>;
-
-export const ModelSelectorSchema = z.union([
-    z.object({
-        id: z.string().min(1),
-        provider: z.string().min(1).optional(),
-    }).strict(),
-    z.object({ provider: z.string().min(1), model: z.string().min(1) }).strict(),
-]);
-
-export type ModelSelector = z.infer<typeof ModelSelectorSchema>;
+export type PublicModelRuntime = z.infer<typeof PublicModelRuntimeSchema>;
 
 export const GenerationConfigSchema = z.object({
     temperature: z.number().min(0).max(2).default(0.7),
@@ -115,18 +93,11 @@ export function normalizeGenerationConfig(
 export const LLMGenerateRequestSchema = z.object({
     messages: z.array(z.custom<Message>()),
     tools: z.array(z.custom<Tool>()),
-    provider: ModelProviderConfigSchema,
-    model: ResolvedModelSchema,
+    runtime: ModelRuntimeSchema,
     generation: GenerationConfigSchema,
 });
 
-export type LLMGenerateRequest = {
-    messages: Message[];
-    tools: Tool[];
-    provider: ModelProviderConfig;
-    model: ResolvedModel;
-    generation: GenerationConfig;
-};
+export type LLMGenerateRequest = z.infer<typeof LLMGenerateRequestSchema>;
 
 export const PathConfigSchema = z.object({
     sessiondir: z.string(),
@@ -134,43 +105,8 @@ export const PathConfigSchema = z.object({
 
 export type PathConfig = z.infer<typeof PathConfigSchema>;
 
-const PersistModelSelectorSchema = z.union([
-    z.string().min(1).transform((id) => ({ id })),
-    ModelSelectorSchema,
-]);
-
-export const PersistConfigFileSchema = z
-    .object({
-        providers: z.array(ModelProviderConfigSchema).default([]),
-        defaultModel: PersistModelSelectorSchema.optional(),
-        generation: GenerationConfigSchema.partial().optional(),
-    })
-    .strict();
-
-export const PersistConfigSchema = PersistConfigFileSchema;
-
-export type PersistConfigFile = z.infer<typeof PersistConfigFileSchema>;
-export type PersistConfig = z.infer<typeof PersistConfigSchema>;
-
-const RuntimeModelSelectorSchema = z.union([
-    z.string().min(1).transform((id) => ({ id })),
-    ModelSelectorSchema,
-]);
-
-export const RuntimeConfigSchema = z
-    .object({
-        activeModel: RuntimeModelSelectorSchema.optional(),
-        paths: PathConfigSchema,
-    })
-    .strict();
-
-export type RuntimeConfig = z.input<typeof RuntimeConfigSchema>;
-export type NormalizedRuntimeConfig = z.output<typeof RuntimeConfigSchema>;
-
 export const AgentConfigSchema = z
     .object({
-        providers: z.array(ModelProviderConfigSchema).default([]),
-        defaultModel: ModelSelectorSchema.optional(),
         generation: GenerationConfigSchema.optional(),
         paths: PathConfigSchema,
     })

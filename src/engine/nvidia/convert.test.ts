@@ -74,15 +74,13 @@ function request(
   return {
     messages: [userMsg("hi")],
     tools: overrides.tools ?? [],
-    provider: {
+    runtime: {
       provider: "nvidia",
       key: "nvapi-test-key",
-    },
-    model: {
-      id: "nvidia/meta-llama-3-3-70b-instruct",
-      provider: "nvidia",
+      model: {
       name: "meta/llama-3.3-70b-instruct",
       thinkingLevels: overrides.thinkingLevels ?? [ThinkingLevel.None],
+      },
     },
     generation: {
       temperature: 0.7,

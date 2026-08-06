@@ -227,11 +227,11 @@ export function buildCreateParamsFromRequest(
   const tools = convertTools(request.tools);
   const effectiveThinking = selectSupportedThinkingLevel(
     request.generation.thinking,
-    request.model.thinkingLevels,
+    request.runtime.model.thinkingLevels,
   );
 
   return {
-    model: request.model.name,
+    model: request.runtime.model.name,
     max_tokens: request.generation.maxOutputTokens ?? 4096,
     ...(system !== undefined && { system }),
     messages,

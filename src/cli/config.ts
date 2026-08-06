@@ -5,12 +5,12 @@ import { z } from "zod";
 import {
   GenerationConfigSchema,
   ModelPresetSchema,
+  ModelRuntimeSchema,
   normalizeGenerationConfig,
 } from "../core/config.js";
 import type {
   GenerationConfig,
-  ModelProviderConfig,
-  ModelSelector,
+  ModelRuntime,
 } from "../core/config.js";
 import { McpPluginConfigSchema } from "../tool/mcp/types.js";
 import { SkillPluginConfigSchema } from "../tool/skill/types.js";
@@ -42,6 +42,15 @@ export const CLIProviderSchema = z
   .strict();
 
 export type CLIProvider = z.infer<typeof CLIProviderSchema>;
+
+export const CLIConfiguredModelSchema = z.object({
+  provider: z.string().min(1),
+  key: z.string().min(1),
+  baseUrl: z.string().optional(),
+  model: ModelPresetSchema,
+}).strict();
+
+export type CLIConfiguredModel = z.infer<typeof CLIConfiguredModelSchema>;
 
 export const CLIAgentModeSchema = z.enum(["build", "plan"]);
 export type CLIAgentMode = z.infer<typeof CLIAgentModeSchema>;
@@ -136,36 +145,72 @@ export const CLIConfigSchema = z
 
 export type CLIConfig = z.infer<typeof CLIConfigSchema>;
 
-export function toAgentProviders(config: CLIConfig): ModelProviderConfig[] {
-  return config.providers.map((provider) => ({
-    provider: provider.engine,
-    key: provider.key,
-    ...(provider.baseURL !== undefined && { baseUrl: provider.baseURL }),
-    models: provider.models,
-  }));
+export function getConfiguredModels(config: CLIConfig): CLIConfiguredModel[] {
+  return config.providers.flatMap((provider) =>
+    provider.models.map((model) => CLIConfiguredModelSchema.parse({
+      provider: provider.engine,
+      key: provider.key,
+      ...(provider.baseURL !== undefined && { baseUrl: provider.baseURL }),
+      model,
+    })),
+  );
 }
 
-export function parseModelSelector(value: string | undefined): ModelSelector | undefined {
+export function parseModelSelector(value: string | undefined): string | undefined {
   const target = value?.trim();
   if (target === undefined || target.length === 0) {
     return undefined;
   }
-
   const sep = target.indexOf("/");
-  if (sep === -1) {
-    return { id: target };
-  }
-
-  const provider = target.slice(0, sep);
-  const id = target.slice(sep + 1);
-  if (provider.length === 0 || id.length === 0) {
+  if (sep !== -1 && (sep === 0 || sep === target.length - 1)) {
     throw new Error(`Invalid model selector: "${target}". Expected id or provider/id.`);
   }
-  return { id, provider };
+  return target;
 }
 
-export function parseDefaultModel(config: CLIConfig): ModelSelector | undefined {
+export function parseDefaultModel(config: CLIConfig): string | undefined {
   return parseModelSelector(config.defaultModel);
+}
+
+export function formatConfiguredModelPath(model: CLIConfiguredModel): string {
+  return `${model.provider}/${model.model.id}`;
+}
+
+export function findConfiguredModel(
+  config: CLIConfig,
+  selector: string,
+): CLIConfiguredModel {
+  const target = parseModelSelector(selector);
+  if (target === undefined) {
+    throw new Error("Model selector is empty.");
+  }
+  const models = getConfiguredModels(config);
+  const slash = target.indexOf("/");
+  const matches = slash === -1
+    ? models.filter((entry) => entry.model.id === target)
+    : models.filter((entry) => formatConfiguredModelPath(entry) === target);
+  if (matches.length === 1) {
+    return matches[0]!;
+  }
+  const available = models.map(formatConfiguredModelPath).join(", ") || "(none)";
+  if (matches.length > 1) {
+    throw new Error(`Model selector is ambiguous: ${target}. Available models: ${available}`);
+  }
+  throw new Error(`Model not found: ${target}. Available models: ${available}`);
+}
+
+export function toModelRuntime(configured: CLIConfiguredModel): ModelRuntime {
+  const { id: _, ...model } = configured.model;
+  return ModelRuntimeSchema.parse({
+    provider: configured.provider,
+    key: configured.key,
+    ...(configured.baseUrl !== undefined && { baseUrl: configured.baseUrl }),
+    model,
+  });
+}
+
+export function resolveModelRuntime(config: CLIConfig, selector: string): ModelRuntime {
+  return toModelRuntime(findConfiguredModel(config, selector));
 }
 
 export function toAgentGenerationConfig(config: CLIConfig): GenerationConfig | undefined {

@@ -6,21 +6,12 @@ import { z } from "zod";
 import { AgentBlueprintSchema } from "./blueprint.js";
 import { BlueprintManager } from "./manager.js";
 import { LLMStreamChunkType, MessageType, type Message, type MessageChunk } from "../core/types.js";
-import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest, type ModelPreset } from "../core/config.js";
+import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest } from "../core/config.js";
 import type { AgentUse } from "../core/create-agent.js";
 import type { LLMEngine } from "../core/llm.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {
-        providers: [{
-            provider: "test",
-            key: "test-key",
-            models: [],
-        }],
-        defaultModel: {
-            provider: "test",
-            model: "test-model",
-        },
         paths: { sessiondir: basepersistdir },
     };
 }
@@ -35,13 +26,6 @@ function textChunk(text: string): MessageChunk {
 function createEngine(onInvoke?: (messages: Message[]) => void): LLMEngine {
     return {
         name: "test",
-        getModels(): ModelPreset[] {
-            return [{
-                id: "test-model",
-                name: "test-model",
-                thinkingLevels: [ThinkingLevel.None],
-            }];
-        },
         async *streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
             onInvoke?.(request.messages);
             yield textChunk("done");
@@ -170,7 +154,7 @@ describe("BlueprintManager", () => {
         });
 
         expect(receivedConfigs).toEqual([null]);
-        expect(agent.getModelDisplayList()).toEqual(["test-model"]);
+        expect(agent.getModel()).toBeUndefined();
     });
 
     it("assembles a fake LLM engine, fake tool, and fake context module into a working MiniAgent", async () => {
@@ -230,6 +214,11 @@ describe("BlueprintManager", () => {
 
         const tools = await agent.getToolList();
         const toolResult = await tools[0]!.execute({ text: "hello" });
+        agent.setModel({
+            provider: "test",
+            key: "test-key",
+            model: { name: "test-model", thinkingLevels: [ThinkingLevel.None] },
+        });
         await agent.run({
             id: "user-1",
             type: MessageType.User,

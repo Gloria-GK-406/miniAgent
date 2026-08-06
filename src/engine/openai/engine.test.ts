@@ -54,14 +54,11 @@ function request(): LLMGenerateRequest {
   return {
     messages,
     tools: [],
-    provider: {
+    runtime: {
       provider: "openai",
       key: "openai-key",
       baseUrl: "https://proxy.example/v1",
-    },
-    model: {
-      id: "openai/o3",
-      provider: "openai",
+      model: {
       name: "o3",
       thinkingLevels: [
         ThinkingLevel.None,
@@ -69,6 +66,7 @@ function request(): LLMGenerateRequest {
         ThinkingLevel.Medium,
         ThinkingLevel.High,
       ],
+      },
     },
     generation: {
       temperature: 0.1,

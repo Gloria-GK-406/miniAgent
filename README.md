@@ -27,14 +27,6 @@ llm.register(new OpenAIEngine());
 const agent = new MiniAgent({
   llm,
   config: {
-    providers: [
-      {
-        provider: "openai",
-        key: process.env.OPENAI_API_KEY!,
-        models: [{ id: "fast", name: "gpt-4o-mini" }],
-      },
-    ],
-    defaultModel: { id: "fast", provider: "openai" },
     generation: {
       temperature: 0.7,
       thinking: "medium",
@@ -43,7 +35,11 @@ const agent = new MiniAgent({
   },
 });
 
-console.log(agent.getModels().map((model) => model.id));
+agent.setModel({
+  provider: "openai",
+  key: process.env.OPENAI_API_KEY!,
+  model: { name: "gpt-4o-mini", thinkingLevels: ["none"] },
+});
 agent.setGenerationConfig({ temperature: 0.2, thinking: "none" });
 
 // 3. Print streaming output
@@ -202,11 +198,11 @@ const processor = {
 
 MiniAgent separates LLM interaction into two layers:
 
-In provider mode, `MiniAgent` sends messages, tools, a resolved provider, a resolved model, and `GenerationConfig` to a registered engine instance.
+`MiniAgent` owns one model runtime set atomically with `setModel()`. Model catalogs and aliases belong to the calling application or CLI.
 
 - **`LLMRequest`** — The interface the agent calls: `streamInvoke(request)`.
-- **`LLMEngine`** — The engine interface. Engines expose `name`, `getModels()`, and `streamGenerate(request)`.
-- **`LLMEngineManager`** — The default `LLMRequest` implementation. It registers engine instances and routes resolved model requests.
+- **`LLMEngine`** — The engine interface. Engines expose `name` and `streamGenerate(request)`.
+- **`LLMEngineManager`** — The default `LLMRequest` implementation. It routes each runtime request by provider.
 
 ```
   MiniAgent ──calls──► LLMRequest (interface)
@@ -236,12 +232,11 @@ engines.register(new GLMEngine());
 engines.register(new GLMCodePlanEngine());
 ```
 
-Provider-mode engines expose a model catalog and receive a per-request provider, resolved model, and generation object:
+Engines receive the active `ModelRuntime` and generation preferences with each request:
 
 ```typescript
 interface LLMEngine {
   readonly name: string;
-  getModels(): ModelPreset[];
   streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 ```
@@ -559,9 +554,8 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 | `getToolList()` | Get all currently available tools. |
 | `previewContext()` | Preview the context that will be sent to the LLM. |
 | `setDiscardBefore(id)` | Set a watermark to discard messages before the given ID. |
-| `getModels()` / `getResolvedModels()` | Get resolved provider-qualified model catalog entries. |
-| `getCurrentResolvedModel()` | Get the active resolved model. |
-| `setResolvedModel(selector)` | Switch active model by `{ id }` or `{ provider, model }`. |
+| `getModel()` | Get the active model runtime without its credential. |
+| `setModel(runtime)` | Atomically replace the active provider, credential, endpoint, and model. |
 | `getGenerationConfig()` | Get generation preferences such as temperature and thinking level. |
 | `setGenerationConfig(update)` | Update generation preferences without changing the active model. |
 | `getConfig()` | Get the current agent configuration. |

@@ -5,10 +5,14 @@ import {
   type ToolCallMessage,
   type ToolResultMessage,
 } from "../../core/types.js";
-import type { ResolvedModel } from "../../core/config.js";
 import { type SessionMeta } from "../../core/session.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
-import { loadConfig, type CLIConfig, type CLIPermissionDecision } from "../config.js";
+import {
+  formatConfiguredModelPath,
+  loadConfig,
+  type CLIConfig,
+  type CLIPermissionDecision,
+} from "../config.js";
 import {
   completeActivityEntry,
   completeApprovalActivityEntry,
@@ -17,9 +21,9 @@ import {
 } from "./activity.js";
 import {
   createCLIAgentFactory,
-  formatResolvedModelPath,
-  getResolvedModelPaths,
-  selectResolvedModelForCLI,
+  getConfiguredModelPaths,
+  getSelectedModelPath,
+  selectModelForCLI,
 } from "./agent-factory.js";
 import {
   addCommandRegistrationNames,
@@ -111,9 +115,8 @@ function transcriptSearchPreview(text: string, query: string): string {
   return `${start > 0 ? "..." : ""}${preview}${end < normalized.length ? "..." : ""}`;
 }
 
-function formatCurrentModel(agent: { getCurrentResolvedModel(): ReturnType<CLICommandContext["agent"]["getCurrentResolvedModel"]> }): string {
-  const current = agent.getCurrentResolvedModel();
-  return current ? formatResolvedModelPath(current) : "(none)";
+function formatCurrentModel(agent: CLICommandContext["agent"]): string {
+  return getSelectedModelPath(agent) ?? "(none)";
 }
 
 function errorMessage(error: unknown): string {
@@ -305,7 +308,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     if (meta.model === undefined) {
       return;
     }
-    selectResolvedModelForCLI(built.agent, meta.model);
+    selectModelForCLI(built.agent, config, meta.model);
   }
 
   applySessionModelPreference(session);
@@ -315,7 +318,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     config,
     mode: activeMode,
     modelName: formatCurrentModel(built.agent),
-    modelPaths: getResolvedModelPaths(built.agent),
+    modelPaths: getConfiguredModelPaths(config),
     commandSuggestions: [],
     commandHelp: [],
     referencePaths: await referenceService.listReferenceCandidates(),
@@ -430,28 +433,25 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     bindAgentEvents();
     updateState({
       modelName: formatCurrentModel(built.agent),
-      modelPaths: getResolvedModelPaths(built.agent),
+      modelPaths: getConfiguredModelPaths(state.config),
       messages: await built.agent.getMessages(),
       sessions: sessionService.listSessions(),
     });
   }
 
   function selectCurrentAgentModel(path: string): string {
-    const selected = selectResolvedModelForCLI(built.agent, path);
-    const modelName = formatResolvedModelPath(selected);
+    const selected = selectModelForCLI(built.agent, state.config, path);
+    const modelName = formatConfiguredModelPath(selected);
     updateState({ modelName });
     return modelName;
   }
 
-  function restoreCurrentAgentModel(
-    previousModel: ResolvedModel | undefined,
-    previousModelName: string,
-  ): void {
-    if (previousModel === undefined) {
+  function restoreCurrentAgentModel(previousModelName: string): void {
+    if (previousModelName === "(none)") {
       updateState({ modelName: previousModelName });
       return;
     }
-    selectCurrentAgentModel(formatResolvedModelPath(previousModel));
+    selectCurrentAgentModel(previousModelName);
   }
 
   async function applyInputOverrides(overrides: CLIInputOverrides): Promise<void> {
@@ -466,7 +466,6 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
 
   async function restoreInputOverrides(
     previousMode: CLIState["mode"],
-    previousModel: ResolvedModel | undefined,
     previousModelName: string,
   ): Promise<void> {
     if (state.mode !== previousMode) {
@@ -474,7 +473,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       await rebuildCurrentAgent();
     }
     if (formatCurrentModel(built.agent) !== previousModelName) {
-      restoreCurrentAgentModel(previousModel, previousModelName);
+      restoreCurrentAgentModel(previousModelName);
     }
   }
 
@@ -568,7 +567,7 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
       sessions: sessionService.listSessions(),
       mode: activeMode,
       modelName: formatCurrentModel(built.agent),
-      modelPaths: getResolvedModelPaths(built.agent),
+      modelPaths: getConfiguredModelPaths(state.config),
       messages: await built.agent.getMessages(),
       tokenUsage: runtimeMetadata.tokenUsage,
       panel: { type: "none" },
@@ -720,13 +719,12 @@ export async function createCLIRuntime(baseDir: string): Promise<CLIAppRuntime> 
     },
     submitInputWithOverrides: async (input, overrides) => {
       const previousMode = state.mode;
-      const previousModel = built.agent.getCurrentResolvedModel();
       const previousModelName = formatCurrentModel(built.agent);
       try {
         await applyInputOverrides(overrides);
         await runtime.submitInput(input);
       } finally {
-        await restoreInputOverrides(previousMode, previousModel, previousModelName);
+        await restoreInputOverrides(previousMode, previousModelName);
       }
     },
     runCommand: async (name, args) => {

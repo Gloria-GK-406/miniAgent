@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LLMGenerateRequest, ResolvedModel } from "./config.js";
+import type { GenerationConfig, LLMGenerateRequest, ModelRuntime } from "./config.js";
 import type { Store } from "../store/store.js";
 
 export enum MessageType {
@@ -146,7 +146,6 @@ export interface LLMStreamHandle<T> extends PromiseLike<T> {
 export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();
 
 export interface LLMRequest {
-  getEngineModels(engineName: string): ResolvedModel[];
   streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
 }
 
@@ -155,11 +154,31 @@ export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
     typeof value === "object" &&
     value !== null &&
     "streamInvoke" in value &&
-    "getEngineModels" in value &&
-    typeof (value as { streamInvoke?: unknown }).streamInvoke === "function" &&
-    typeof (value as { getEngineModels?: unknown }).getEngineModels === "function"
+    typeof (value as { streamInvoke?: unknown }).streamInvoke === "function"
   );
 });
+
+export const AgentRuntimeAccessSchema = z.object({
+  getModelRuntime: z.function(
+    z.tuple([]),
+    z.custom<ModelRuntime>().optional(),
+  ),
+  getGenerationConfig: z.function(
+    z.tuple([]),
+    z.custom<GenerationConfig>(),
+  ),
+});
+
+export type AgentRuntimeAccess = z.infer<typeof AgentRuntimeAccessSchema>;
+
+export const AgentRuntimeRequireSchema = z.object({
+  setAgentRuntimeAccess: z.function(
+    z.tuple([AgentRuntimeAccessSchema]),
+    z.void(),
+  ),
+});
+
+export type AgentRuntimeRequire = z.infer<typeof AgentRuntimeRequireSchema>;
 
 export const ContextProviderSchema = z.object({
   priority: z.number().int(),

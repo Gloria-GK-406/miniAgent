@@ -57,19 +57,17 @@ function request(): LLMGenerateRequest {
   return {
     messages,
     tools: [],
-    provider: {
+    runtime: {
       provider: "glm",
       key: "glm-key",
-    },
-    model: {
-      id: "glm/glm-5.2",
-      provider: "glm",
+      model: {
       name: "glm-5.2",
       thinkingLevels: [
         ThinkingLevel.None,
         ThinkingLevel.Low,
         ThinkingLevel.Medium,
       ],
+      },
     },
     generation: {
       temperature: 0.4,

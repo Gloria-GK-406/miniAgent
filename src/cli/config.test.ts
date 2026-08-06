@@ -7,10 +7,11 @@ import {
   CLIConfigSchema,
   ConfigTemplateCreatedError,
   getGlobalConfigPath,
+  getConfiguredModels,
   loadConfig,
   parseDefaultModel,
+  resolveModelRuntime,
   toAgentGenerationConfig,
-  toAgentProviders,
 } from "./config.js";
 
 async function writeJson(path: string, value: unknown): Promise<void> {
@@ -125,7 +126,7 @@ describe("CLI config provider mode", () => {
         showToolDetails: false,
       },
     });
-    expect(parseDefaultModel(config)).toEqual({ id: "fast" });
+    expect(parseDefaultModel(config)).toBe("fast");
     expect(toAgentGenerationConfig(config)).toEqual({
       temperature: 0.6,
       thinking: ThinkingLevel.Medium,
@@ -216,7 +217,7 @@ describe("CLI config provider mode", () => {
     expect(CLIConfigSchema.safeParse({ shell: { windows: "fish" } }).success).toBe(false);
   });
 
-  it("converts CLI engine providers to agent provider configs", () => {
+  it("resolves a configured model to one runtime", () => {
     const config = CLIConfigSchema.parse({
       providers: [
         {
@@ -236,25 +237,17 @@ describe("CLI config provider mode", () => {
       defaultModel: "openai/fast",
     });
 
-    expect(parseDefaultModel(config)).toEqual({
-      id: "fast",
+    expect(parseDefaultModel(config)).toBe("openai/fast");
+    expect(resolveModelRuntime(config, "openai/fast")).toEqual({
       provider: "openai",
-    });
-    expect(toAgentProviders(config)).toEqual([
-      {
-        provider: "openai",
-        key: "test-key",
-        baseUrl: "https://example.test/v1",
-        models: [
-          {
-            id: "fast",
-            name: "gpt-4o-mini",
-            displayName: "Fast",
-            thinkingLevels: [ThinkingLevel.None],
-          },
-        ],
+      key: "test-key",
+      baseUrl: "https://example.test/v1",
+      model: {
+        name: "gpt-4o-mini",
+        displayName: "Fast",
+        thinkingLevels: [ThinkingLevel.None],
       },
-    ]);
+    });
   });
 
   it("keeps mcp, skill, and subagent convenience config on CLIConfig only", () => {
@@ -292,13 +285,7 @@ describe("CLI config provider mode", () => {
     });
     expect(config.skill).toEqual({ directories: ["/tmp/skills"] });
     expect(config.subagent).toEqual({ path: "/tmp/subagents" });
-    expect(toAgentProviders(config)).toEqual([
-      {
-        provider: "openai",
-        key: "test-key",
-        models: [{ id: "fast", name: "gpt-4o-mini" }],
-      },
-    ]);
+    expect(getConfiguredModels(config)).toHaveLength(1);
   });
 
   it("does not derive generation from model presets", () => {

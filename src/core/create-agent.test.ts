@@ -6,29 +6,23 @@ import { z } from "zod";
 import { createMiniAgent } from "./create-agent.js";
 import { defineAgentModule } from "./module.js";
 import { LLMStreamChunkType, MessageType, type LLMRequest, type Message, type MessageChunk } from "./types.js";
-import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest, type ResolvedModel } from "./config.js";
+import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest } from "./config.js";
 import type { Store } from "../store/store.js";
 import type { MessageSource } from "../store/message-source.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {
-        providers: [{
-            provider: "test",
-            key: "test-key",
-            baseUrl: "http://localhost",
-            models: [{ id: "test-model", name: "test-model" }],
-        }],
         paths: { sessiondir: basepersistdir },
     };
 }
 
-function resolvedModel(): ResolvedModel {
-    return {
-        id: "test-model",
+function setTestModel(agent: ReturnType<typeof createMiniAgent>): void {
+    agent.setModel({
         provider: "test",
-        name: "test-model",
-        thinkingLevels: [ThinkingLevel.None],
-    };
+        key: "test-key",
+        baseUrl: "http://localhost",
+        model: { name: "test-model", thinkingLevels: [ThinkingLevel.None] },
+    });
 }
 
 function textChunk(text: string): MessageChunk {
@@ -40,9 +34,6 @@ function textChunk(text: string): MessageChunk {
 
 function createLLM(text = "done", onInvoke?: (messages: Message[]) => void): LLMRequest {
     return {
-        getEngineModels(engineName: string): ResolvedModel[] {
-            return engineName === "test" ? [resolvedModel()] : [];
-        },
         async *streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk> {
             onInvoke?.(request.messages);
             yield textChunk(text);
@@ -99,6 +90,7 @@ describe("createMiniAgent", () => {
             ],
         });
 
+        setTestModel(agent);
         await agent.run({
             id: "user-1",
             type: MessageType.User,
@@ -178,6 +170,7 @@ describe("createMiniAgent", () => {
             ],
         });
 
+        setTestModel(agent);
         await agent.run({
             id: "user-1",
             type: MessageType.User,

@@ -1,5 +1,6 @@
 import type {
     AfterTurnProcessor,
+    AgentRuntimeRequire,
     ContextProcessor,
     ContextProvider,
     Destroyable,
@@ -26,6 +27,7 @@ export type AgentRegistrable =
     | TurnContextAppender
     | ToolApprover
     | LLMRequire
+    | AgentRuntimeRequire
     | Destroyable;
 
 export type AgentModule = Record<string, unknown>;

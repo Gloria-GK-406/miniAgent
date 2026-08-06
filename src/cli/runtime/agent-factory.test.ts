@@ -5,34 +5,24 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ThinkingLevel,
   type GenerationConfig,
-  type ModelProviderConfig,
-  type ResolvedModel,
 } from "../../core/config.js";
+import type { MiniAgent } from "../../core/agent.js";
 import { MessageType } from "../../core/types.js";
-import { loadConfig, type CLIAgentMode, type CLIConfig } from "../config.js";
+import {
+  CLIConfigSchema,
+  loadConfig,
+  type CLIAgentMode,
+  type CLIConfig,
+} from "../config.js";
 import {
   buildSubagentAgentConfig,
   createCLIAgentFactory,
-  formatResolvedModelPath,
-  getResolvedModelPaths,
+  getConfiguredModelPaths,
   resolveSubagentSessionId,
-  selectResolvedModelForCLI,
+  selectModelForCLI,
 } from "./agent-factory.js";
 import { createPermissionService } from "./permission-service.js";
 import { createShellService } from "./shell-service.js";
-
-function resolvedModel(
-  id: string,
-  provider = "openai",
-  name = id,
-): ResolvedModel {
-  return {
-    id,
-    provider,
-    name,
-    thinkingLevels: [ThinkingLevel.None],
-  };
-}
 
 function toolCall(toolName: string, args: Record<string, unknown> = {}): {
   id: string;
@@ -84,8 +74,11 @@ describe("createCLIAgentFactory", () => {
 
     const built = await factory.build("session-1");
 
-    expect(built.agent.getModels().map(formatResolvedModelPath)).toEqual(["openai/fast"]);
-    expect(built.agent.getCurrentResolvedModel()).toMatchObject({ id: "fast", provider: "openai" });
+    expect(getConfiguredModelPaths(built.config)).toEqual(["openai/fast"]);
+    expect(built.agent.getModel()).toMatchObject({
+      provider: "openai",
+      model: { name: "gpt-4o-mini" },
+    });
     expect((await built.agent.getToolList()).map((tool) => tool.name)).toEqual(expect.arrayContaining([
       "read",
       "edit",
@@ -244,72 +237,59 @@ describe("createCLIAgentFactory", () => {
   });
 
   it("formats and selects resolved model paths", () => {
-    const agent = {
-      getModels: vi.fn(() => [
-        resolvedModel("fast", "openai"),
-        resolvedModel("deep", "anthropic"),
-      ]),
-      setResolvedModel: vi.fn(),
-    };
+    const config = CLIConfigSchema.parse({ providers: [
+      { engine: "openai", key: "openai-key", models: [{ id: "fast", name: "gpt" }] },
+      { engine: "anthropic", key: "anthropic-key", models: [{ id: "deep", name: "claude" }] },
+    ] });
+    const setModel = vi.fn();
+    const agent = { setModel } as unknown as MiniAgent;
 
-    expect(getResolvedModelPaths(agent)).toEqual(["openai/fast", "anthropic/deep"]);
-    expect(selectResolvedModelForCLI(agent, "anthropic/deep")).toMatchObject({
-      id: "deep",
+    expect(getConfiguredModelPaths(config)).toEqual(["openai/fast", "anthropic/deep"]);
+    expect(selectModelForCLI(agent, config, "anthropic/deep")).toMatchObject({
       provider: "anthropic",
+      model: { id: "deep" },
     });
-    expect(agent.setResolvedModel).toHaveBeenCalledWith({
-      id: "deep",
+    expect(setModel).toHaveBeenCalledWith({
       provider: "anthropic",
+      key: "anthropic-key",
+      model: { name: "claude", thinkingLevels: [ThinkingLevel.None] },
     });
   });
 
   it("selects a unique model by id and rejects ambiguous bare ids", () => {
-    const uniqueAgent = {
-      getModels: vi.fn(() => [resolvedModel("fast", "openai")]),
-      setResolvedModel: vi.fn(),
-    };
-    selectResolvedModelForCLI(uniqueAgent, "fast");
+    const setModel = vi.fn();
+    const agent = { setModel } as unknown as MiniAgent;
+    const uniqueConfig = CLIConfigSchema.parse({ providers: [
+      { engine: "openai", key: "key", models: [{ id: "fast", name: "gpt" }] },
+    ] });
+    selectModelForCLI(agent, uniqueConfig, "fast");
 
-    expect(uniqueAgent.setResolvedModel).toHaveBeenCalledWith({
-      id: "fast",
+    expect(setModel).toHaveBeenCalledWith({
       provider: "openai",
+      key: "key",
+      model: { name: "gpt", thinkingLevels: [ThinkingLevel.None] },
     });
 
-    const ambiguousAgent = {
-      getModels: vi.fn(() => [
-        resolvedModel("fast", "openai"),
-        resolvedModel("fast", "anthropic"),
-      ]),
-      setResolvedModel: vi.fn(),
-    };
+    const ambiguousConfig = CLIConfigSchema.parse({ providers: [
+      { engine: "openai", key: "key", models: [{ id: "fast", name: "gpt" }] },
+      { engine: "anthropic", key: "key", models: [{ id: "fast", name: "claude" }] },
+    ] });
 
-    expect(() => selectResolvedModelForCLI(ambiguousAgent, "fast")).toThrow(
+    expect(() => selectModelForCLI(agent, ambiguousConfig, "fast")).toThrow(
       /Model selector is ambiguous: fast.*openai\/fast.*anthropic\/fast/,
     );
-    expect(ambiguousAgent.setResolvedModel).not.toHaveBeenCalled();
   });
 
-  it("builds provider-only subagent config from the parent resolved model", () => {
-    const providers: ModelProviderConfig[] = [
-      {
-        provider: "openai",
-        key: "test-key",
-        models: [{ id: "fast", name: "gpt-4o-mini" }],
-      },
-    ];
+  it("builds subagent config without provider catalogs", () => {
     const generation: GenerationConfig = {
       temperature: 0.6,
       thinking: ThinkingLevel.Medium,
     };
 
     expect(buildSubagentAgentConfig({
-      providers,
-      currentModel: resolvedModel("fast", "openai", "gpt-4o-mini"),
       generation,
       paths: { sessiondir: "/tmp/subagent-session" },
     })).toEqual({
-      providers,
-      defaultModel: { id: "fast", provider: "openai" },
       generation,
       paths: { sessiondir: "/tmp/subagent-session" },
     });

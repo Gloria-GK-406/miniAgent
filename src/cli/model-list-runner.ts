@@ -32,13 +32,9 @@ function isDefaultModel(
   if (selector === undefined) {
     return false;
   }
-  if ("id" in selector) {
-    if (selector.provider !== undefined) {
-      return selector.provider === provider && selector.id === id;
-    }
-    return selector.id === id;
-  }
-  return selector.provider === provider && selector.model === id;
+  return selector.includes("/")
+    ? selector === `${provider}/${id}`
+    : selector === id;
 }
 
 export function listConfiguredModels(

@@ -13,10 +13,8 @@ import {
   type AgentConfig,
   type GenerationConfig,
   type JsonValue,
-  type ModelProviderConfig,
   type NormalizedAgentConfig,
   type PathConfig,
-  type ResolvedModel,
 } from "../../core/config.js";
 import { SessionManager } from "../../core/session.js";
 import type { Message } from "../../core/types.js";
@@ -24,11 +22,15 @@ import type { ConfiguredSubagentFactory, SubagentInvocation } from "../../tool/s
 import { TodoManager } from "../../tool/todo.js";
 import {
   CLIAGENT_DIR,
+  findConfiguredModel,
+  formatConfiguredModelPath,
+  getConfiguredModels,
   loadConfig,
   parseDefaultModel,
+  resolveModelRuntime,
   toAgentGenerationConfig,
-  toAgentProviders,
   type CLIAgentMode,
+  type CLIConfiguredModel,
   type CLIConfig,
 } from "../config.js";
 import { createCLIToolkit } from "../tools/cli-toolkit.js";
@@ -84,18 +86,11 @@ interface CreateCLIBlueprintOptions {
 }
 
 interface CreateBuiltinBlueprintManagerOptions {
-  getAgentConfig: () => AgentConfig;
   subagentFactory: ConfiguredSubagentFactory;
   onCompressor?: (compressor: CLICompressor) => void;
 }
 
-interface ModelListAgent {
-  getModels(): ResolvedModel[];
-}
-
-interface ModelSwitchAgent extends ModelListAgent {
-  setResolvedModel(selector: { id: string; provider: string }): void;
-}
+const selectedModelPaths = new WeakMap<MiniAgent, string>();
 
 export interface CLICompressor {
   getCompressedCount(): number;
@@ -105,8 +100,6 @@ export interface CLICompressor {
 }
 
 export interface BuildSubagentAgentConfigOptions {
-  providers: ModelProviderConfig[];
-  currentModel: ResolvedModel | undefined;
   generation: GenerationConfig;
   paths: PathConfig;
 }
@@ -141,55 +134,30 @@ interface BuiltCLIAgent {
   todoManager: TodoManager;
 }
 
-export function formatResolvedModelPath(model: ResolvedModel): string {
-  return `${model.provider}/${model.id}`;
+export function getConfiguredModelPaths(config: CLIConfig): string[] {
+  return getConfiguredModels(config).map(formatConfiguredModelPath);
 }
 
-export function getResolvedModelPaths(agent: ModelListAgent): string[] {
-  return agent.getModels().map(formatResolvedModelPath);
-}
-
-function availableModelPaths(models: ResolvedModel[]): string {
-  return models.map(formatResolvedModelPath).join(", ") || "(none)";
+export function getSelectedModelPath(agent: MiniAgent): string | undefined {
+  return selectedModelPaths.get(agent);
 }
 
 function resolveMode(mode: CLIAgentFactoryOptions["mode"]): CLIAgentMode {
   return typeof mode === "function" ? mode() : mode;
 }
 
-export function findResolvedModelForCLI(models: ResolvedModel[], selector: string): ResolvedModel {
-  const trimmed = selector.trim();
-  if (trimmed.length === 0) {
-    throw new Error("Model selector is empty.");
-  }
-
-  const sep = trimmed.indexOf("/");
-  if (sep !== -1) {
-    const provider = trimmed.slice(0, sep);
-    const id = trimmed.slice(sep + 1);
-    const found = models.find((model) => model.provider === provider && model.id === id);
-    if (found) {
-      return found;
-    }
-    throw new Error(`Model not found: ${trimmed}. Available models: ${availableModelPaths(models)}`);
-  }
-
-  const matches = models.filter((model) => model.id === trimmed);
-  if (matches.length === 1) {
-    return matches[0]!;
-  }
-  if (matches.length > 1) {
-    throw new Error(`Model selector is ambiguous: ${trimmed}. Available models: ${availableModelPaths(matches)}`);
-  }
-  throw new Error(`Model not found: ${trimmed}. Available models: ${availableModelPaths(models)}`);
+export function findConfiguredModelForCLI(config: CLIConfig, selector: string): CLIConfiguredModel {
+  return findConfiguredModel(config, selector);
 }
 
-export function selectResolvedModelForCLI(
-  agent: ModelSwitchAgent,
+export function selectModelForCLI(
+  agent: MiniAgent,
+  config: CLIConfig,
   selector: string,
-): ResolvedModel {
-  const selected = findResolvedModelForCLI(agent.getModels(), selector);
-  agent.setResolvedModel({ id: selected.id, provider: selected.provider });
+): CLIConfiguredModel {
+  const selected = findConfiguredModelForCLI(config, selector);
+  agent.setModel(resolveModelRuntime(config, formatConfiguredModelPath(selected)));
+  selectedModelPaths.set(agent, formatConfiguredModelPath(selected));
   return selected;
 }
 
@@ -197,13 +165,6 @@ export function buildSubagentAgentConfig(
   options: BuildSubagentAgentConfigOptions,
 ): NormalizedAgentConfig {
   return AgentConfigSchema.parse({
-    providers: options.providers,
-    ...(options.currentModel !== undefined && {
-      defaultModel: {
-        id: options.currentModel.id,
-        provider: options.currentModel.provider,
-      },
-    }),
     generation: options.generation,
     paths: options.paths,
   });
@@ -257,7 +218,6 @@ export async function createCLIAgentFactory(
         options,
         subagentFactory,
         getBaseSystemPrompt(activeConfig),
-        () => currentParentAgent?.getConfig(),
         getTodoManager(sessionId),
       );
       currentParentAgent = built.agent;
@@ -287,18 +247,15 @@ function createConfiguredSubagentFactory(
       sessionManager.getActive()?.id,
     );
     const persistDir = sessionManager.getSessionPersistDir(sessionId);
-    const currentModel = request.entry.model !== undefined
-      ? findResolvedModelForCLI(parentAgent.getModels(), request.entry.model)
-      : parentAgent.getCurrentResolvedModel();
+    const selectedModel = request.entry.model
+      ?? getSelectedModelPath(parentAgent)
+      ?? parseDefaultModel(activeConfig);
     const agentConfig = buildSubagentAgentConfig({
-      providers: toAgentProviders(activeConfig),
-      currentModel,
       generation: parentAgent.getGenerationConfig(),
       paths: { sessiondir: join(persistDir, `subagent-${crypto.randomUUID().slice(0, 8)}`) },
     });
 
     const manager = createBuiltinBlueprintManager({
-      getAgentConfig: () => agentConfig,
       subagentFactory: factory,
     });
     const blueprint = createCLIBlueprint({
@@ -315,11 +272,15 @@ function createConfiguredSubagentFactory(
       }),
     });
 
-    return manager.assemble({
+    const child = await manager.assemble({
       config: agentConfig,
       blueprint,
       extraUses: createRuntimeExtraUses(options),
     });
+    if (selectedModel !== undefined) {
+      selectModelForCLI(child, activeConfig, selectedModel);
+    }
+    return child;
   };
   return factory;
 }
@@ -330,21 +291,17 @@ async function buildAgentInner(
   options: CLIAgentFactoryOptions,
   subagentFactory: ConfiguredSubagentFactory,
   userSystemPrompt: string,
-  getCurrentAgentConfig: () => AgentConfig | undefined,
   todoManager: TodoManager,
 ): Promise<BuiltCLIAgent> {
   const persistDir = new SessionManager(join(options.baseDir, CLIAGENT_DIR)).getSessionPersistDir(sessionId);
   const defaultModel = parseDefaultModel(config);
   const generation = toAgentGenerationConfig(config);
   const agentConfig: AgentConfig = AgentConfigSchema.parse({
-    providers: toAgentProviders(config),
-    ...(defaultModel !== undefined && { defaultModel }),
     ...(generation !== undefined && { generation }),
     paths: { sessiondir: persistDir },
   });
   let createdCompressor: CLICompressor | undefined;
   const manager = createBuiltinBlueprintManager({
-    getAgentConfig: () => getCurrentAgentConfig() ?? agentConfig,
     subagentFactory,
     onCompressor: (compressor) => {
       createdCompressor = compressor;
@@ -370,6 +327,9 @@ async function buildAgentInner(
     blueprint,
     extraUses: createRuntimeExtraUses(options, todoManager),
   });
+  if (defaultModel !== undefined) {
+    selectModelForCLI(agent, config, defaultModel);
+  }
   if (createdCompressor === undefined) {
     throw new Error("Expected assembled CLI agent to include a context compressor.");
   }
@@ -443,7 +403,6 @@ function createBuiltinBlueprintManager(
 ): BlueprintManager {
   const manager = new BlueprintManager();
   registerBuiltinBlueprintImpls(manager, {
-    getAgentConfig: options.getAgentConfig,
     getHITL: () => false,
     subagentFactory: options.subagentFactory,
     ...(options.onCompressor !== undefined && { onCompressor: options.onCompressor }),

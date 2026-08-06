@@ -31,7 +31,6 @@ export type { LLMEngine } from "./core/llm.js";
 export { createLLMStreamHandle } from "./core/llm.js";
 export type { LLMStreamController } from "./core/llm.js";
 export { emptyTokenCount, createTokenCount, addTokenCount } from "./core/llm.js";
-export { resolveModelsFromProviders, selectResolvedModel } from "./core/model-resolution.js";
 export type {
     CreateMiniAgentOptions,
     AgentInstaller,
@@ -52,7 +51,11 @@ export type {
 } from "./assembly/capability.js";
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
-export { LLMRequestSchema } from "./core/types.js";
+export {
+    AgentRuntimeAccessSchema,
+    AgentRuntimeRequireSchema,
+    LLMRequestSchema,
+} from "./core/types.js";
 export { DestroyableSchema } from "./core/types.js";
 export type {
     Message,
@@ -71,6 +74,8 @@ export type {
     ReasoningDeltaChunk,
     ToolCallArgumentsDeltaChunk,
     LLMRequest,
+    AgentRuntimeAccess,
+    AgentRuntimeRequire,
     LLMStreamHandle,
     ContextProvider,
     ContextProcessor,
@@ -93,33 +98,25 @@ export {
     JsonValueSchema,
     ThinkingLevelSchema,
     ModelPresetSchema,
-    ProviderModelOverridesSchema,
-    ModelProviderConfigSchema,
-    ResolvedModelSchema,
-    ModelSelectorSchema,
+    ModelSchema,
+    ModelRuntimeSchema,
+    PublicModelRuntimeSchema,
     GenerationConfigSchema,
     LLMGenerateRequestSchema,
     PathConfigSchema,
-    PersistConfigFileSchema,
-    PersistConfigSchema,
-    RuntimeConfigSchema,
     AgentConfigSchema,
     normalizeGenerationConfig,
 } from "./core/config.js";
 export type {
     JsonValue,
     ModelPreset,
-    ProviderModelOverrides,
-    ModelProviderConfig,
-    ResolvedModel,
-    ModelSelector,
+    Model,
+    ModelRuntime,
+    PublicModelRuntime,
     GenerationConfig,
     GenerationConfigInput,
     LLMGenerateRequest,
     PathConfig,
-    PersistConfigFile,
-    PersistConfig,
-    RuntimeConfig,
     AgentConfig,
     NormalizedAgentConfig,
 } from "./core/config.js";
@@ -189,10 +186,3 @@ export { SkillPlugin } from "./tool/skill/plugin.js";
 export { SkillPluginConfigSchema, SkillCapabilitySelectorSchema } from "./tool/skill/types.js";
 export type { SkillPluginConfig, SkillCapabilitySelector, SkillEntry } from "./tool/skill/types.js";
 export { AgentContextProvider } from "./tool/agent-context.js";
-
-export {
-    PersistentConfigFileLoader,
-    PersistentConfigAggregator,
-    AgentConfigResolver,
-    AgentConfigService,
-} from "./utils/config/index.js";

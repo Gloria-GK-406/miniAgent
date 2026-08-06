@@ -165,12 +165,12 @@ function selectSupportedReasoningLevel(
 }
 
 function selectOpenAIReasoningLevel(request: LLMGenerateRequest): ThinkingLevel | undefined {
-  if (request.model.provider !== "openai") {
+  if (request.runtime.provider !== "openai") {
     return undefined;
   }
   return selectSupportedReasoningLevel(
     request.generation.thinking,
-    request.model.thinkingLevels,
+    request.runtime.model.thinkingLevels,
   );
 }
 
@@ -178,7 +178,7 @@ export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {
   const reasoningLevel = selectOpenAIReasoningLevel(request);
 
   return {
-    model: request.model.name,
+    model: request.runtime.model.name,
     messages: convertMessages(request.messages),
     tools: convertTools(request.tools),
     ...(request.generation.maxOutputTokens !== undefined && {

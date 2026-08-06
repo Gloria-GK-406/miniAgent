@@ -51,16 +51,14 @@ function request(): LLMGenerateRequest {
   return {
     messages,
     tools: [],
-    provider: {
+    runtime: {
       provider: "anthropic",
       key: "anthropic-key",
       baseUrl: "https://anthropic-proxy.example",
-    },
-    model: {
-      id: "anthropic/claude-sonnet-4-5",
-      provider: "anthropic",
+      model: {
       name: "claude-sonnet-4-5",
       thinkingLevels: [ThinkingLevel.None, ThinkingLevel.Low],
+      },
     },
     generation: {
       temperature: 0.3,

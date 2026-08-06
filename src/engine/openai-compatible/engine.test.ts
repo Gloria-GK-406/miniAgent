@@ -54,17 +54,15 @@ function request(): LLMGenerateRequest {
   return {
     messages,
     tools: [],
-    provider: {
+    runtime: {
       provider: "openai-compatible",
       key: "request-key",
       baseUrl: "http://localhost:9000/v1",
-    },
-    model: {
-      id: "openai-compatible/custom-model",
-      provider: "openai-compatible",
+      model: {
       name: "custom-model",
       maxOutputTokens: 1234,
       thinkingLevels: [ThinkingLevel.None],
+      },
     },
     generation: {
       temperature: 0.2,

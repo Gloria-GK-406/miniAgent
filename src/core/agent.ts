@@ -2,6 +2,7 @@ import type {
     Action,
     AfterTurnProcessor,
     AgentContextControl,
+    AgentRuntimeRequire,
     ContextProcessor,
     ContextProvider,
     Destroyable,
@@ -22,6 +23,7 @@ import type {
 } from "./types.js";
 import {
     ActionType,
+    AgentRuntimeRequireSchema,
     AfterTurnProcessorSchema,
     ContextProcessorSchema,
     ContextProviderSchema,
@@ -38,6 +40,8 @@ import {
 } from "./types.js";
 import {
     AgentConfigSchema,
+    ModelRuntimeSchema,
+    PublicModelRuntimeSchema,
     ThinkingLevel,
     normalizeGenerationConfig,
 } from "./config.js";
@@ -46,25 +50,10 @@ import type {
     GenerationConfig,
     GenerationConfigInput,
     LLMGenerateRequest,
-    ModelProviderConfig,
-    ModelSelector,
+    ModelRuntime,
     NormalizedAgentConfig,
-    ResolvedModel,
+    PublicModelRuntime,
 } from "./config.js";
-import {
-    availableModelIds,
-    cloneAgentConfig,
-    cloneGenerationConfig,
-    cloneProviderConfig,
-    cloneResolvedModel,
-    selectorDescription,
-    selectorFromResolvedModel,
-    validateUniqueProviders,
-} from "./model-config-utils.js";
-import {
-    resolveModelsFromProviders,
-    selectResolvedModel,
-} from "./model-resolution.js";
 import { ToolProviderSchema, ToolSchema } from "../tool/types.js";
 import type { ToolProvider } from "../tool/types.js";
 import { ToolApproverSchema } from "../tool/approver.js";
@@ -132,9 +121,7 @@ export class MiniAgent {
     private messageSource: MessageSource;
     private llm: LLMRequest;
     private config: NormalizedAgentConfig;
-    private providerConfigs: ModelProviderConfig[];
-    private resolvedModels: ResolvedModel[];
-    private currentModel: ResolvedModel | undefined;
+    private currentModel: ModelRuntime | undefined;
     private generationConfig: GenerationConfig;
     private tools: Map<string, Tool> = new Map();
     private toolProviders: ToolProvider[] = [];
@@ -177,10 +164,6 @@ export class MiniAgent {
         this.name = "";
         this.llm = resolvedOptions.llm;
         this.config = AgentConfigSchema.parse(resolvedOptions.config);
-        this.providerConfigs = this.config.providers.map(cloneProviderConfig);
-        validateUniqueProviders(this.providerConfigs);
-        this.resolvedModels = resolveModelsFromProviders(this.providerConfigs, this.llm);
-        this.currentModel = selectResolvedModel(this.resolvedModels, this.config.defaultModel);
         this.generationConfig = normalizeGenerationConfig(
             this.config.generation ?? DEFAULT_GENERATION_CONFIG,
         );
@@ -223,67 +206,41 @@ export class MiniAgent {
     }
 
     private syncEffectiveConfig(): void {
-        const defaultModel = this.currentModel
-            ? selectorFromResolvedModel(this.currentModel)
-            : this.config.defaultModel;
         this.config = AgentConfigSchema.parse({
-            providers: this.providerConfigs.map(cloneProviderConfig),
-            ...(defaultModel !== undefined && { defaultModel }),
-            generation: cloneGenerationConfig(this.generationConfig),
+            generation: { ...this.generationConfig },
             paths: { ...this.config.paths },
         });
     }
 
     getConfig(): NormalizedAgentConfig {
-        return cloneAgentConfig(this.config);
+        return AgentConfigSchema.parse(this.config);
     }
 
-    private getProviderConfigForModel(model: ResolvedModel): ModelProviderConfig {
-        const provider = this.providerConfigs.find((entry) =>
-            entry.provider === model.provider,
-        );
-        if (!provider) {
-            throw new Error(`Provider not found for current model: ${model.provider}`);
-        }
-        return provider;
-    }
-
-    private requireCurrentModel(): ResolvedModel {
+    private requireCurrentModel(): ModelRuntime {
         if (!this.currentModel) {
-            throw new Error("No model is available. Configure providers or register engine models first.");
+            throw new Error("No model is configured. Call setModel() before run().");
         }
-        return this.currentModel;
+        return structuredClone(this.currentModel);
     }
 
-    getModels(): ResolvedModel[] {
-        return this.getResolvedModels();
-    }
-
-    getResolvedModels(): ResolvedModel[] {
-        return this.resolvedModels.map(cloneResolvedModel);
-    }
-
-    getModelDisplayList(): string[] {
-        return this.resolvedModels.map((model) => model.id);
-    }
-
-    getCurrentResolvedModel(): ResolvedModel | undefined {
-        return this.currentModel ? cloneResolvedModel(this.currentModel) : undefined;
-    }
-
-    setResolvedModel(selector: ModelSelector): void {
-        const selected = selectResolvedModel(this.resolvedModels, selector);
-        if (!selected) {
-            throw new Error(
-                `Model not found: ${selectorDescription(selector)}. Available models: ${availableModelIds(this.resolvedModels)}`,
-            );
+    getModel(): PublicModelRuntime | undefined {
+        if (!this.currentModel) {
+            return undefined;
         }
-        this.currentModel = selected;
-        this.syncEffectiveConfig();
+        const { key: _, ...publicRuntime } = this.currentModel;
+        return PublicModelRuntimeSchema.parse(publicRuntime);
+    }
+
+    setModel(runtime: ModelRuntime): void {
+        this.ensureNotDestroyed();
+        if (this.running) {
+            throw new Error("Cannot change model while the agent is running");
+        }
+        this.currentModel = ModelRuntimeSchema.parse(runtime);
     }
 
     getGenerationConfig(): GenerationConfig {
-        return cloneGenerationConfig(this.generationConfig);
+        return { ...this.generationConfig };
     }
 
     setGenerationConfig(config: GenerationConfigInput | GenerationConfig): void {
@@ -310,6 +267,7 @@ export class MiniAgent {
     register(turnContextAppender: TurnContextAppender): void;
     register(approver: ToolApprover): void;
     register(destroyable: Destroyable): void;
+    register(runtimeRequire: AgentRuntimeRequire): void;
     register(module: AgentModule): void;
     register(item: AgentRegistrable | AgentModule): void {
         this.ensureNotDestroyed();
@@ -373,6 +331,16 @@ export class MiniAgent {
             matched = true;
             const req = candidate as LLMRequire;
             void req.setLLMRequest(this.llm);
+        }
+        if (AgentRuntimeRequireSchema.safeParse(candidate).success) {
+            matched = true;
+            const req = candidate as AgentRuntimeRequire;
+            req.setAgentRuntimeAccess({
+                getModelRuntime: () => this.currentModel
+                    ? structuredClone(this.currentModel)
+                    : undefined,
+                getGenerationConfig: () => this.getGenerationConfig(),
+            });
         }
         if (TurnContextConsumerSchema.safeParse(candidate).success) {
             matched = true;
@@ -706,16 +674,15 @@ export class MiniAgent {
     }
 
     private buildGenerateRequest(
-        currentModel: ResolvedModel,
+        currentModel: ModelRuntime,
         context: Message[],
         tools: Tool[],
     ): LLMGenerateRequest {
         return {
-            provider: cloneProviderConfig(this.getProviderConfigForModel(currentModel)),
-            model: cloneResolvedModel(currentModel),
+            runtime: structuredClone(currentModel),
             messages: [...context],
             tools: [...tools],
-            generation: cloneGenerationConfig(this.generationConfig),
+            generation: { ...this.generationConfig },
         };
     }
 
