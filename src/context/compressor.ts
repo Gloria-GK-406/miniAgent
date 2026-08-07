@@ -1,13 +1,9 @@
 import type {
-    AgentRuntimeAccess,
-    AgentRuntimeRequire,
     ContextProvider,
-    LLMRequest,
-    LLMRequire,
     Message,
 } from "../core/types.js";
-import { LLMStreamChunkType, MessageType } from "../core/types.js";
-import type { LLMGenerateRequest } from "../core/config.js";
+import { MessageType } from "../core/types.js";
+import type { OneShotLLMFactory, OneShotLLMRequire } from "../core/one-shot-llm.js";
 
 const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the following conversation into a concise summary that preserves:
 1. Key decisions made
@@ -39,10 +35,9 @@ export interface CompressionConfig {
 
 export type ContextCompressorOptions = Partial<CompressionConfig>;
 
-export class ContextCompressor implements ContextProvider, LLMRequire, AgentRuntimeRequire {
+export class ContextCompressor implements ContextProvider, OneShotLLMRequire {
     priority = -1000;
-    private llm: LLMRequest | null = null;
-    private runtimeAccess: AgentRuntimeAccess | null = null;
+    private oneShotFactory: OneShotLLMFactory | null = null;
     private config: CompressionConfig;
     private messages: Message[] = [];
     private summary: string | null = null;
@@ -56,12 +51,8 @@ export class ContextCompressor implements ContextProvider, LLMRequire, AgentRunt
         };
     }
 
-    async setLLMRequest(llm: LLMRequest): Promise<void> {
-        this.llm = llm;
-    }
-
-    setAgentRuntimeAccess(access: AgentRuntimeAccess): void {
-        this.runtimeAccess = access;
+    setOneShotLLMFactory(factory: OneShotLLMFactory): void {
+        this.oneShotFactory = factory;
     }
 
     getCompressedCount(): number {
@@ -87,10 +78,7 @@ export class ContextCompressor implements ContextProvider, LLMRequire, AgentRunt
     }
 
     private async compress(messages: Message[]): Promise<void> {
-        if (!this.llm || !this.runtimeAccess) return;
-        const runtime = this.runtimeAccess.getModelRuntime();
-        if (!runtime) return;
-        const generationConfig = this.runtimeAccess.getGenerationConfig();
+        if (!this.oneShotFactory) return;
 
         const conversationText = messages
             .map((m) => {
@@ -105,25 +93,22 @@ export class ContextCompressor implements ContextProvider, LLMRequire, AgentRunt
         };
 
         try {
-            const request: LLMGenerateRequest = {
-                runtime,
-                messages: [
-                    { id: "compress-system", type: MessageType.System, content: SUMMARIZE_PROMPT },
-                    summarizeRequest,
-                ],
-                tools: [],
-                generation: generationConfig,
-            };
-            let summary = "";
-            for await (const chunk of this.llm.streamInvoke(request)) {
-                if (chunk.type === LLMStreamChunkType.TextDelta) {
-                    summary += chunk.text;
-                }
-            }
+            const response = await this.oneShotFactory.create().invoke([
+                { id: "compress-system", type: MessageType.System, content: SUMMARIZE_PROMPT },
+                summarizeRequest,
+            ]);
+            const summary = Array.isArray(response.message)
+                ? ""
+                : typeof response.message.content === "string"
+                    ? response.message.content
+                    : response.message.content.type === "text"
+                        ? response.message.content.text
+                        : "";
             if (summary.trim() === "") {
-                summary = buildFallbackSummary(messages);
+                this.summary = buildFallbackSummary(messages);
+            } else {
+                this.summary = summary;
             }
-            this.summary = summary;
             this.compressedCount += messages.length;
         } catch {
             this.summary = buildFallbackSummary(messages);

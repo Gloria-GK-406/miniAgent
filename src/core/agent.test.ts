@@ -20,6 +20,8 @@ import type {
   LLMGenerateRequest,
 } from "./config.js";
 import type { Tool } from "../tool/types.js";
+import type { OneShotLLMFactory } from "./one-shot-llm.js";
+import { TokenUsageCounter } from "./token-usage.js";
 
 function userMessage(id = "user-1"): Message {
   return {
@@ -90,6 +92,42 @@ describe("MiniAgent", () => {
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
+  });
+
+  it("injects fresh one-shot callers and shares token usage through the service", async () => {
+    const requests: LLMGenerateRequest[] = [];
+    const usage = new TokenUsageCounter();
+    const agent = new MiniAgent({
+      llm: createLLM({
+        chunks: [
+          chunkText("done"),
+          {
+            type: LLMStreamChunkType.Usage,
+            tokenCount: { input: 5, output: 2, total: 7 },
+          },
+        ],
+        onRequest: (request) => requests.push(request),
+      }),
+      config: createConfig(testDir),
+      tokenUsage: usage,
+    });
+    let factory: OneShotLLMFactory | undefined;
+    agent.register({
+      setOneShotLLMFactory(value: OneShotLLMFactory): void {
+        factory = value;
+      },
+    });
+    setTestModel(agent);
+
+    await agent.run(userMessage());
+    const oneShot = factory!.create();
+    await oneShot.invoke([userMessage("internal")]);
+
+    expect(requests).toHaveLength(2);
+    expect(requests[1]!.tools).toEqual([]);
+    expect(agent.getContextCount()).toEqual({ input: 10, output: 4, total: 14 });
+    agent.resetContextCount();
+    expect(agent.getContextCount()).toEqual({ input: 0, output: 0, total: 0 });
   });
 
   it("does not treat setConfig-only objects as registrable modules", () => {

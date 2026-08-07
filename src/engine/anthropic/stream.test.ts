@@ -22,6 +22,39 @@ async function collectStreamChunks(
 }
 
 describe("streamAnthropicChunks", () => {
+  it("combines start input usage with terminal output usage", async () => {
+    const events = [
+      {
+        type: "message_start",
+        message: {
+          usage: {
+            input_tokens: 10,
+            output_tokens: 0,
+            cache_creation_input_tokens: 2,
+            cache_read_input_tokens: 3,
+          },
+        },
+      },
+      {
+        type: "message_delta",
+        usage: { input_tokens: 0, output_tokens: 5 },
+      },
+    ] as RawMessageStreamEvent[];
+
+    await expect(
+      collectStreamChunks(streamAnthropicChunks(toAsyncIterable(events))),
+    ).resolves.toEqual([
+      {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: { input: 15, output: 0, total: 15 },
+      },
+      {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: { input: 15, output: 5, total: 20 },
+      },
+    ]);
+  });
+
   it("emits an empty tool-call delta when a tool_use block has no argument delta", async () => {
     const events: RawMessageStreamEvent[] = [
       {

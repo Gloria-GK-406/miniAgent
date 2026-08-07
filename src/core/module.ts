@@ -1,6 +1,5 @@
 import type {
     AfterTurnProcessor,
-    AgentRuntimeRequire,
     ContextProcessor,
     ContextProvider,
     Destroyable,
@@ -11,6 +10,7 @@ import type {
     TurnContextAppender,
     TurnContextConsumer,
 } from "./types.js";
+import type { OneShotLLMRequire } from "./one-shot-llm.js";
 import type { ToolProvider, Tool } from "../tool/types.js";
 import type { ToolApprover } from "../tool/approver.js";
 
@@ -27,7 +27,7 @@ export type AgentRegistrable =
     | TurnContextAppender
     | ToolApprover
     | LLMRequire
-    | AgentRuntimeRequire
+    | OneShotLLMRequire
     | Destroyable;
 
 export type AgentModule = Record<string, unknown>;

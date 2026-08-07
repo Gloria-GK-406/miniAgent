@@ -80,6 +80,15 @@ export async function* streamOpenAIChunks(
   const toolCalls: OpenAIToolCallBuffer[] = [];
 
   for await (const chunk of stream) {
+    if (chunk.usage) {
+      yield {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: createTokenCount(
+          chunk.usage.prompt_tokens,
+          chunk.usage.completion_tokens,
+        ),
+      };
+    }
     const choice = chunk.choices[0];
     if (!choice) {
       continue;

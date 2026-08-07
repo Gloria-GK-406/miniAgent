@@ -40,6 +40,24 @@ async function collectStreamChunks(
 }
 
 describe("streamNVIDIAChunks", () => {
+  it("emits provider token usage from a terminal chunk", async () => {
+    const usageChunk = {
+      id: "chunk-usage",
+      object: "chat.completion.chunk",
+      created: 1,
+      model: "nvidia-test",
+      choices: [],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+    } as ChatCompletionChunk;
+
+    await expect(
+      collectStreamChunks(streamNVIDIAChunks(toAsyncIterable([usageChunk]))),
+    ).resolves.toEqual([{
+      type: LLMStreamChunkType.Usage,
+      tokenCount: { input: 10, output: 5, total: 15 },
+    }]);
+  });
+
   it("emits one empty tool-call delta when id/name arrive without arguments", async () => {
     await expect(
       collectStreamChunks(

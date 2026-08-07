@@ -18,6 +18,7 @@ export function createMiniAgent(options: CreateMiniAgentOptions): MiniAgent {
     const agent = new MiniAgent(options.llm, options.config, {
         ...(options.store !== undefined && { store: options.store }),
         ...(options.messageSource !== undefined && { messageSource: options.messageSource }),
+        ...(options.tokenUsage !== undefined && { tokenUsage: options.tokenUsage }),
     });
 
     for (const item of options.use ?? []) {

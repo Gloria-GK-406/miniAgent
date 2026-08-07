@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { GenerationConfig, LLMGenerateRequest, ModelRuntime } from "./config.js";
+import type { LLMGenerateRequest } from "./config.js";
 import type { Store } from "../store/store.js";
 
 export enum MessageType {
@@ -106,6 +106,7 @@ export enum LLMStreamChunkType {
   TextDelta = "text-delta",
   ReasoningDelta = "reasoning-delta",
   ToolCallArgumentsDelta = "tool-call-arguments-delta",
+  Usage = "usage",
 }
 
 export const TextDeltaChunkSchema = z.object({
@@ -126,15 +127,22 @@ export const ToolCallArgumentsDeltaChunkSchema = z.object({
   toolName: z.string().optional(),
 });
 
+export const UsageChunkSchema = z.object({
+  type: z.literal(LLMStreamChunkType.Usage),
+  tokenCount: TokenCountSchema,
+});
+
 export const LLMStreamChunkSchema = z.union([
   TextDeltaChunkSchema,
   ReasoningDeltaChunkSchema,
   ToolCallArgumentsDeltaChunkSchema,
+  UsageChunkSchema,
 ]);
 
 export type TextDeltaChunk = z.infer<typeof TextDeltaChunkSchema>;
 export type ReasoningDeltaChunk = z.infer<typeof ReasoningDeltaChunkSchema>;
 export type ToolCallArgumentsDeltaChunk = z.infer<typeof ToolCallArgumentsDeltaChunkSchema>;
+export type UsageChunk = z.infer<typeof UsageChunkSchema>;
 export type LLMStreamChunk = z.infer<typeof LLMStreamChunkSchema>;
 export type MessageChunk = LLMStreamChunk;
 
@@ -157,28 +165,6 @@ export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
     typeof (value as { streamInvoke?: unknown }).streamInvoke === "function"
   );
 });
-
-export const AgentRuntimeAccessSchema = z.object({
-  getModelRuntime: z.function(
-    z.tuple([]),
-    z.custom<ModelRuntime>().optional(),
-  ),
-  getGenerationConfig: z.function(
-    z.tuple([]),
-    z.custom<GenerationConfig>(),
-  ),
-});
-
-export type AgentRuntimeAccess = z.infer<typeof AgentRuntimeAccessSchema>;
-
-export const AgentRuntimeRequireSchema = z.object({
-  setAgentRuntimeAccess: z.function(
-    z.tuple([AgentRuntimeAccessSchema]),
-    z.void(),
-  ),
-});
-
-export type AgentRuntimeRequire = z.infer<typeof AgentRuntimeRequireSchema>;
 
 export const ContextProviderSchema = z.object({
   priority: z.number().int(),

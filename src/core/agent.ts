@@ -2,14 +2,12 @@ import type {
     Action,
     AfterTurnProcessor,
     AgentContextControl,
-    AgentRuntimeRequire,
     ContextProcessor,
     ContextProvider,
     Destroyable,
     ErrorHandler,
     LLMRequest,
     LLMRequire,
-    LLMResponse,
     Message,
     MessageChunk,
     MessageNotifier,
@@ -23,14 +21,12 @@ import type {
 } from "./types.js";
 import {
     ActionType,
-    AgentRuntimeRequireSchema,
     AfterTurnProcessorSchema,
     ContextProcessorSchema,
     ContextProviderSchema,
     DestroyableSchema,
     ErrorHandlerSchema,
     LLMRequireSchema,
-    LLMStreamChunkType,
     MessageNotifierSchema,
     MessageType,
     PersistRequireSchema,
@@ -65,12 +61,22 @@ import { FileStore } from "../store/file-store.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 import { StopException } from "./errors.js";
-import { addTokenCount, emptyTokenCount } from "./llm.js";
+import { collectLLMResponse } from "./llm.js";
 import type { AgentModule, AgentRegistrable } from "./module.js";
+import {
+    OneShotLLM,
+    OneShotLLMRequireSchema,
+    type OneShotLLMRequire,
+} from "./one-shot-llm.js";
+import {
+    createTokenUsageService,
+    type TokenUsageService,
+} from "./token-usage.js";
 
 export interface MiniAgentOptions {
     store?: Store;
     messageSource?: MessageSource;
+    tokenUsage?: TokenUsageService;
 }
 
 export interface MiniAgentCreateOptions extends MiniAgentOptions {
@@ -83,36 +89,11 @@ const DEFAULT_GENERATION_CONFIG = {
     thinking: ThinkingLevel.Medium,
 } satisfies GenerationConfig;
 
-interface ToolCallBuffer {
-    id?: string;
-    name?: string;
-    argumentsText: string;
-}
-
 function isCreateOptions(value: LLMRequest | MiniAgentCreateOptions): value is MiniAgentCreateOptions {
     return typeof value === "object"
         && value !== null
         && "llm" in value
         && "config" in value;
-}
-
-function getToolCallBuffer(buffers: ToolCallBuffer[], index: number): ToolCallBuffer {
-    const existing = buffers[index];
-    if (existing) {
-        return existing;
-    }
-    const created: ToolCallBuffer = {
-        argumentsText: "",
-    };
-    buffers[index] = created;
-    return created;
-}
-
-function parseToolArguments(buffer: ToolCallBuffer): Record<string, unknown> {
-    if (buffer.argumentsText.trim() === "") {
-        return {};
-    }
-    return JSON.parse(buffer.argumentsText) as Record<string, unknown>;
 }
 
 export class MiniAgent {
@@ -140,7 +121,7 @@ export class MiniAgent {
     private running = false;
     private stopped = false;
     private destroyed = false;
-    private contextCount: TokenCount = emptyTokenCount();
+    private tokenUsage: TokenUsageService;
     private toolAbortController: AbortController | null = null;
     private activeStream: AsyncGenerator<MessageChunk> | null = null;
     private activeRunPromise: Promise<Message[]> | undefined;
@@ -169,6 +150,7 @@ export class MiniAgent {
         );
         this.syncEffectiveConfig();
         this.store = resolvedOptions.store ?? new FileStore(this.config.paths.sessiondir);
+        this.tokenUsage = resolvedOptions.tokenUsage ?? createTokenUsageService();
         this.messageSource = resolvedOptions.messageSource
             ?? new FileMessageSource(this.store, "messages.jsonl");
     }
@@ -252,7 +234,11 @@ export class MiniAgent {
     }
 
     getContextCount(): TokenCount {
-        return this.contextCount;
+        return this.tokenUsage.getTokenUsage();
+    }
+
+    resetContextCount(): void {
+        this.tokenUsage.resetTokenUsage();
     }
 
     register(tool: Tool): void;
@@ -267,7 +253,7 @@ export class MiniAgent {
     register(turnContextAppender: TurnContextAppender): void;
     register(approver: ToolApprover): void;
     register(destroyable: Destroyable): void;
-    register(runtimeRequire: AgentRuntimeRequire): void;
+    register(oneShotRequire: OneShotLLMRequire): void;
     register(module: AgentModule): void;
     register(item: AgentRegistrable | AgentModule): void {
         this.ensureNotDestroyed();
@@ -332,14 +318,16 @@ export class MiniAgent {
             const req = candidate as LLMRequire;
             void req.setLLMRequest(this.llm);
         }
-        if (AgentRuntimeRequireSchema.safeParse(candidate).success) {
+        if (OneShotLLMRequireSchema.safeParse(candidate).success) {
             matched = true;
-            const req = candidate as AgentRuntimeRequire;
-            req.setAgentRuntimeAccess({
-                getModelRuntime: () => this.currentModel
-                    ? structuredClone(this.currentModel)
-                    : undefined,
-                getGenerationConfig: () => this.getGenerationConfig(),
+            const req = candidate as OneShotLLMRequire;
+            req.setOneShotLLMFactory({
+                create: () => new OneShotLLM(
+                    this.llm,
+                    this.requireCurrentModel(),
+                    this.getGenerationConfig(),
+                    this.tokenUsage,
+                ),
             });
         }
         if (TurnContextConsumerSchema.safeParse(candidate).success) {
@@ -601,76 +589,21 @@ export class MiniAgent {
         void this.activeStream?.return?.(undefined);
     }
 
-    private async collectStreamResponse(stream: AsyncGenerator<MessageChunk>): Promise<LLMResponse> {
-        let content = "";
-        let reasoningContent = "";
-        const toolCalls: ToolCallBuffer[] = [];
+    private async collectStreamResponse(stream: AsyncGenerator<MessageChunk>) {
         this.activeStream = stream;
         try {
-            for await (const chunk of stream) {
-                this.emitter.emit("llm:chunk", { chunk });
-                switch (chunk.type) {
-                    case LLMStreamChunkType.TextDelta:
-                        content += chunk.text;
-                        break;
-                    case LLMStreamChunkType.ReasoningDelta:
-                        reasoningContent += chunk.text;
-                        break;
-                    case LLMStreamChunkType.ToolCallArgumentsDelta: {
-                        const buffer = getToolCallBuffer(toolCalls, chunk.index);
-                        buffer.argumentsText += chunk.argsText;
-                        if (chunk.toolCallId !== undefined) {
-                            buffer.id = chunk.toolCallId;
-                        }
-                        if (chunk.toolName !== undefined) {
-                            buffer.name = chunk.toolName;
-                        }
-                        break;
-                    }
-                }
-                if (this.stopped) {
-                    await stream.return?.(undefined);
-                    break;
-                }
-            }
+            return await collectLLMResponse(stream, {
+                onChunk: (chunk) => this.emitter.emit("llm:chunk", { chunk }),
+                onTokenUsage: (tokenCount) => {
+                    this.tokenUsage.reportTokenUsage(tokenCount);
+                },
+                shouldStop: () => this.stopped,
+            });
         } finally {
             if (this.activeStream === stream) {
                 this.activeStream = null;
             }
         }
-
-        if (toolCalls.length > 0) {
-            return {
-                message: toolCalls.map((toolCall) => {
-                    if (!toolCall.id) {
-                        throw new Error("LLM stream ended without a tool call id");
-                    }
-                    if (!toolCall.name) {
-                        throw new Error("LLM stream ended without a tool name");
-                    }
-                    return {
-                        id: crypto.randomUUID(),
-                        type: MessageType.ToolCall,
-                        content,
-                        toolCallId: toolCall.id,
-                        toolName: toolCall.name,
-                        arguments: parseToolArguments(toolCall),
-                        ...(reasoningContent !== "" && { reasoningContent }),
-                    };
-                }),
-                tokenCount: emptyTokenCount(),
-            };
-        }
-
-        return {
-            message: {
-                id: crypto.randomUUID(),
-                type: MessageType.Assist,
-                content,
-                ...(reasoningContent !== "" && { reasoningContent }),
-            },
-            tokenCount: emptyTokenCount(),
-        };
     }
 
     private buildGenerateRequest(
@@ -726,7 +659,6 @@ export class MiniAgent {
                     const response = await this.collectStreamResponse(
                         this.llm.streamInvoke(request),
                     );
-                    this.contextCount = addTokenCount(this.contextCount, response.tokenCount);
                     this.emitter.emit("llm:response", { response });
 
                     if (!Array.isArray(response.message)) {

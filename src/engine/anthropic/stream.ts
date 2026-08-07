@@ -33,8 +33,28 @@ export async function* streamAnthropicChunks(
   stream: AsyncIterable<RawMessageStreamEvent>,
 ): AsyncGenerator<LLMStreamChunk> {
   const toolUses = new Map<number, AnthropicToolUseBuffer>();
+  let inputTokens = 0;
 
   for await (const event of stream) {
+    if (event.type === "message_start") {
+      inputTokens = (event.message.usage.input_tokens ?? 0)
+        + (event.message.usage.cache_creation_input_tokens ?? 0)
+        + (event.message.usage.cache_read_input_tokens ?? 0);
+      yield {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: createTokenCount(inputTokens, event.message.usage.output_tokens),
+      };
+      continue;
+    }
+
+    if (event.type === "message_delta") {
+      yield {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: createTokenCount(inputTokens, event.usage.output_tokens),
+      };
+      continue;
+    }
+
     if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
       const toolUse = event.content_block as ToolUseBlock;
       toolUses.set(event.index, {

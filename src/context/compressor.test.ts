@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ContextCompressor } from "./compressor.js";
 import { ThinkingLevel, type LLMGenerateRequest, type ModelRuntime } from "../core/config.js";
 import { LLMStreamChunkType, MessageType, type LLMRequest, type Message } from "../core/types.js";
+import { OneShotLLM } from "../core/one-shot-llm.js";
 
 function messages(count: number): Message[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -30,10 +31,13 @@ describe("ContextCompressor", () => {
     };
     let current = runtime("first");
     const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
-    await compressor.setLLMRequest(llm);
-    compressor.setAgentRuntimeAccess({
-      getModelRuntime: () => structuredClone(current),
-      getGenerationConfig: () => ({ temperature: 0.2, thinking: ThinkingLevel.Low }),
+    compressor.setOneShotLLMFactory({
+      create: () => new OneShotLLM(
+        llm,
+        current,
+        { temperature: 0.2, thinking: ThinkingLevel.Low },
+        { reportTokenUsage: () => {} },
+      ),
     });
 
     compressor.updateMessages(messages(5));
@@ -50,7 +54,7 @@ describe("ContextCompressor", () => {
     });
   });
 
-  it("does nothing until both LLM and runtime access are injected", async () => {
+  it("does nothing until a one-shot factory is injected", async () => {
     const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
     compressor.updateMessages(messages(5));
     await compressor.maybeCompress();
@@ -59,15 +63,18 @@ describe("ContextCompressor", () => {
 
   it("falls back to a local summary when generation fails", async () => {
     const compressor = new ContextCompressor({ maxMessages: 3, keepRecent: 1 });
-    await compressor.setLLMRequest({
-      async *streamInvoke() {
-        throw new Error("offline");
-        yield { type: LLMStreamChunkType.TextDelta, text: "unreachable" };
-      },
-    });
-    compressor.setAgentRuntimeAccess({
-      getModelRuntime: () => runtime("test"),
-      getGenerationConfig: () => ({ temperature: 0.7, thinking: ThinkingLevel.Medium }),
+    compressor.setOneShotLLMFactory({
+      create: () => new OneShotLLM(
+        {
+          async *streamInvoke() {
+            throw new Error("offline");
+            yield { type: LLMStreamChunkType.TextDelta, text: "unreachable" };
+          },
+        },
+        runtime("test"),
+        { temperature: 0.7, thinking: ThinkingLevel.Medium },
+        { reportTokenUsage: () => {} },
+      ),
     });
     compressor.updateMessages(messages(5));
 

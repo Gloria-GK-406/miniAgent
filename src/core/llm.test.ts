@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { LLMEngineManager } from "./llm.js";
+import { describe, expect, it, vi } from "vitest";
+import { collectLLMResponse, LLMEngineManager } from "./llm.js";
 import { ThinkingLevel, type LLMGenerateRequest } from "./config.js";
 import { LLMRequestSchema, LLMStreamChunkType, type MessageChunk } from "./types.js";
 
@@ -49,5 +49,90 @@ describe("LLMEngineManager", () => {
     expect(LLMRequestSchema.safeParse({
       streamInvoke: () => chunkStream("ok"),
     }).success).toBe(true);
+  });
+});
+
+describe("collectLLMResponse", () => {
+  it("assembles deltas and retains the latest provider usage", async () => {
+    const onTokenUsage = vi.fn();
+    async function* stream(): AsyncGenerator<MessageChunk> {
+      yield { type: LLMStreamChunkType.TextDelta, text: "answer" };
+      yield {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: { input: 10, output: 2, total: 12 },
+      };
+    }
+
+    const response = await collectLLMResponse(stream(), { onTokenUsage });
+
+    expect(response).toMatchObject({
+      message: { content: "answer" },
+      tokenCount: { input: 10, output: 2, total: 12 },
+    });
+    expect(onTokenUsage).toHaveBeenCalledOnce();
+    expect(onTokenUsage).toHaveBeenCalledWith({ input: 10, output: 2, total: 12 });
+  });
+
+  it("returns zero usage when a stream provides none", async () => {
+    const onTokenUsage = vi.fn();
+    const response = await collectLLMResponse(chunkStream("answer"), { onTokenUsage });
+
+    expect(response.tokenCount).toEqual({ input: 0, output: 0, total: 0 });
+    expect(onTokenUsage).not.toHaveBeenCalled();
+  });
+
+  it("does not report when stopped after usage but before stream completion", async () => {
+    let releaseStream!: () => void;
+    const release = new Promise<void>((resolve) => {
+      releaseStream = resolve;
+    });
+    let usageSeen!: () => void;
+    const seen = new Promise<void>((resolve) => {
+      usageSeen = resolve;
+    });
+    let stopped = false;
+    const onTokenUsage = vi.fn();
+    async function* stream(): AsyncGenerator<MessageChunk> {
+      yield {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: { input: 3, output: 1, total: 4 },
+      };
+      await release;
+    }
+
+    const responsePromise = collectLLMResponse(stream(), {
+      onChunk: (chunk) => {
+        if (chunk.type === LLMStreamChunkType.Usage) usageSeen();
+      },
+      onTokenUsage,
+      shouldStop: () => stopped,
+    });
+    await seen;
+    stopped = true;
+    releaseStream();
+    await responsePromise;
+
+    expect(onTokenUsage).not.toHaveBeenCalled();
+  });
+
+  it("does not report when final tool response assembly fails", async () => {
+    const onTokenUsage = vi.fn();
+    async function* stream(): AsyncGenerator<MessageChunk> {
+      yield {
+        type: LLMStreamChunkType.Usage,
+        tokenCount: { input: 3, output: 1, total: 4 },
+      };
+      yield {
+        type: LLMStreamChunkType.ToolCallArgumentsDelta,
+        index: 0,
+        argsText: "{invalid",
+        toolCallId: "call-1",
+        toolName: "tool",
+      };
+    }
+
+    await expect(collectLLMResponse(stream(), { onTokenUsage }))
+      .rejects.toThrow();
+    expect(onTokenUsage).not.toHaveBeenCalled();
   });
 });

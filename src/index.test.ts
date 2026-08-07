@@ -10,6 +10,9 @@ import {
     PublicModelRuntimeSchema,
     ThinkingLevel,
     ThinkingLevelSchema,
+    TokenUsageCounter,
+    TokenUsageServiceSchema,
+    OneShotLLMRequireSchema,
     normalizeGenerationConfig,
     type GenerationConfig,
     type GenerationConfigInput,
@@ -65,10 +68,22 @@ describe("root exports", () => {
             "Model" + "ConfigSchema",
             "Model" + "GroupSchema",
             "Model" + "AwareLLMRequestSchema",
+            "Agent" + "RuntimeAccessSchema",
+            "Agent" + "RuntimeRequireSchema",
         ];
 
         for (const name of retiredExports) {
             expect(publicApi).not.toHaveProperty(name);
         }
+    });
+
+    it("exports one-shot injection and aggregate token usage contracts", () => {
+        const usage = new TokenUsageCounter();
+
+        expect(TokenUsageServiceSchema.safeParse(usage).success).toBe(true);
+        expect(usage.getTokenUsage()).toEqual({ input: 0, output: 0, total: 0 });
+        expect(OneShotLLMRequireSchema.safeParse({
+            setOneShotLLMFactory: (): void => {},
+        }).success).toBe(true);
     });
 });

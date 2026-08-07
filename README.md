@@ -560,6 +560,7 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 | `setGenerationConfig(update)` | Update generation preferences without changing the active model. |
 | `getConfig()` | Get the current agent configuration. |
 | `getContextCount()` | Get cumulative token usage statistics. |
+| `resetContextCount()` | Reset cumulative token usage statistics. |
 
 ## Tech Stack
 

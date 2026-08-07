@@ -499,6 +499,7 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 | `setGenerationConfig(update)` | 更新生成配置，不切换活动模型 |
 | `getConfig()` | 获取当前 Agent 配置 |
 | `getContextCount()` | 获取累计 token 使用统计 |
+| `resetContextCount()` | 重置累计 token 使用统计 |
 
 ## 技术栈
 

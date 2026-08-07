@@ -26,8 +26,12 @@ export type {
     DefaultBlueprintOptions,
     RegisterBuiltinBlueprintImplsOptions,
 } from "./assembly/builtins.js";
-export { DefaultLLMEngineRegister, LLMEngineManager } from "./core/llm.js";
-export type { LLMEngine } from "./core/llm.js";
+export {
+    collectLLMResponse,
+    DefaultLLMEngineRegister,
+    LLMEngineManager,
+} from "./core/llm.js";
+export type { CollectLLMResponseOptions, LLMEngine } from "./core/llm.js";
 export { createLLMStreamHandle } from "./core/llm.js";
 export type { LLMStreamController } from "./core/llm.js";
 export { emptyTokenCount, createTokenCount, addTokenCount } from "./core/llm.js";
@@ -52,9 +56,8 @@ export type {
 
 export { MessageType, ActionType, LLMStreamChunkType } from "./core/types.js";
 export {
-    AgentRuntimeAccessSchema,
-    AgentRuntimeRequireSchema,
     LLMRequestSchema,
+    UsageChunkSchema,
 } from "./core/types.js";
 export { DestroyableSchema } from "./core/types.js";
 export type {
@@ -73,9 +76,8 @@ export type {
     TextDeltaChunk,
     ReasoningDeltaChunk,
     ToolCallArgumentsDeltaChunk,
+    UsageChunk,
     LLMRequest,
-    AgentRuntimeAccess,
-    AgentRuntimeRequire,
     LLMStreamHandle,
     ContextProvider,
     ContextProcessor,
@@ -92,6 +94,31 @@ export type {
     LLMRequire,
     Destroyable,
 } from "./core/types.js";
+
+export {
+    OneShotLLM,
+    OneShotLLMFactorySchema,
+    OneShotLLMRequireSchema,
+    OneShotLLMSchema,
+} from "./core/one-shot-llm.js";
+export type {
+    OneShotLLMFactory,
+    OneShotLLMRequire,
+} from "./core/one-shot-llm.js";
+export {
+    createTokenUsageService,
+    TokenUsageCounter,
+    TokenUsageReaderSchema,
+    TokenUsageReporterSchema,
+    TokenUsageResetterSchema,
+    TokenUsageServiceSchema,
+} from "./core/token-usage.js";
+export type {
+    TokenUsageReader,
+    TokenUsageReporter,
+    TokenUsageResetter,
+    TokenUsageService,
+} from "./core/token-usage.js";
 
 export {
     ThinkingLevel,

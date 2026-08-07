@@ -1,10 +1,12 @@
 import type {
+  LLMResponse,
   LLMRequest,
   MessageChunk,
   TokenCount,
   LLMStreamChunk,
   LLMStreamHandle,
 } from "./types.js";
+import { LLMStreamChunkType, MessageType } from "./types.js";
 import type { LLMGenerateRequest } from "./config.js";
 
 export interface LLMEngine {
@@ -130,6 +132,104 @@ export class LLMEngineManager implements LLMRequest {
 }
 
 export class DefaultLLMEngineRegister extends LLMEngineManager {}
+
+interface ToolCallBuffer {
+  id?: string;
+  name?: string;
+  argumentsText: string;
+}
+
+export interface CollectLLMResponseOptions {
+  onChunk?: (chunk: LLMStreamChunk) => void;
+  onTokenUsage?: (tokenCount: TokenCount) => void;
+  shouldStop?: () => boolean;
+}
+
+function getToolCallBuffer(buffers: ToolCallBuffer[], index: number): ToolCallBuffer {
+  const existing = buffers[index];
+  if (existing) return existing;
+  const created: ToolCallBuffer = { argumentsText: "" };
+  buffers[index] = created;
+  return created;
+}
+
+export async function collectLLMResponse(
+  stream: AsyncGenerator<MessageChunk>,
+  options: CollectLLMResponseOptions = {},
+): Promise<LLMResponse> {
+  let content = "";
+  let reasoningContent = "";
+  let tokenCount = emptyTokenCount();
+  let hasTokenUsage = false;
+  let interrupted = false;
+  const toolCalls: ToolCallBuffer[] = [];
+
+  for await (const chunk of stream) {
+    options.onChunk?.(chunk);
+    switch (chunk.type) {
+      case LLMStreamChunkType.TextDelta:
+        content += chunk.text;
+        break;
+      case LLMStreamChunkType.ReasoningDelta:
+        reasoningContent += chunk.text;
+        break;
+      case LLMStreamChunkType.ToolCallArgumentsDelta: {
+        const buffer = getToolCallBuffer(toolCalls, chunk.index);
+        buffer.argumentsText += chunk.argsText;
+        if (chunk.toolCallId !== undefined) buffer.id = chunk.toolCallId;
+        if (chunk.toolName !== undefined) buffer.name = chunk.toolName;
+        break;
+      }
+      case LLMStreamChunkType.Usage:
+        tokenCount = { ...chunk.tokenCount };
+        hasTokenUsage = true;
+        break;
+    }
+    if (options.shouldStop?.()) {
+      interrupted = true;
+      await stream.return?.(undefined);
+      break;
+    }
+  }
+
+  let response: LLMResponse;
+  if (toolCalls.length > 0) {
+    response = {
+      message: toolCalls.map((toolCall) => {
+        if (!toolCall.id) throw new Error("LLM stream ended without a tool call id");
+        if (!toolCall.name) throw new Error("LLM stream ended without a tool name");
+        const argumentsObject = toolCall.argumentsText.trim() === ""
+          ? {}
+          : JSON.parse(toolCall.argumentsText) as Record<string, unknown>;
+        return {
+          id: crypto.randomUUID(),
+          type: MessageType.ToolCall,
+          content,
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          arguments: argumentsObject,
+          ...(reasoningContent !== "" && { reasoningContent }),
+        };
+      }),
+      tokenCount,
+    };
+  } else {
+    response = {
+      message: {
+        id: crypto.randomUUID(),
+        type: MessageType.Assist,
+        content,
+        ...(reasoningContent !== "" && { reasoningContent }),
+      },
+      tokenCount,
+    };
+  }
+
+  if (hasTokenUsage && !interrupted && !options.shouldStop?.()) {
+    options.onTokenUsage?.({ ...tokenCount });
+  }
+  return response;
+}
 
 export function emptyTokenCount(): TokenCount {
   return {
