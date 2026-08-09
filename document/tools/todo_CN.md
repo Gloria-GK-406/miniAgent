@@ -58,6 +58,6 @@ agent.register(todo);
 ## 注册
 
 ```typescript
-import { TodoManager } from "@piaoxianguo/miniagent";
+import { TodoManager } from "@piaoxianguo/miniagent-extensions";
 agent.register(new TodoManager());
 ```

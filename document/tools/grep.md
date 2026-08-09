@@ -41,6 +41,6 @@ Search a single file:
 ## Registration
 
 ```typescript
-import { grepTool } from "@piaoxianguo/miniagent";
+import { grepTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(grepTool);
 ```

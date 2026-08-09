@@ -37,6 +37,6 @@ Execute a bash command. Returns stdout, stderr, and exit code. Supports timeout 
 ## Registration
 
 ```typescript
-import { bashTool } from "@piaoxianguo/miniagent";
+import { bashTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(bashTool);
 ```

@@ -59,6 +59,6 @@ agent.register(todo);
 ## Registration
 
 ```typescript
-import { TodoManager } from "@piaoxianguo/miniagent";
+import { TodoManager } from "@piaoxianguo/miniagent-extensions";
 agent.register(new TodoManager());
 ```

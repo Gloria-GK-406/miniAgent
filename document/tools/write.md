@@ -24,6 +24,6 @@ Write content to a file. Creates parent directories if needed. Overwrites existi
 ## Registration
 
 ```typescript
-import { writeTool } from "@piaoxianguo/miniagent";
+import { writeTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(writeTool);
 ```

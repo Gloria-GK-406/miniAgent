@@ -5,7 +5,7 @@ Connect to MCP (Model Context Protocol) servers and expose their tools to the ag
 ## Setup
 
 ```typescript
-import { McpPlugin } from "@piaoxianguo/miniagent/extensions/mcp";
+import { McpPlugin } from "@piaoxianguo/miniagent-extensions/mcp";
 
 const mcp = new McpPlugin({
   servers: {

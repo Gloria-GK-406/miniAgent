@@ -41,6 +41,6 @@
 ## 注册
 
 ```typescript
-import { grepTool } from "@piaoxianguo/miniagent";
+import { grepTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(grepTool);
 ```

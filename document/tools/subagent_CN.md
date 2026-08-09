@@ -7,7 +7,7 @@
 使用自定义系统提示词内联生成子 Agent：
 
 ```typescript
-import { SubAgentProvider } from "@piaoxianguo/miniagent";
+import { SubAgentProvider } from "@piaoxianguo/miniagent-extensions";
 
 const factory = async (task: string, systemPrompt: string) => {
   // 创建并返回一个 MiniAgent 实例
@@ -31,7 +31,7 @@ agent.register(provider);
 ### 设置
 
 ```typescript
-import { SubagentPlugin } from "@piaoxianguo/miniagent/extensions/subagent";
+import { SubagentPlugin } from "@piaoxianguo/miniagent-extensions/subagent";
 
 const subagent = new SubagentPlugin({
   path: "./.cliagent/subagent/",

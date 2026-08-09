@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Build & Test
@@ -14,8 +17,8 @@ jobs:
       matrix:
         node-version: [20, 22]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -25,40 +28,140 @@ jobs:
       - run: npm run build
       - run: npm test
 
-  publish:
-    name: Publish to npm
-    needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  package-validation:
+    name: Validate exact split-package candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+      - name: Pin npm and assert release toolchain
+        run: |
+          npm install --global npm@10.9.4
+          test "$(node --version)" = "v22.22.0"
+          test "$(npm --version)" = "10.9.4"
+      - run: npm ci
+      - run: npm run build
+      - name: Generate the deterministic package candidate
+        run: npm run release:build -- --verify-determinism
+      - name: Validate package policy, archives, and strict consumers
+        run: |
+          npm run release:test
+          npm run release:verify -- --candidate .release/candidate/manifest.json
+
+  release-eligibility:
+    name: Select the one-shot 0.8 release commit
+    needs: [check, package-validation]
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.intent.outputs.eligible }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.0
+      - name: Require this master commit to add the exact release intent
+        id: intent
+        run: |
+          node scripts/release-eligibility.mjs --sha "${{ github.sha }}" --event "${{ github.event_name }}" --ref "${{ github.ref }}" > release-eligibility.json
+          node -e "const d=require('./release-eligibility.json');process.stdout.write('eligible='+String(d.eligible)+'\n')" >> "$GITHUB_OUTPUT"
+
+  release-candidate:
+    name: Accept and retain release candidate
+    needs: [check, package-validation, release-eligibility]
+    if: needs.release-eligibility.outputs.eligible == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+      - name: Pin npm and assert release toolchain
+        run: |
+          npm install --global npm@10.9.4
+          test "$(node --version)" = "v22.22.0"
+          test "$(npm --version)" = "10.9.4"
+      - run: npm ci
+      - name: Recover candidate from this run before fallback generation
+        id: recover
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: miniagent-0.8.0-candidate-${{ github.sha }}-${{ github.run_id }}
+          path: .release/candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - name: Generate candidate only when recovery is unavailable
+        if: steps.recover.outcome != 'success'
+        run: |
+          npm run build
+          npm run release:build -- --verify-determinism
+      - name: Completely reaccept exact recovered or generated candidate
+        run: |
+          npm run release:test -- --skip-generation
+          npm run release:verify -- --candidate .release/candidate/manifest.json
+      - name: Record retained candidate identity
+        if: steps.recover.outcome != 'success'
+        run: |
+          node -e "const fs=require('node:fs');const m=require('./.release/candidate/manifest.json');fs.writeFileSync('.release/candidate/run-record.json',JSON.stringify({runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,sha:process.env.GITHUB_SHA,candidateId:m.candidateId,packages:m.packages.map(({name,integrity,archive})=>({name,integrity,archive}))},null,2)+'\n')"
+      - name: Reject secret/config residue before retention
+        run: |
+          test -f .release/candidate/manifest.json
+          test -z "$(find .release/candidate -type f \( -name '.npmrc' -o -name '*.pem' -o -name '*.key' \) -print -quit)"
+          test "$(find .release/candidate/archives -type f -name '*.tgz' | wc -l | tr -d ' ')" = "3"
+      - name: Upload accepted candidate before any mutation
+        if: steps.recover.outcome != 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miniagent-0.8.0-candidate-${{ github.sha }}-${{ github.run_id }}
+          path: .release/candidate
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish split packages
+    needs: [check, package-validation, release-eligibility, release-candidate]
+    if: needs.release-eligibility.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: miniagent-npm-0.8.0
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.22.0
           cache: npm
           registry-url: https://registry.npmjs.org
-      - run: npm ci
-      - run: npm run build
-
-      - name: Check if version is already published
-        id: version-check
+      - name: Pin npm and assert release toolchain
         run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PUBLISHED=$(npm view "${PKG_NAME}@${PKG_VERSION}" version 2>/dev/null || echo "")
-          if [ "$PUBLISHED" = "$PKG_VERSION" ]; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-            echo "Version ${PKG_VERSION} is already published, skipping."
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
-            echo "Version ${PKG_VERSION} is not yet published, proceeding."
-          fi
-
-      - name: Publish
-        if: steps.version-check.outputs.published == 'false'
-        run: npm publish --provenance --access public
+          npm install --global npm@10.9.4
+          test "$(node --version)" = "v22.22.0"
+          test "$(npm --version)" = "10.9.4"
+      - run: npm ci
+      - name: Download the retained accepted candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: miniagent-0.8.0-candidate-${{ github.sha }}-${{ github.run_id }}
+          path: .release/candidate
+      - name: Reaccept retained bytes immediately before publication
+        run: npm run release:verify -- --candidate .release/candidate/manifest.json
+      - name: Publish only missing accepted tarballs with provenance
+        run: npm run release:publish -- --candidate .release/candidate/manifest.json
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Registry smoke against the retained candidate record
+        run: npm run release:registry-smoke -- --version 0.8.0 --candidate .release/candidate/manifest.json --require-provenance

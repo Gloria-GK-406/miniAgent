@@ -24,6 +24,6 @@
 ## 注册
 
 ```typescript
-import { writeTool } from "@piaoxianguo/miniagent";
+import { writeTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(writeTool);
 ```

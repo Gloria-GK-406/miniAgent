@@ -7,7 +7,7 @@ File-based subagent management with `run_subagent` tool, plus a simple inline `S
 Spawn sub-agents inline with a custom system prompt:
 
 ```typescript
-import { SubAgentProvider } from "@piaoxianguo/miniagent";
+import { SubAgentProvider } from "@piaoxianguo/miniagent-extensions";
 
 const factory = async (task: string, systemPrompt: string) => {
   // Create and return a MiniAgent instance
@@ -31,7 +31,7 @@ Scans directories for Markdown files with frontmatter to define subagents. Each 
 ### Setup
 
 ```typescript
-import { SubagentPlugin } from "@piaoxianguo/miniagent/extensions/subagent";
+import { SubagentPlugin } from "@piaoxianguo/miniagent-extensions/subagent";
 
 const subagent = new SubagentPlugin({
   path: "./.cliagent/subagent/",

@@ -7,7 +7,7 @@
 ## 快速开始
 
 ```bash
-npm install @piaoxianguo/miniagent
+npm install @piaoxianguo/miniagent-core @piaoxianguo/miniagent-engine
 ```
 
 ```typescript
@@ -15,8 +15,8 @@ import {
   MiniAgent,
   LLMEngineManager,
   MessageType,
-} from "@piaoxianguo/miniagent";
-import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
+} from "@piaoxianguo/miniagent-core";
+import { OpenAIEngine } from "@piaoxianguo/miniagent-engine/openai";
 import { z } from "zod";
 
 // 1. 配置 LLM 引擎
@@ -92,22 +92,22 @@ MiniAgent 基于一个原则：**最小核心，自由组装**。
 - **自动检测** — 组件通过 Zod schema 验证识别，而非手动类型标签。注册工具、提供者或处理器，Agent 知道它是什么。
 - **插件优于框架** — 没有继承层级，没有抽象基类。只需要满足正确 schema 的普通对象。
 
-### 源码分层
+### 0.8 拆分包
 
-当前仍是单一 npm 包，但源码已经遵循未来拆包所需的依赖图：
+MiniAgent 0.8 发布为三个职责清晰的包：
 
 ```text
 core <- engine
 core <- extensions
-core + engine + extensions <- cli
 ```
 
-- `@piaoxianguo/miniagent/core` 提供 Agent 运行内核和扩展协议，包括 `Tool`、`ToolProvider`、`ToolApprover`。
-- `@piaoxianguo/miniagent/engine` 提供模型厂商适配器。
-- `@piaoxianguo/miniagent/extensions` 提供具体工具、MCP、Skill、Subagent、上下文增强和文件持久化。
-- CLI 是唯一产品组合层；engine 与 extensions 是互不依赖的平级扩展。
+- `@piaoxianguo/miniagent-core` 提供 Agent 运行内核和扩展协议，包括 `Tool`、`ToolProvider`、`ToolApprover`。
+- `@piaoxianguo/miniagent-engine` 提供模型厂商适配器，并依赖 core。
+- `@piaoxianguo/miniagent-extensions` 提供具体工具、MCP、Skill、Subagent、上下文增强和文件持久化，并依赖 core。
 
-旧的 `@piaoxianguo/miniagent/tool` 导出继续作为 extensions 的兼容别名。仓库 lint 会强制检查分层方向、公共入口、外部依赖边界，以及运行时和纯类型循环。
+安装 engine 或 extensions 时会自动安装兼容的 core。0.8 不发布旧的 `@piaoxianguo/miniagent` 聚合包，也不发布 CLI 包；应用只需安装实际导入的拆分包。engine 与 extensions 是互不依赖的平级扩展。
+
+仓库 lint 会强制检查分层方向、公共入口、外部依赖边界，以及运行时和纯类型循环。
 
 ## 工具与接口
 
@@ -232,12 +232,12 @@ MiniAgent 通过 `setModel()`原子持有一个模型运行时；模型目录和
 ### 内置引擎
 
 ```typescript
-import { LLMEngineManager } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
-import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
-import { OpenAICompatibleEngine } from "@piaoxianguo/miniagent/engine/openai-compatible";
-import { GLMEngine } from "@piaoxianguo/miniagent/engine/glm";
-import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
+import { LLMEngineManager } from "@piaoxianguo/miniagent-core";
+import { AnthropicEngine } from "@piaoxianguo/miniagent-engine/anthropic";
+import { OpenAIEngine } from "@piaoxianguo/miniagent-engine/openai";
+import { OpenAICompatibleEngine } from "@piaoxianguo/miniagent-engine/openai-compatible";
+import { GLMEngine } from "@piaoxianguo/miniagent-engine/glm";
+import { GLMCodePlanEngine } from "@piaoxianguo/miniagent-engine/glm-codeplan";
 
 const engines = new LLMEngineManager();
 engines.register(new AnthropicEngine());
@@ -285,10 +285,8 @@ const blueprint = {
 注册语义组件槽位的实现，然后从蓝图组装 Agent：
 
 ```typescript
-import {
-  BlueprintManager,
-  registerBuiltinBlueprintImpls,
-} from "@piaoxianguo/miniagent";
+// BlueprintManager 和内置 assembly registry 属于源码层 CLI API，
+// 不由 0.8 npm 拆分包导出。
 
 const manager = new BlueprintManager();
 registerBuiltinBlueprintImpls(manager, {
@@ -334,7 +332,7 @@ const blueprint = {
 更简单的场景下，使用 `createMiniAgent` 的 `use` 数组 —— 一个包含工具、提供者、模块或设置函数的平铺列表：
 
 ```typescript
-import { createMiniAgent } from "@piaoxianguo/miniagent";
+import { createMiniAgent } from "@piaoxianguo/miniagent-core";
 
 const agent = createMiniAgent({
   llm: engines,

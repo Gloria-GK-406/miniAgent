@@ -37,6 +37,6 @@
 ## 注册
 
 ```typescript
-import { bashTool } from "@piaoxianguo/miniagent";
+import { bashTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(bashTool);
 ```

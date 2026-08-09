@@ -1,0 +1,7 @@
+{
+  "responses": {
+    "@piaoxianguo/miniagent-core@0.8.0": { "status": 404 },
+    "@piaoxianguo/miniagent-engine@0.8.0": { "status": 404 },
+    "@piaoxianguo/miniagent-extensions@0.8.0": { "status": 404 }
+  }
+}

@@ -1,6 +1,7 @@
 {
   "name": "@piaoxianguo/miniagent",
-  "version": "0.7.1",
+  "version": "0.8.0",
+  "private": true,
   "description": "A minimal, extensible TypeScript Agent framework",
   "keywords": [
     "agent",
@@ -14,8 +15,9 @@
   ],
   "author": "Gloria-GK-406",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public"
+  "packageManager": "npm@10.9.4",
+  "engines": {
+    "node": "22.22.0"
   },
   "repository": {
     "type": "git",
@@ -115,8 +117,13 @@
     "test:watch": "vitest --exclude 'test/smoketest/**'",
     "smoketest": "vitest run --config vitest.config.ts test/smoketest/",
     "package:smoke": "node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
-    "chat": "tsx --tsconfig tsconfig.cli.json src/cli/index.tsx",
-    "prepublishOnly": "npm run lint && npm run build && npm test && npm run package:smoke"
+    "release:toolchain": "node scripts/build-release-packages.mjs --check-toolchain",
+    "release:build": "node scripts/build-release-packages.mjs",
+    "release:test": "node --test scripts/release-packages.test.mjs",
+    "release:verify": "node scripts/verify-release-packages.mjs",
+    "release:publish": "node scripts/publish-release-packages.mjs",
+    "release:registry-smoke": "node scripts/registry-smoke.mjs",
+    "chat": "tsx --tsconfig tsconfig.cli.json src/cli/index.tsx"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -145,7 +152,7 @@
     "openai": "^6.33.0",
     "react": "^19.2.5",
     "yaml": "^2.8.3",
-    "zod": "^3.25.0-beta.20250519T094321",
+    "zod": "^3.25.28",
     "zod-to-json-schema": "^3.25.2"
   }
 }

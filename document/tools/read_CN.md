@@ -34,6 +34,6 @@
 ## 注册
 
 ```typescript
-import { readTool } from "@piaoxianguo/miniagent";
+import { readTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(readTool);
 ```

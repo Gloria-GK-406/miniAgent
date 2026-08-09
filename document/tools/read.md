@@ -34,6 +34,6 @@ Read a file or directory. For files, returns content with optional line range. F
 ## Registration
 
 ```typescript
-import { readTool } from "@piaoxianguo/miniagent";
+import { readTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(readTool);
 ```

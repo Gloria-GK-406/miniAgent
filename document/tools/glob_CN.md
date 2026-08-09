@@ -37,6 +37,6 @@
 ## 注册
 
 ```typescript
-import { globTool } from "@piaoxianguo/miniagent";
+import { globTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(globTool);
 ```

@@ -50,11 +50,13 @@ describe("CLI package entry", () => {
     expect(scripts["prebuild"]).toBe("node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"");
   });
 
-  it("runs the full local quality gate before publishing", async () => {
+  it("keeps the unified source package private and non-publishable", async () => {
     const pkg = await readJson("package.json");
     const scripts = pkg["scripts"] as Record<string, unknown>;
 
-    expect(scripts["prepublishOnly"]).toBe("npm run lint && npm run build && npm test && npm run package:smoke");
+    expect(pkg["private"]).toBe(true);
+    expect(pkg["publishConfig"]).toBeUndefined();
+    expect(scripts["prepublishOnly"]).toBeUndefined();
   });
 
   it("smoke tests the built CLI binary before publishing", async () => {

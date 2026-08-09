@@ -29,7 +29,7 @@ Automatically loads agent framework configuration files from project and global 
 ## Registration
 
 ```typescript
-import { AgentContextProvider } from "@piaoxianguo/miniagent";
+import { AgentContextProvider } from "@piaoxianguo/miniagent-extensions";
 
 const contextProvider = new AgentContextProvider(process.cwd());
 agent.register(contextProvider);

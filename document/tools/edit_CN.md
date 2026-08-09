@@ -36,6 +36,6 @@
 ## 注册
 
 ```typescript
-import { editTool } from "@piaoxianguo/miniagent";
+import { editTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(editTool);
 ```

@@ -36,6 +36,6 @@ Replace all occurrences:
 ## Registration
 
 ```typescript
-import { editTool } from "@piaoxianguo/miniagent";
+import { editTool } from "@piaoxianguo/miniagent-extensions";
 agent.register(editTool);
 ```

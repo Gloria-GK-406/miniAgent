@@ -7,7 +7,7 @@ A minimal, extensible TypeScript Agent framework. Simple by default, powerful wh
 ## Quick Start
 
 ```bash
-npm install @piaoxianguo/miniagent
+npm install @piaoxianguo/miniagent-core @piaoxianguo/miniagent-engine
 ```
 
 ```typescript
@@ -15,8 +15,8 @@ import {
   MiniAgent,
   LLMEngineManager,
   MessageType,
-} from "@piaoxianguo/miniagent";
-import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
+} from "@piaoxianguo/miniagent-core";
+import { OpenAIEngine } from "@piaoxianguo/miniagent-engine/openai";
 import { z } from "zod";
 
 // 1. Set up the LLM engine
@@ -92,22 +92,22 @@ The core does exactly one thing — the agent loop (collect context → call LLM
 - **Auto-Detection** — Components are identified by Zod schema validation, not manual type tags. You register a tool, a provider, or a processor — the agent knows what it is.
 - **Plugin Over Framework** — No inheritance hierarchies, no abstract base classes. Just plain objects that satisfy the right schema.
 
-### Source Layers
+### 0.8 Packages
 
-The single npm package already follows the dependency graph intended for future package separation:
+MiniAgent 0.8 is published as three focused packages:
 
 ```text
 core <- engine
 core <- extensions
-core + engine + extensions <- cli
 ```
 
-- `@piaoxianguo/miniagent/core` exposes the Agent runtime and extension contracts, including `Tool`, `ToolProvider`, and `ToolApprover`.
-- `@piaoxianguo/miniagent/engine` exposes model-provider adapters.
-- `@piaoxianguo/miniagent/extensions` exposes concrete tools, MCP, skills, subagents, context features, and file persistence.
-- The CLI is the sole product composition layer. Engine and extensions are siblings and never depend on each other.
+- `@piaoxianguo/miniagent-core` exposes the Agent runtime and extension contracts, including `Tool`, `ToolProvider`, and `ToolApprover`.
+- `@piaoxianguo/miniagent-engine` exposes model-provider adapters and depends on core.
+- `@piaoxianguo/miniagent-extensions` exposes concrete tools, MCP, skills, subagents, context features, and file persistence, and depends on core.
 
-The legacy `@piaoxianguo/miniagent/tool` export remains available as a compatibility alias for extensions. Repository linting enforces layer direction, public entry points, external dependency boundaries, and zero runtime or type-only cycles.
+Installing engine or extensions installs the compatible core package automatically. Version 0.8 does not publish the old `@piaoxianguo/miniagent` aggregate package or a CLI package; install only the split packages your application imports. Engine and extensions are siblings and never depend on each other.
+
+Repository linting enforces layer direction, public entry points, external dependency boundaries, and zero runtime or type-only cycles.
 
 ## Tools and Interfaces
 
@@ -234,12 +234,12 @@ MiniAgent separates LLM interaction into two layers:
 ### Built-in Engines
 
 ```typescript
-import { LLMEngineManager } from "@piaoxianguo/miniagent";
-import { AnthropicEngine } from "@piaoxianguo/miniagent/engine/anthropic";
-import { OpenAIEngine } from "@piaoxianguo/miniagent/engine/openai";
-import { OpenAICompatibleEngine } from "@piaoxianguo/miniagent/engine/openai-compatible";
-import { GLMEngine } from "@piaoxianguo/miniagent/engine/glm";
-import { GLMCodePlanEngine } from "@piaoxianguo/miniagent/engine/glm-codeplan";
+import { LLMEngineManager } from "@piaoxianguo/miniagent-core";
+import { AnthropicEngine } from "@piaoxianguo/miniagent-engine/anthropic";
+import { OpenAIEngine } from "@piaoxianguo/miniagent-engine/openai";
+import { OpenAICompatibleEngine } from "@piaoxianguo/miniagent-engine/openai-compatible";
+import { GLMEngine } from "@piaoxianguo/miniagent-engine/glm";
+import { GLMCodePlanEngine } from "@piaoxianguo/miniagent-engine/glm-codeplan";
 
 const engines = new LLMEngineManager();
 engines.register(new AnthropicEngine());
@@ -290,10 +290,8 @@ Register implementations for semantic component slots, then assemble an agent
 from the blueprint:
 
 ```typescript
-import {
-  BlueprintManager,
-  registerBuiltinBlueprintImpls,
-} from "@piaoxianguo/miniagent";
+// BlueprintManager and the built-in assembly registry are source-level CLI APIs.
+// They are not exported by the 0.8 npm packages.
 
 const manager = new BlueprintManager();
 registerBuiltinBlueprintImpls(manager, {
@@ -340,7 +338,7 @@ const blueprint = {
 For simpler cases, use `createMiniAgent` with the `use` array — a flat list of tools, providers, modules, or setup functions:
 
 ```typescript
-import { createMiniAgent } from "@piaoxianguo/miniagent";
+import { createMiniAgent } from "@piaoxianguo/miniagent-core";
 
 const agent = createMiniAgent({
   llm: engines,
