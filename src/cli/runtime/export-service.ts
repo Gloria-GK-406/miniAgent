@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
-import { SessionMetaSchema, type SessionMeta } from "../../core/session.js";
-import { MessageSchema, type Message, type MessageContent } from "../../core/types.js";
+import { SessionMetaSchema, type SessionMeta } from "../session-manager.js";
+import { MessageSchema, type Message, type MessageContent } from "../../core/index.js";
 import { resolveWorkspacePath } from "../tools/workspace.js";
 import {
   CLISessionRuntimeMetadataSchema,

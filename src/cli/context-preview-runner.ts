@@ -1,4 +1,4 @@
-import type { Message, MessageContent } from "../core/types.js";
+import type { Message, MessageContent } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { TodoItemSnapshot } from "../tool/todo.js";
+import type { TodoItemSnapshot } from "../extensions/index.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 import {
   filterTodos,

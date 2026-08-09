@@ -6,13 +6,12 @@ import type {
     ErrorHandler,
     LLMRequire,
     MessageNotifier,
-    PersistRequire,
     TurnContextAppender,
     TurnContextConsumer,
 } from "./types.js";
+import type { PersistRequire } from "./persistence.js";
 import type { OneShotLLMRequire } from "./one-shot-llm.js";
-import type { ToolProvider, Tool } from "../tool/types.js";
-import type { ToolApprover } from "../tool/approver.js";
+import type { Tool, ToolApprover, ToolProvider } from "./tool.js";
 
 export type AgentRegistrable =
     | Tool

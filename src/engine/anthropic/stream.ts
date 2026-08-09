@@ -2,9 +2,9 @@ import type {
   RawMessageStreamEvent,
   ToolUseBlock,
 } from "@anthropic-ai/sdk/resources/messages/messages.js";
-import type { LLMResponse, LLMStreamChunk } from "../../core/types.js";
-import { LLMStreamChunkType, MessageType } from "../../core/types.js";
-import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
+import type { LLMResponse, LLMStreamChunk } from "../../core/index.js";
+import { LLMStreamChunkType, MessageType } from "../../core/index.js";
+import { createTokenCount, emptyTokenCount } from "../../core/index.js";
 
 interface AnthropicToolUseBuffer {
   id: string;

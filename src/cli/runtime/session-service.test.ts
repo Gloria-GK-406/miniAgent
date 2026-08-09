@@ -2,8 +2,8 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MessageType } from "../../core/types.js";
-import type { Message } from "../../core/types.js";
+import { MessageType } from "../../core/index.js";
+import type { Message } from "../../core/index.js";
 import { createCLISessionService } from "./session-service.js";
 
 describe("CLISessionService", () => {

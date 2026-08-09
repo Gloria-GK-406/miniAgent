@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   ChatCompletionChunk,
 } from "openai/resources/chat/completions/completions.js";
-import { LLMStreamChunkType, MessageType } from "../../core/types.js";
+import { LLMStreamChunkType, MessageType } from "../../core/index.js";
 import { consumeOpenAIStream, streamOpenAIChunks } from "./stream.js";
 
 async function* toAsyncIterable<T>(items: T[]): AsyncIterable<T> {

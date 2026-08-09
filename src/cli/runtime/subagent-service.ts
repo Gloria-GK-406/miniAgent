@@ -2,8 +2,8 @@ import type { Dirent } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { SubagentDefinitionSchema } from "../../tool/subagent.js";
-import { parseFrontmatter } from "../../utils/frontmatter.js";
+import { SubagentDefinitionSchema } from "../../extensions/index.js";
+import { parseFrontmatter } from "../../extensions/index.js";
 import type { CLIConfig } from "../config.js";
 
 export interface CLISubagentSummary {

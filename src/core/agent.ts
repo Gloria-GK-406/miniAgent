@@ -11,7 +11,6 @@ import type {
     Message,
     MessageChunk,
     MessageNotifier,
-    PersistRequire,
     TokenCount,
     Tool,
     ToolCallMessage,
@@ -29,7 +28,6 @@ import {
     LLMRequireSchema,
     MessageNotifierSchema,
     MessageType,
-    PersistRequireSchema,
     ToolResultMessageSchema,
     TurnContextAppenderSchema,
     TurnContextConsumerSchema,
@@ -50,14 +48,21 @@ import type {
     NormalizedAgentConfig,
     PublicModelRuntime,
 } from "./config.js";
-import { ToolProviderSchema, ToolSchema } from "../tool/types.js";
-import type { ToolProvider } from "../tool/types.js";
-import { ToolApproverSchema } from "../tool/approver.js";
-import type { ToolApprover } from "../tool/approver.js";
-import type { MessageSource } from "../store/message-source.js";
-import { FileMessageSource } from "../store/message-source.js";
-import type { Store } from "../store/store.js";
-import { FileStore } from "../store/file-store.js";
+import {
+    ToolApproverSchema,
+    ToolProviderSchema,
+    ToolSchema,
+    type ToolApprover,
+    type ToolProvider,
+} from "./tool.js";
+import {
+    MemoryMessageSource,
+    MemoryStore,
+    PersistRequireSchema,
+    type MessageSource,
+    type PersistRequire,
+    type Store,
+} from "./persistence.js";
 import { EventEmitter } from "eventemitter3";
 import type { AgentEventMap } from "./events.js";
 import { StopException } from "./errors.js";
@@ -149,10 +154,10 @@ export class MiniAgent {
             this.config.generation ?? DEFAULT_GENERATION_CONFIG,
         );
         this.syncEffectiveConfig();
-        this.store = resolvedOptions.store ?? new FileStore(this.config.paths.sessiondir);
+        this.store = resolvedOptions.store ?? new MemoryStore();
         this.tokenUsage = resolvedOptions.tokenUsage ?? createTokenUsageService();
         this.messageSource = resolvedOptions.messageSource
-            ?? new FileMessageSource(this.store, "messages.jsonl");
+            ?? new MemoryMessageSource();
     }
 
     getGuid(): string {

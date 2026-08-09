@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Tool } from "../tool/types.js";
-import type { Message } from "./types.js";
+import type { Tool } from "./tool.js";
+import type { Message } from "./message.js";
 
 export type JsonValue =
     | string

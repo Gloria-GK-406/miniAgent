@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { ThinkingLevel } from "../core/config.js";
+import { ThinkingLevel } from "../core/index.js";
 import {
   CLIConfigSchema,
   ConfigTemplateCreatedError,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MessageType } from "../../core/types.js";
+import { MessageType } from "../../core/index.js";
 import {
   createReferenceTurnContextAppender,
   createReferenceTurnContextMessages,

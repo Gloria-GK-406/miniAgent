@@ -1,4 +1,4 @@
-import type { SessionMeta } from "../../core/session.js";
+import type { SessionMeta } from "../session-manager.js";
 import type { CLIConfig } from "../config.js";
 import type { DiagnosticsService } from "./diagnostics-service.js";
 import type { GitService } from "./git-service.js";

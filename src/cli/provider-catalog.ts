@@ -1,8 +1,8 @@
-import { ThinkingLevel, type ModelPreset } from "../core/config.js";
-import { ANTHROPIC_MODEL_PRESETS } from "../engine/anthropic/models.js";
-import { GLM_CODEPLAN_MODEL_PRESETS } from "../engine/glm-codeplan/models.js";
-import { GLM_MODEL_PRESETS } from "../engine/glm/models.js";
-import { OPENAI_MODEL_PRESETS } from "../engine/openai/models.js";
+import { ThinkingLevel, type ModelPreset } from "../core/index.js";
+import { ANTHROPIC_MODEL_PRESETS } from "../engine/index.js";
+import { GLM_CODEPLAN_MODEL_PRESETS } from "../engine/index.js";
+import { GLM_MODEL_PRESETS } from "../engine/index.js";
+import { OPENAI_MODEL_PRESETS } from "../engine/index.js";
 import type { CLIProviderConnection } from "./runtime/types.js";
 
 export type ConnectProviderId =

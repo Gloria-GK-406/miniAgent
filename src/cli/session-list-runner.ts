@@ -1,4 +1,4 @@
-import type { SessionMeta } from "../core/session.js";
+import type { SessionMeta } from "./session-manager.js";
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;

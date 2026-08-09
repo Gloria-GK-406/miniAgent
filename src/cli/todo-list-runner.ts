@@ -1,4 +1,4 @@
-import type { TodoItemSnapshot } from "../tool/todo.js";
+import type { TodoItemSnapshot } from "../extensions/index.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";

@@ -1,7 +1,7 @@
 import OpenAI from "openai";
-import type { LLMEngine } from "../../core/llm.js";
-import type { LLMGenerateRequest } from "../../core/config.js";
-import type { MessageChunk } from "../../core/types.js";
+import type { LLMEngine } from "../../core/index.js";
+import type { LLMGenerateRequest } from "../../core/index.js";
+import type { MessageChunk } from "../../core/index.js";
 import { buildCreateParamsFromRequest } from "../openai-compatible/convert.js";
 import { streamOpenAIChunks } from "../openai-compatible/stream.js";
 

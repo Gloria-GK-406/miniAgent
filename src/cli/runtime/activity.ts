@@ -1,4 +1,4 @@
-import type { ToolCallMessage, ToolResultMessage, MessageContent } from "../../core/types.js";
+import type { ToolCallMessage, ToolResultMessage, MessageContent } from "../../core/index.js";
 import type { CLIActivityEntry, CLIApprovalAnswer, CLIApprovalDecision } from "./types.js";
 
 export function classifyActivityKind(toolName: string): CLIActivityEntry["kind"] {

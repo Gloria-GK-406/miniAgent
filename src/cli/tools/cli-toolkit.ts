@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
-import type { Tool } from "../../tool/types.js";
+import type { Tool } from "../../core/index.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 import type { ShellService } from "../runtime/shell-service.js";
 import type { SnapshotService } from "../runtime/snapshot-service.js";

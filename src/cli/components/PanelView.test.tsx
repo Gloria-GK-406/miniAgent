@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "ink";
-import { MessageType } from "../../core/types.js";
-import type { Message } from "../../core/types.js";
+import { MessageType } from "../../core/index.js";
+import type { Message } from "../../core/index.js";
 import { PanelView } from "./PanelView.js";
 
 describe("PanelView", () => {

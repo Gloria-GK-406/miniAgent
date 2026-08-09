@@ -1,10 +1,10 @@
 import type { CommandRegistry } from "../runtime/command-registry.js";
 import type { CLICommandContext, CLIInputHistoryPanelEntry } from "../runtime/types.js";
 import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
-import type { SessionMeta } from "../../core/session.js";
-import { MessageType, type Message, type MessageContent, type ToolCallMessage } from "../../core/types.js";
-import type { Tool } from "../../tool/types.js";
-import type { TodoItemSnapshot } from "../../tool/todo.js";
+import type { SessionMeta } from "../session-manager.js";
+import { MessageType, type Message, type MessageContent, type ToolCallMessage } from "../../core/index.js";
+import type { Tool } from "../../core/index.js";
+import type { TodoItemSnapshot } from "../../extensions/index.js";
 import { formatConfigForDisplay } from "../config-display.js";
 import { formatConfigPaths, resolveConfigPaths } from "../config-paths-runner.js";
 import { readPackageVersion } from "../package-info.js";

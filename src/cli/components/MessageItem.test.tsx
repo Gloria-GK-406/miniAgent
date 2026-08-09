@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { renderToString } from "ink";
 import { MessageItem } from "./MessageItem.js";
-import type { Message } from "../../core/types.js";
-import { MessageType } from "../../core/types.js";
+import type { Message } from "../../core/index.js";
+import { MessageType } from "../../core/index.js";
 
 describe("MessageItem", () => {
   it("renders User message with ASCII prompt and text", () => {

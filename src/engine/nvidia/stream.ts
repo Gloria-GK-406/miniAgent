@@ -1,9 +1,9 @@
 import type {
   ChatCompletionChunk,
 } from "openai/resources/chat/completions/completions.js";
-import type { LLMResponse, LLMStreamChunk } from "../../core/types.js";
-import { LLMStreamChunkType, MessageType } from "../../core/types.js";
-import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
+import type { LLMResponse, LLMStreamChunk } from "../../core/index.js";
+import { LLMStreamChunkType, MessageType } from "../../core/index.js";
+import { createTokenCount, emptyTokenCount } from "../../core/index.js";
 
 const THINKING_OPEN = "<think>";
 const THINKING_CLOSE = "</think>";

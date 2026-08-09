@@ -1,4 +1,4 @@
-import { ThinkingLevel, type ModelPreset } from "../../core/config.js";
+import { ThinkingLevel, type ModelPreset } from "../../core/index.js";
 
 const GLM_FULL_THINKING_LEVELS = [
   ThinkingLevel.None,

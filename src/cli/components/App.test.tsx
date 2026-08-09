@@ -13,7 +13,7 @@ import {
   resolveMessageScrollAction,
 } from "./App.js";
 import { buildRenderableLines } from "./MessageList.js";
-import { MessageType, type Message } from "../../core/types.js";
+import { MessageType, type Message } from "../../core/index.js";
 import { CLIConfigSchema } from "../config.js";
 import type { CLIAppRuntime, CLIEvent, CLIRuntimeSubscriber, CLIState } from "../runtime/types.js";
 

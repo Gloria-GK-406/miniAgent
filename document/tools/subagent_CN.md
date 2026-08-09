@@ -31,7 +31,7 @@ agent.register(provider);
 ### 设置
 
 ```typescript
-import { SubagentPlugin } from "@piaoxianguo/miniagent/tool/subagent";
+import { SubagentPlugin } from "@piaoxianguo/miniagent/extensions/subagent";
 
 const subagent = new SubagentPlugin({
   path: "./.cliagent/subagent/",

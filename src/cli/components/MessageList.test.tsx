@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { renderToString } from "ink";
 import { MessageList, buildRenderableLines, buildRenderableMessages } from "./MessageList.js";
-import { MessageType } from "../../core/types.js";
-import type { Message } from "../../core/types.js";
+import { MessageType } from "../../core/index.js";
+import type { Message } from "../../core/index.js";
 
 describe("MessageList", () => {
   it("adds a temporary assist message for streaming text after a user message", () => {

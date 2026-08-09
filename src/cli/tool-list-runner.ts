@@ -1,5 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import type { Tool } from "../tool/types.js";
+import type { Tool } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import { createModeAwarePermissionService, createPermissionService } from "./runtime/permission-service.js";

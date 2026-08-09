@@ -19,7 +19,7 @@ import type {
   AgentConfig,
   LLMGenerateRequest,
 } from "./config.js";
-import type { Tool } from "../tool/types.js";
+import type { Tool } from "./tool.js";
 import type { OneShotLLMFactory } from "./one-shot-llm.js";
 import { TokenUsageCounter } from "./token-usage.js";
 

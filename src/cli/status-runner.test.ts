@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MessageType } from "../core/types.js";
+import { MessageType } from "../core/index.js";
 import { CLIConfigSchema } from "./config.js";
 import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
 import {

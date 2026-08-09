@@ -6,36 +6,26 @@
 
 ```
 src/
-  index.ts                              # 入口
-  core/
-    agent.ts                            # MiniAgent 类，主循环（注册、上下文构建、工具执行）
-    types.ts                            # 所有 Zod schema、类型推导、枚举定义
-    llm.ts                              # LLMEngine 抽象层、DefaultLLMEngineRegister、createLLMRequest
-    message-source.ts                   # MessageSource 消息序列管理（含丢弃水位线）
-  context/
-    compressor.ts                       # ContextCompressor 上下文压缩（摘要旧消息）
-  tool/
-    approver.ts                         # ToolApprover 工具审批（人工确认机制）
+  index.ts                              # 公共兼容入口
+  core/                                 # Agent 内核、扩展协议、内存态基础设施
+    index.ts                            # core 公共入口
+    agent.ts                            # MiniAgent 主循环
+    tool.ts                             # Tool / ToolProvider / ToolApprover 协议
+    persistence.ts                      # Store / MessageSource 协议与内存实现
+    capability.ts                       # 扩展能力选择协议
   engine/
-    anthropic/                          # Anthropic Claude 引擎
-      engine.ts                         # createAnthropicEngine
-      convert.ts                        # 消息/工具/响应转换 + buildCreateParams
-      convert.test.ts
-      index.ts
-    openai/                             # OpenAI 引擎（无自定义 baseUrl）
-      engine.ts                         # createOpenAIEngine，复用 openai-compatible
-      index.ts
-    openai-compatible/                  # OpenAI 兼容协议通用引擎
-      engine.ts                         # createOpenAICompatibleEngine
-      convert.ts                        # 消息/工具/响应转换 + buildCreateParams
-      convert.test.ts
-      index.ts
-    glm/                                # 智谱 GLM 引擎（固定 baseUrl）
-      engine.ts                         # createGLMEngine
-      index.ts
-    glm-codeplan/                       # 智谱 GLM CodePlan 引擎
-      engine.ts                         # createGLMCodePlanEngine
-      index.ts
+    index.ts                            # engine 公共入口
+    anthropic/ openai/ glm/ ...         # 厂商模型适配器
+  extensions/                          # 基于 core 的可选具体扩展
+    index.ts                            # extensions 公共入口
+    mcp/ skill/                         # 集成扩展
+    context/                            # 上下文压缩等扩展
+    persistence/                        # 文件持久化适配器
+    read.ts write.ts ...                # 具体工具
+  cli/                                  # 产品层和唯一 composition root
+    assembly/                           # blueprint 与默认实现组装
+    public.ts                           # CLI 侧兼容公共 API
+    index.tsx                           # CLI 可执行入口
 ```
 
 ## 技术栈
@@ -55,7 +45,7 @@ npm run build          # tsc 编译
 npm run dev            # tsx 直接运行 src/index.ts
 npm run start          # node dist/index.js
 npm run typecheck      # tsc --noEmit 类型检查
-npm run lint           # eslint src
+npm run lint           # ESLint + 四层依赖和循环检查
 npm run lint:fix       # eslint src --fix
 npm test               # vitest run（运行所有测试）
 npm run test:watch     # vitest watch 模式
@@ -89,6 +79,8 @@ npx vitest run -t "convertMessages"
 - 继承：`@eslint/js` recommended + `typescript-eslint` recommended
 - `@typescript-eslint/no-unused-vars`：允许 `_` 前缀的未使用变量/参数
 - `@typescript-eslint/consistent-type-imports`：强制 `import { type X }` 内联类型导入风格
+- 四层依赖固定为 `core <- engine/extensions <- cli`，engine 与 extensions 互不依赖
+- 跨层导入必须使用对应层的公共入口 `index.ts`；`npm run lint:deps` 检查类型循环、未知层和外部依赖边界
 
 ## Git Commit 规则
 
@@ -103,9 +95,7 @@ npx vitest run -t "convertMessages"
 
 ```typescript
 // 类型导入：使用 inline type-imports 风格（ESLint 强制）
-import type { Message, ModelConfig, Tool } from "../../core/types.js";
-import type { AssistMessage, ToolCallMessage } from "../../core/types.js";
-import { MessageType } from "../../core/types.js";
+import { MessageType, type AssistMessage, type Message, type Tool } from "../../core/index.js";
 
 // 外部包
 import { z } from "zod";

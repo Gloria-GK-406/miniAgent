@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   RawMessageStreamEvent,
 } from "@anthropic-ai/sdk/resources/messages/messages.js";
-import { LLMStreamChunkType, MessageType } from "../../core/types.js";
+import { LLMStreamChunkType, MessageType } from "../../core/index.js";
 import { consumeAnthropicStream, streamAnthropicChunks } from "./stream.js";
 
 async function* toAsyncIterable<T>(items: T[]): AsyncIterable<T> {

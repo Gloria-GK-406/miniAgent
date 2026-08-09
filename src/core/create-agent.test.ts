@@ -7,8 +7,7 @@ import { createMiniAgent } from "./create-agent.js";
 import { defineAgentModule } from "./module.js";
 import { LLMStreamChunkType, MessageType, type LLMRequest, type Message, type MessageChunk } from "./types.js";
 import { ThinkingLevel, type AgentConfig, type LLMGenerateRequest } from "./config.js";
-import type { Store } from "../store/store.js";
-import type { MessageSource } from "../store/message-source.js";
+import type { MessageSource, Store } from "./persistence.js";
 
 function createConfig(basepersistdir: string): AgentConfig {
     return {

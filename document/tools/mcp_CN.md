@@ -5,7 +5,7 @@
 ## 设置
 
 ```typescript
-import { McpPlugin } from "@piaoxianguo/miniagent/tool/mcp";
+import { McpPlugin } from "@piaoxianguo/miniagent/extensions/mcp";
 
 const mcp = new McpPlugin({
   servers: {

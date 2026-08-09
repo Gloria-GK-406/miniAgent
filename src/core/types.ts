@@ -1,82 +1,35 @@
 import { z } from "zod";
 import type { LLMGenerateRequest } from "./config.js";
-import type { Store } from "../store/store.js";
-
-export enum MessageType {
-  System = "system",
-  User = "user",
-  Assist = "assist",
-  ToolCall = "toolcall",
-  ToolResult = "toolresult",
-}
-
-export const TextContentSchema = z.object({
-  type: z.literal("text"),
-  text: z.string(),
-});
-
-export const ImageContentSchema = z.object({
-  type: z.literal("image"),
-  mediaType: z.string(),
-  data: z.string(),
-});
-
-export const MessageContentSchema = z.union([
-  z.string(),
-  TextContentSchema,
-  ImageContentSchema,
-]);
-
-export const BaseMessageSchema = z.object({
-  id: z.string(),
-  type: z.nativeEnum(MessageType),
-  content: MessageContentSchema,
-});
-
-export const SystemMessageSchema = BaseMessageSchema.extend({
-  type: z.literal(MessageType.System),
-});
-
-export const UserMessageSchema = BaseMessageSchema.extend({
-  type: z.literal(MessageType.User),
-});
-
-export const AssistMessageSchema = BaseMessageSchema.extend({
-  type: z.literal(MessageType.Assist),
-  reasoningContent: z.string().optional(),
-});
-
-export const ToolCallMessageSchema = BaseMessageSchema.extend({
-  type: z.literal(MessageType.ToolCall),
-  toolCallId: z.string(),
-  toolName: z.string(),
-  arguments: z.record(z.unknown()),
-  reasoningContent: z.string().optional(),
-});
-
-export const ToolResultMessageSchema = BaseMessageSchema.extend({
-  type: z.literal(MessageType.ToolResult),
-  toolCallId: z.string(),
-});
-
-export const MessageSchema = z.union([
-  SystemMessageSchema,
-  UserMessageSchema,
+import {
   AssistMessageSchema,
+  MessageSchema,
+  ToolCallMessageSchema,
+} from "./message.js";
+export {
+  AssistMessageSchema,
+  BaseMessageSchema,
+  ImageContentSchema,
+  MessageContentSchema,
+  MessageSchema,
+  MessageType,
+  SystemMessageSchema,
+  TextContentSchema,
   ToolCallMessageSchema,
   ToolResultMessageSchema,
-]);
-
-export type BaseMessage = z.infer<typeof BaseMessageSchema>;
-export type TextContent = z.infer<typeof TextContentSchema>;
-export type ImageContent = z.infer<typeof ImageContentSchema>;
-export type MessageContent = z.infer<typeof MessageContentSchema>;
-export type SystemMessage = z.infer<typeof SystemMessageSchema>;
-export type UserMessage = z.infer<typeof UserMessageSchema>;
-export type AssistMessage = z.infer<typeof AssistMessageSchema>;
-export type ToolCallMessage = z.infer<typeof ToolCallMessageSchema>;
-export type ToolResultMessage = z.infer<typeof ToolResultMessageSchema>;
-export type Message = z.infer<typeof MessageSchema>;
+  UserMessageSchema,
+} from "./message.js";
+export type {
+  AssistMessage,
+  BaseMessage,
+  ImageContent,
+  Message,
+  MessageContent,
+  SystemMessage,
+  TextContent,
+  ToolCallMessage,
+  ToolResultMessage,
+  UserMessage,
+} from "./message.js";
 
 export const LLMMessageResponseSchema = z.union([
   AssistMessageSchema,
@@ -100,7 +53,7 @@ export const LLMResponseSchema = z.object({
 
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 
-export type { Tool } from "../tool/types.js";
+export type { Tool } from "./tool.js";
 
 export enum LLMStreamChunkType {
   TextDelta = "text-delta",
@@ -305,15 +258,6 @@ export const AfterTurnProcessorSchema = z.object({
 });
 
 export type AfterTurnProcessor = z.infer<typeof AfterTurnProcessorSchema>;
-
-export const PersistRequireSchema = z.object({
-  setStore: z.function(
-    z.tuple([z.custom<Store>()]),
-    z.promise(z.void()),
-  ),
-});
-
-export type PersistRequire = z.infer<typeof PersistRequireSchema>;
 
 export const LLMRequireSchema = z.object({
   setLLMRequest: z.function(

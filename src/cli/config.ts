@@ -7,14 +7,14 @@ import {
   ModelPresetSchema,
   ModelRuntimeSchema,
   normalizeGenerationConfig,
-} from "../core/config.js";
+} from "../core/index.js";
 import type {
   GenerationConfig,
   ModelRuntime,
-} from "../core/config.js";
-import { McpPluginConfigSchema } from "../tool/mcp/types.js";
-import { SkillPluginConfigSchema } from "../tool/skill/types.js";
-import { SubagentPluginConfigSchema } from "../tool/subagent.js";
+} from "../core/index.js";
+import { McpPluginConfigSchema } from "../extensions/index.js";
+import { SkillPluginConfigSchema } from "../extensions/index.js";
+import { SubagentPluginConfigSchema } from "../extensions/index.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 

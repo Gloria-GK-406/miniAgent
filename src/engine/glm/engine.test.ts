@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ThinkingLevel, type LLMGenerateRequest } from "../../core/config.js";
+import { ThinkingLevel, type LLMGenerateRequest } from "../../core/index.js";
 import {
   LLMStreamChunkType,
   MessageType,
   type Message,
   type MessageChunk,
-} from "../../core/types.js";
+} from "../../core/index.js";
 import { GLMEngine } from "./engine.js";
 
 const openAIMocks = vi.hoisted(() => ({

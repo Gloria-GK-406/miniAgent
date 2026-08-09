@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ThinkingLevel } from "../../core/config.js";
+import { ThinkingLevel } from "../../core/index.js";
 import { CLIConfigSchema } from "../config.js";
 import { createProviderConfigService } from "./provider-config-service.js";
 

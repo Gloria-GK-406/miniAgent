@@ -7,17 +7,17 @@ import type {
   ImageContent,
   LLMMessageResponse,
   LLMResponse,
-} from "../../core/types.js";
+} from "../../core/index.js";
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-} from "../../core/config.js";
+} from "../../core/index.js";
 import type {
   ChatCompletionMessageParam,
   ChatCompletion,
 } from "openai/resources/chat/completions/completions.js";
-import { MessageType } from "../../core/types.js";
-import { createTokenCount, emptyTokenCount } from "../../core/llm.js";
+import { MessageType } from "../../core/index.js";
+import { createTokenCount, emptyTokenCount } from "../../core/index.js";
 import { convertTools } from "../openai-compatible/convert.js";
 
 type GLMMessageParam = ChatCompletionMessageParam & {

@@ -2,7 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { MessageType, type Message } from "../core/types.js";
+import { MessageType, type Message } from "../core/index.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import {
   formatSessionClearResultJson,

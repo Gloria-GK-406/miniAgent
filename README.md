@@ -92,6 +92,23 @@ The core does exactly one thing — the agent loop (collect context → call LLM
 - **Auto-Detection** — Components are identified by Zod schema validation, not manual type tags. You register a tool, a provider, or a processor — the agent knows what it is.
 - **Plugin Over Framework** — No inheritance hierarchies, no abstract base classes. Just plain objects that satisfy the right schema.
 
+### Source Layers
+
+The single npm package already follows the dependency graph intended for future package separation:
+
+```text
+core <- engine
+core <- extensions
+core + engine + extensions <- cli
+```
+
+- `@piaoxianguo/miniagent/core` exposes the Agent runtime and extension contracts, including `Tool`, `ToolProvider`, and `ToolApprover`.
+- `@piaoxianguo/miniagent/engine` exposes model-provider adapters.
+- `@piaoxianguo/miniagent/extensions` exposes concrete tools, MCP, skills, subagents, context features, and file persistence.
+- The CLI is the sole product composition layer. Engine and extensions are siblings and never depend on each other.
+
+The legacy `@piaoxianguo/miniagent/tool` export remains available as a compatibility alias for extensions. Repository linting enforces layer direction, public entry points, external dependency boundaries, and zero runtime or type-only cycles.
+
 ## Tools and Interfaces
 
 ### Tool

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Tool } from "../../tool/types.js";
+import type { Tool } from "../../core/index.js";
 import type { GitService } from "../runtime/git-service.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 

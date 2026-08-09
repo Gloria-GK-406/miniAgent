@@ -33,13 +33,69 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
     "./engine": {
       "types": "./dist/engine/index.d.ts",
       "import": "./dist/engine/index.js"
     },
+    "./engine/anthropic": {
+      "types": "./dist/engine/anthropic/index.d.ts",
+      "import": "./dist/engine/anthropic/index.js"
+    },
+    "./engine/openai": {
+      "types": "./dist/engine/openai/index.d.ts",
+      "import": "./dist/engine/openai/index.js"
+    },
+    "./engine/openai-compatible": {
+      "types": "./dist/engine/openai-compatible/index.d.ts",
+      "import": "./dist/engine/openai-compatible/index.js"
+    },
+    "./engine/glm": {
+      "types": "./dist/engine/glm/index.d.ts",
+      "import": "./dist/engine/glm/index.js"
+    },
+    "./engine/glm-codeplan": {
+      "types": "./dist/engine/glm-codeplan/index.d.ts",
+      "import": "./dist/engine/glm-codeplan/index.js"
+    },
+    "./engine/nvidia": {
+      "types": "./dist/engine/nvidia/index.d.ts",
+      "import": "./dist/engine/nvidia/index.js"
+    },
+    "./extensions": {
+      "types": "./dist/extensions/index.d.ts",
+      "import": "./dist/extensions/index.js"
+    },
+    "./extensions/mcp": {
+      "types": "./dist/extensions/mcp/index.d.ts",
+      "import": "./dist/extensions/mcp/index.js"
+    },
+    "./extensions/skill": {
+      "types": "./dist/extensions/skill/index.d.ts",
+      "import": "./dist/extensions/skill/index.js"
+    },
+    "./extensions/subagent": {
+      "types": "./dist/extensions/subagent.d.ts",
+      "import": "./dist/extensions/subagent.js"
+    },
     "./tool": {
-      "types": "./dist/tool/index.d.ts",
-      "import": "./dist/tool/index.js"
+      "types": "./dist/extensions/index.d.ts",
+      "import": "./dist/extensions/index.js"
+    },
+    "./tool/mcp": {
+      "types": "./dist/extensions/mcp/index.d.ts",
+      "import": "./dist/extensions/mcp/index.js"
+    },
+    "./tool/skill": {
+      "types": "./dist/extensions/skill/index.d.ts",
+      "import": "./dist/extensions/skill/index.js"
+    },
+    "./tool/subagent": {
+      "types": "./dist/extensions/subagent.d.ts",
+      "import": "./dist/extensions/subagent.js"
     }
   },
   "files": [
@@ -51,12 +107,14 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "npm run lint:code && npm run lint:deps",
+    "lint:code": "eslint src",
+    "lint:deps": "node scripts/check-dependencies.mjs",
     "lint:fix": "eslint src --fix",
     "test": "vitest run --exclude 'test/smoketest/**'",
     "test:watch": "vitest --exclude 'test/smoketest/**'",
     "smoketest": "vitest run --config vitest.config.ts test/smoketest/",
-    "package:smoke": "node dist/cli/index.js --version && node dist/cli/index.js --help",
+    "package:smoke": "node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
     "chat": "tsx --tsconfig tsconfig.cli.json src/cli/index.tsx",
     "prepublishOnly": "npm run lint && npm run build && npm test && npm run package:smoke"
   },

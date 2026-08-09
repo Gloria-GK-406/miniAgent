@@ -61,7 +61,9 @@ describe("CLI package entry", () => {
     const pkg = await readJson("package.json");
     const scripts = pkg["scripts"] as Record<string, unknown>;
 
-    expect(scripts["package:smoke"]).toBe("node dist/cli/index.js --version && node dist/cli/index.js --help");
+    expect(scripts["package:smoke"]).toBe(
+      "node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
+    );
   });
 
   it("keeps the compiled CLI directly executable by Node package managers", async () => {

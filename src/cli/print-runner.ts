@@ -1,4 +1,4 @@
-import { MessageType, type Message, type MessageContent } from "../core/types.js";
+import { MessageType, type Message, type MessageContent } from "../core/index.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 
 export interface PrintStreams {

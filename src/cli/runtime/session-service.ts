@@ -1,8 +1,8 @@
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { SessionManager, SessionMetaSchema, type SessionMeta } from "../../core/session.js";
-import { MessageSchema, TokenCountSchema, type Message, type TokenCount } from "../../core/types.js";
+import { SessionManager, SessionMetaSchema, type SessionMeta } from "../session-manager.js";
+import { MessageSchema, TokenCountSchema, type Message, type TokenCount } from "../../core/index.js";
 import { CLIAGENT_DIR, CLIAgentModeSchema, type CLIAgentMode } from "../config.js";
 
 const MESSAGE_FILE = "messages.jsonl";

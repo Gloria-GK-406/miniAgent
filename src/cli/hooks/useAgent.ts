@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Message, TokenCount } from "../../core/types.js";
-import { MessageType } from "../../core/types.js";
+import type { Message, TokenCount } from "../../core/index.js";
+import { MessageType } from "../../core/index.js";
 
 interface AgentLike {
   on(event: string, listener: (...args: unknown[]) => void): unknown;

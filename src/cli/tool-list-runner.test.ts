@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
-import type { Tool } from "../tool/types.js";
+import type { Tool } from "../core/index.js";
 import { CLIConfigSchema } from "./config.js";
 import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
 import {

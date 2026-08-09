@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ThinkingLevel } from "../../core/config.js";
+import { ThinkingLevel } from "../../core/index.js";
 import { CLIConfigSchema } from "../config.js";
 import {
   createDoctorService,

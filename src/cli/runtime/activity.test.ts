@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MessageType } from "../../core/types.js";
+import { MessageType } from "../../core/index.js";
 import {
   classifyActivityKind,
   completeApprovalActivityEntry,
@@ -7,7 +7,7 @@ import {
   createApprovalActivityEntry,
   createActivityEntry,
 } from "./activity.js";
-import type { ToolCallMessage, ToolResultMessage } from "../../core/types.js";
+import type { ToolCallMessage, ToolResultMessage } from "../../core/index.js";
 
 function toolCall(toolName: string): ToolCallMessage {
   return {

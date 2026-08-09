@@ -7,8 +7,8 @@ import { InputBox } from "./components/InputBox.js";
 import { CommandPalette } from "./components/CommandPalette.js";
 import { App } from "./components/App.js";
 import { matchSuggestions } from "./hooks/useSuggestion.js";
-import { MessageType } from "../core/types.js";
-import type { Message } from "../core/types.js";
+import { MessageType } from "../core/index.js";
+import type { Message } from "../core/index.js";
 import type { CLIAppRuntime, CLIRuntimeSubscriber, CLIState } from "./runtime/types.js";
 
 function runtimeState(overrides: Partial<CLIState> = {}): CLIState {

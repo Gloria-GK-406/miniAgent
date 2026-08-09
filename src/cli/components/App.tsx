@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
-import type { SessionMeta } from "../../core/session.js";
-import type { Message } from "../../core/types.js";
+import type { SessionMeta } from "../session-manager.js";
+import type { Message } from "../../core/index.js";
 import { useRuntime } from "../hooks/useRuntime.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
 import type {

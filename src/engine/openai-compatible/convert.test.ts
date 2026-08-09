@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { MessageType } from "../../core/types.js";
+import { MessageType } from "../../core/index.js";
 import {
   convertMessages,
   convertTools,
   buildCreateParamsFromRequest,
   convertResponse,
 } from "./convert.js";
-import type { Message, Tool, ImageContent } from "../../core/types.js";
+import type { Message, Tool, ImageContent } from "../../core/index.js";
 import {
   ThinkingLevel,
   type LLMGenerateRequest,
-} from "../../core/config.js";
+} from "../../core/index.js";
 
 function sysMsg(content: string): Message {
   return { id: "sys-1", type: MessageType.System, content };

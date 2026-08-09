@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
-import type { Message, MessageContent, ToolCallMessage } from "../../core/types.js";
-import { MessageType } from "../../core/types.js";
+import type { Message, MessageContent, ToolCallMessage } from "../../core/index.js";
+import { MessageType } from "../../core/index.js";
 
 export interface PanelData {
   title: string;

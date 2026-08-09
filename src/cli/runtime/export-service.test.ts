@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MessageType, type Message } from "../../core/types.js";
+import { MessageType, type Message } from "../../core/index.js";
 import { createExportService, CLISessionExportSchema } from "./export-service.js";
 import { createCLISessionService } from "./session-service.js";
 

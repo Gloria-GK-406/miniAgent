@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAgent } from "./useAgent.js";
-import type { Message } from "../../core/types.js";
-import { MessageType } from "../../core/types.js";
+import type { Message } from "../../core/index.js";
+import { MessageType } from "../../core/index.js";
 
 function createMockAgent() {
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();

@@ -5,7 +5,7 @@ Load skill instructions from `SKILL.md` manifests in configurable directories.
 ## Setup
 
 ```typescript
-import { SkillPlugin } from "@piaoxianguo/miniagent/tool/skill";
+import { SkillPlugin } from "@piaoxianguo/miniagent/extensions/skill";
 
 const skill = new SkillPlugin({
   directories: ["./skills/", "~/.cliagent/skills/"],

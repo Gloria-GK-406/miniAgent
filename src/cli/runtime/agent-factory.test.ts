@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ThinkingLevel,
   type GenerationConfig,
-} from "../../core/config.js";
-import type { MiniAgent } from "../../core/agent.js";
-import { MessageType } from "../../core/types.js";
+} from "../../core/index.js";
+import type { MiniAgent } from "../../core/index.js";
+import { MessageType } from "../../core/index.js";
 import {
   CLIConfigSchema,
   loadConfig,

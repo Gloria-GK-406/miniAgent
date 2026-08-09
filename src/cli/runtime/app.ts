@@ -4,8 +4,8 @@ import {
   type MessageContent,
   type ToolCallMessage,
   type ToolResultMessage,
-} from "../../core/types.js";
-import { type SessionMeta } from "../../core/session.js";
+} from "../../core/index.js";
+import { type SessionMeta } from "../session-manager.js";
 import { registerBuiltinCommands } from "../commands/builtin.js";
 import {
   formatConfiguredModelPath,

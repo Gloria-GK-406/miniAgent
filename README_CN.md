@@ -92,6 +92,23 @@ MiniAgent 基于一个原则：**最小核心，自由组装**。
 - **自动检测** — 组件通过 Zod schema 验证识别，而非手动类型标签。注册工具、提供者或处理器，Agent 知道它是什么。
 - **插件优于框架** — 没有继承层级，没有抽象基类。只需要满足正确 schema 的普通对象。
 
+### 源码分层
+
+当前仍是单一 npm 包，但源码已经遵循未来拆包所需的依赖图：
+
+```text
+core <- engine
+core <- extensions
+core + engine + extensions <- cli
+```
+
+- `@piaoxianguo/miniagent/core` 提供 Agent 运行内核和扩展协议，包括 `Tool`、`ToolProvider`、`ToolApprover`。
+- `@piaoxianguo/miniagent/engine` 提供模型厂商适配器。
+- `@piaoxianguo/miniagent/extensions` 提供具体工具、MCP、Skill、Subagent、上下文增强和文件持久化。
+- CLI 是唯一产品组合层；engine 与 extensions 是互不依赖的平级扩展。
+
+旧的 `@piaoxianguo/miniagent/tool` 导出继续作为 extensions 的兼容别名。仓库 lint 会强制检查分层方向、公共入口、外部依赖边界，以及运行时和纯类型循环。
+
 ## 工具与接口
 
 ### Tool

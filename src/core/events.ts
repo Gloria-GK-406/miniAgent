@@ -5,7 +5,7 @@ import type {
     LLMResponse,
     LLMStreamChunk,
 } from "./types.js";
-import type { Tool } from "../tool/types.js";
+import type { Tool } from "./tool.js";
 
 export interface AgentEventMap {
     "run:start": (payload: { input: Message }) => void;

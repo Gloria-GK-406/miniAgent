@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
-import type { Message, MessageContent } from "../../core/types.js";
-import { MessageType } from "../../core/types.js";
+import type { Message, MessageContent } from "../../core/index.js";
+import { MessageType } from "../../core/index.js";
 
 export interface RenderLine {
   key: string;

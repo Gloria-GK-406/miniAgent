@@ -1,5 +1,5 @@
-import { MessageType, type Message } from "../../core/types.js";
-import type { TurnContextAppender } from "../../core/types.js";
+import { MessageType, type Message } from "../../core/index.js";
+import type { TurnContextAppender } from "../../core/index.js";
 import type { ResolvedReference } from "./reference-service.js";
 
 function formatReferenceRange(ref: ResolvedReference): string {

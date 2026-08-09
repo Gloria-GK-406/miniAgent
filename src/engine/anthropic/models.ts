@@ -1,4 +1,4 @@
-import { ThinkingLevel, type ModelPreset } from "../../core/config.js";
+import { ThinkingLevel, type ModelPreset } from "../../core/index.js";
 
 export const ANTHROPIC_MODEL_PRESETS: ModelPreset[] = [
   {

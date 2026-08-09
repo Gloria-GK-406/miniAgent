@@ -1,12 +1,12 @@
 import { join } from "node:path";
 
-import { getCapabilityNamespace, isCapabilityEnabled } from "../../assembly/capability.js";
-import type { AgentCapabilityRule, AgentCapabilitySelector } from "../../assembly/capability.js";
-import { createDefaultBlueprint, registerBuiltinBlueprintImpls } from "../../assembly/builtins.js";
-import type { AgentBlueprint, BlueprintUse } from "../../assembly/blueprint.js";
-import { BlueprintManager } from "../../assembly/manager.js";
-import type { MiniAgent } from "../../core/agent.js";
-import type { AgentUse } from "../../core/create-agent.js";
+import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/index.js";
+import type { AgentCapabilityRule, AgentCapabilitySelector } from "../../core/index.js";
+import { createDefaultBlueprint, registerBuiltinBlueprintImpls } from "../assembly/builtins.js";
+import type { AgentBlueprint, BlueprintUse } from "../assembly/blueprint.js";
+import { BlueprintManager } from "../assembly/manager.js";
+import type { MiniAgent } from "../../core/index.js";
+import type { AgentUse } from "../../core/index.js";
 import {
   AgentConfigSchema,
   JsonValueSchema,
@@ -15,11 +15,11 @@ import {
   type JsonValue,
   type NormalizedAgentConfig,
   type PathConfig,
-} from "../../core/config.js";
-import { SessionManager } from "../../core/session.js";
-import type { Message } from "../../core/types.js";
-import type { ConfiguredSubagentFactory, SubagentInvocation } from "../../tool/subagent.js";
-import { TodoManager } from "../../tool/todo.js";
+} from "../../core/index.js";
+import { SessionManager } from "../session-manager.js";
+import type { Message } from "../../core/index.js";
+import type { ConfiguredSubagentFactory, SubagentInvocation } from "../../extensions/index.js";
+import { TodoManager } from "../../extensions/index.js";
 import {
   CLIAGENT_DIR,
   findConfiguredModel,

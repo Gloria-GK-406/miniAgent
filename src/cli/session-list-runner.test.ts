@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SessionMeta } from "../core/session.js";
+import type { SessionMeta } from "./session-manager.js";
 import {
   formatSessionList,
   formatSessionListJson,

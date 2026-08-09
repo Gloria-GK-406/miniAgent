@@ -31,7 +31,7 @@ Scans directories for Markdown files with frontmatter to define subagents. Each 
 ### Setup
 
 ```typescript
-import { SubagentPlugin } from "@piaoxianguo/miniagent/tool/subagent";
+import { SubagentPlugin } from "@piaoxianguo/miniagent/extensions/subagent";
 
 const subagent = new SubagentPlugin({
   path: "./.cliagent/subagent/",

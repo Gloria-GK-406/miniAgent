@@ -1,14 +1,14 @@
-import type { MiniAgent } from "../../core/agent.js";
-import type { ModelPreset } from "../../core/config.js";
-import type { SessionMeta } from "../../core/session.js";
+import type { MiniAgent } from "../../core/index.js";
+import type { ModelPreset } from "../../core/index.js";
+import type { SessionMeta } from "../session-manager.js";
 import type {
   Message,
   TokenCount,
   ToolCallMessage,
   ToolResultMessage,
-} from "../../core/types.js";
-import type { Tool } from "../../tool/types.js";
-import type { TodoItemSnapshot } from "../../tool/todo.js";
+} from "../../core/index.js";
+import type { Tool } from "../../core/index.js";
+import type { TodoItemSnapshot } from "../../extensions/index.js";
 import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
 import type { DiagnosticResult } from "./diagnostics-service.js";
 import type { CLIDoctorCheck } from "./doctor-service.js";
