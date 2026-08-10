@@ -88,7 +88,7 @@ MiniAgent 基于一个原则：**最小核心，自由组装**。
                     └─────────────────────────────────┘
 ```
 
-- **Schema 驱动类型** — 所有数据结构用 Zod schema 定义，TypeScript 类型自动推导，运行时验证免费获得。
+- **可执行 Schema 契约** — 数据由 Zod 完整描述，协议对象在结构校验时保留实例身份，不透明对象必须提供真实运行时谓词；TypeScript 类型统一从这些契约推导。
 - **自动检测** — 组件通过 Zod schema 验证识别，而非手动类型标签。注册工具、提供者或处理器，Agent 知道它是什么。
 - **插件优于框架** — 没有继承层级，没有抽象基类。只需要满足正确 schema 的普通对象。
 
@@ -524,7 +524,7 @@ agent.on("message:notify", ({ message }) => { /* 新消息创建 */ });
 - **测试**：Vitest
 - **Lint**：ESLint（typescript-eslint）
 - **SDK**：`@anthropic-ai/sdk`、`openai`、`@modelcontextprotocol/sdk`
-- **工具**：`eventemitter3`、`lru-cache`、`zod-to-json-schema`
+- **工具**：`eventemitter3`、`lru-cache`
 
 ## CLI Phase 3 补充
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import {
   CLIAGENT_DIR,
   CLIPermissionConfigSchema,
@@ -13,20 +14,17 @@ import {
 export const PermissionRuleTargetSchema = z.object({
   toolName: z.string(),
   pattern: z.string().optional(),
-}) as z.ZodType<{
-  toolName: string;
-  pattern?: string;
-}>;
+});
 export type PermissionRuleTarget = z.infer<typeof PermissionRuleTargetSchema>;
 
-export const PermissionConfigServiceSchema = z.custom<{
-  setRule(
+export const PermissionConfigServiceSchema = createProtocolSchema({
+  setRule: createFunctionSchema<(
     target: string,
     decision: CLIPermissionDecision,
     effectivePermission: CLIPermissionConfig,
-  ): Promise<CLIConfig>;
-  unsetRule(target: string): Promise<CLIConfig>;
-}>();
+  ) => Promise<CLIConfig>>(),
+  unsetRule: createFunctionSchema<(target: string) => Promise<CLIConfig>>(),
+});
 export type PermissionConfigService = z.infer<typeof PermissionConfigServiceSchema>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

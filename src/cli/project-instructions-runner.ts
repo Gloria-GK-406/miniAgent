@@ -10,22 +10,14 @@ export const ProjectInstructionsInitRequestSchema = z.object({
   baseDir: z.string(),
   force: z.boolean().optional(),
   output: ProjectInstructionsInitOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  force?: boolean;
-  output?: ProjectInstructionsInitOutput;
-}>;
+});
 export type ProjectInstructionsInitRequest = z.infer<typeof ProjectInstructionsInitRequestSchema>;
 
 export const ProjectInstructionsInitResultSchema = z.object({
   ok: z.boolean(),
   path: z.string(),
   written: z.boolean(),
-}) as z.ZodType<{
-  ok: boolean;
-  path: string;
-  written: boolean;
-}>;
+});
 export type ProjectInstructionsInitResult = z.infer<typeof ProjectInstructionsInitResultSchema>;
 
 export function formatProjectInstructionsInitJson(result: ProjectInstructionsInitResult): string {

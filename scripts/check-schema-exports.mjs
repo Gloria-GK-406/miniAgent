@@ -42,8 +42,10 @@ function hasExportModifier(node) {
 }
 
 function collectZodBindings(sourceFile) {
+  const customBindings = new Set();
   const namespaceBindings = new Set();
   const derivationBindings = new Map();
+  const zodTypeBindings = new Set();
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)
@@ -67,13 +69,15 @@ function collectZodBindings(sourceFile) {
     for (const element of bindings.elements) {
       const importedName = (element.propertyName ?? element.name).text;
       if (importedName === "z") namespaceBindings.add(element.name.text);
+      if (importedName === "custom") customBindings.add(element.name.text);
+      if (importedName === "ZodType") zodTypeBindings.add(element.name.text);
       if (ZOD_DERIVATION_NAMES.has(importedName)) {
         derivationBindings.set(element.name.text, importedName);
       }
     }
   }
 
-  return { derivationBindings, namespaceBindings };
+  return { customBindings, derivationBindings, namespaceBindings, zodTypeBindings };
 }
 
 function hasZodSchemaBrand(type, checker) {
@@ -126,6 +130,39 @@ function declarationDiagnostic(sourceFile, node, name, detail) {
     line: position.line + 1,
     name,
   };
+}
+
+function nodeDiagnostic(sourceFile, node, name, detail) {
+  const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+  return {
+    column: position.character + 1,
+    detail,
+    filePath: sourceFile.fileName,
+    line: position.line + 1,
+    name,
+  };
+}
+
+function isZodMember(expression, member, bindings) {
+  return (ts.isPropertyAccessExpression(expression)
+    && ts.isIdentifier(expression.expression)
+    && bindings.namespaceBindings.has(expression.expression.text)
+    && expression.name.text === member)
+    || (member === "custom"
+      && ts.isIdentifier(expression)
+      && bindings.customBindings.has(expression.text));
+}
+
+function isAssertedZodType(typeNode, bindings) {
+  if (!ts.isTypeReferenceNode(typeNode)) {
+    return false;
+  }
+  if (ts.isIdentifier(typeNode.typeName)) {
+    return bindings.zodTypeBindings.has(typeNode.typeName.text);
+  }
+  return ts.isIdentifier(typeNode.typeName.left)
+    && bindings.namespaceBindings.has(typeNode.typeName.left.text)
+    && typeNode.typeName.right.text === "ZodType";
 }
 
 function analyzeSourceFile(sourceFile, checker) {
@@ -181,6 +218,42 @@ function analyzeSourceFile(sourceFile, checker) {
   }
 
   analyzeStatements(sourceFile.statements);
+
+  function analyzeSchemaConstruction(node) {
+    if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node))
+      && isAssertedZodType(node.type, zodBindings)) {
+      diagnostics.push(nodeDiagnostic(
+        sourceFile,
+        node,
+        "asserted ZodType",
+        "ZodType assertions are forbidden because they can replace a Schema's inferred contract with a handwritten structure",
+      ));
+    }
+
+    if (ts.isCallExpression(node) && isZodMember(node.expression, "custom", zodBindings)) {
+      if (node.arguments.length === 0) {
+        diagnostics.push(nodeDiagnostic(
+          sourceFile,
+          node,
+          "predicate-free z.custom",
+          "z.custom must include a real runtime predicate; use a data Schema, createFunctionSchema, createProtocolSchema, or an opaque-object predicate",
+        ));
+      }
+      const customType = node.typeArguments?.[0];
+      if (customType !== undefined && ts.isTypeLiteralNode(customType)) {
+        diagnostics.push(nodeDiagnostic(
+          sourceFile,
+          node,
+          "structural z.custom",
+          "structural data and service contracts must be described by Zod fields rather than z.custom with a handwritten type literal",
+        ));
+      }
+    }
+
+    ts.forEachChild(node, analyzeSchemaConstruction);
+  }
+
+  analyzeSchemaConstruction(sourceFile);
 
   return diagnostics;
 }

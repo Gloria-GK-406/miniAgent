@@ -12,11 +12,7 @@ export const SessionClearRequestSchema = z.object({
   baseDir: z.string(),
   sessionId: z.string().optional(),
   output: SessionClearOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  sessionId?: string;
-  output?: SessionClearOutput;
-}>;
+});
 export type SessionClearRequest = z.infer<typeof SessionClearRequestSchema>;
 
 export const SessionClearResultSchema = z.object({
@@ -24,12 +20,7 @@ export const SessionClearResultSchema = z.object({
   sessionId: z.string(),
   sessionName: z.string(),
   messageCount: z.number(),
-}) as z.ZodType<{
-  ok: boolean;
-  sessionId: string;
-  sessionName: string;
-  messageCount: number;
-}>;
+});
 export type SessionClearResult = z.infer<typeof SessionClearResultSchema>;
 
 export function formatSessionClearResultJson(result: SessionClearResult): string {

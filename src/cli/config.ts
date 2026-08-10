@@ -37,12 +37,7 @@ export const LoadConfigOptionsSchema = z.object({
   platform: NodePlatformSchema.optional(),
   homeDir: z.string().optional(),
   createTemplateIfMissing: z.boolean().optional(),
-}) as z.ZodType<{
-  env?: Record<string, string | undefined>;
-  platform?: NodeJS.Platform;
-  homeDir?: string;
-  createTemplateIfMissing?: boolean;
-}>;
+});
 export type LoadConfigOptions = z.infer<typeof LoadConfigOptionsSchema>;
 
 export class ConfigTemplateCreatedError extends Error {

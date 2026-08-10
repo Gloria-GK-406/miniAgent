@@ -540,39 +540,40 @@ export class MiniAgent {
     async execute(toolCall: ToolCallMessage): Promise<ToolResultMessage> {
         this.ensureNotDestroyed();
         this.emitter.emit("tool:execute", { toolCall });
-        const approved = await this.requestApproval(
-            toolCall.toolName,
-            toolCall.arguments as Record<string, unknown>,
-        );
-        if (!approved) {
-            const result = ToolResultMessageSchema.parse({
-                id: crypto.randomUUID(),
-                type: MessageType.ToolResult,
-                toolCallId: toolCall.toolCallId,
-                content: "Tool execution denied by user.",
-            });
-            this.emitter.emit("tool:result", { toolCall, result });
-            return result;
-        }
         const tool = this.turnToolMap.get(toolCall.toolName);
-        let content: string;
+        let content = "Tool execution failed.";
         if (!tool) {
             content = `tool not found: ${toolCall.toolName}`;
         } else {
-            const abortController = new AbortController();
-            this.toolAbortController = abortController;
+            let args: Record<string, unknown> | undefined;
             try {
-                content = await tool.execute(
-                    toolCall.arguments as Record<string, unknown>,
-                    abortController.signal,
-                );
-            } catch (error: unknown) {
-                if (error instanceof StopException) {
-                    throw error;
+                const parsed = tool.parameters.parse(toolCall.arguments);
+                if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+                    throw new Error(`Tool parameters must produce an object: ${tool.name}`);
                 }
+                args = parsed as Record<string, unknown>;
+            } catch (error: unknown) {
                 content = error instanceof Error ? error.message : String(error);
-            } finally {
-                this.toolAbortController = null;
+            }
+
+            if (args !== undefined) {
+                const approved = await this.requestApproval(toolCall.toolName, args);
+                if (!approved) {
+                    content = "Tool execution denied by user.";
+                } else {
+                    const abortController = new AbortController();
+                    this.toolAbortController = abortController;
+                    try {
+                        content = await tool.execute(args, abortController.signal);
+                    } catch (error: unknown) {
+                        if (error instanceof StopException) {
+                            throw error;
+                        }
+                        content = error instanceof Error ? error.message : String(error);
+                    } finally {
+                        this.toolAbortController = null;
+                    }
+                }
             }
         }
 

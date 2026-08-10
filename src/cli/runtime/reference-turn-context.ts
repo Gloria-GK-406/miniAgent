@@ -1,6 +1,5 @@
-import { z } from "zod";
-import { MessageType, type Message } from "../../core/index.js";
-import { TurnContextAppenderSchema, type TurnContextAppender } from "../../core/index.js";
+import { type z } from "zod";
+import { createFunctionSchema, createProtocolSchema, MessageType, type Message } from "../../core/index.js";
 import type { ResolvedReference } from "./reference-service.js";
 
 function formatReferenceRange(ref: ResolvedReference): string {
@@ -34,13 +33,13 @@ export function createReferenceTurnContextMessages(
   }];
 }
 
-export const ReferenceTurnContextAppenderSchema = z.intersection(z.lazy(() => TurnContextAppenderSchema), z.custom<{
-  setReferences(references: ResolvedReference[]): void;
-  clear(): void;
-}>()) as z.ZodType<TurnContextAppender & {
-  setReferences(references: ResolvedReference[]): void;
-  clear(): void;
-}>;
+export const ReferenceTurnContextAppenderSchema = createProtocolSchema({
+  setReferences: createFunctionSchema<(
+    references: ResolvedReference[],
+  ) => void>(),
+  clear: createFunctionSchema<() => void>(),
+  appendTurnContext: createFunctionSchema<() => Promise<Message[]>>(),
+});
 export type ReferenceTurnContextAppender = z.infer<typeof ReferenceTurnContextAppenderSchema>;
 
 export function createReferenceTurnContextAppender(): ReferenceTurnContextAppender {

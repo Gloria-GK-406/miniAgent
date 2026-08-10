@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Dirent } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 
 export const ResolvedReferenceSchema = z.object({
   token: z.string(),
@@ -10,20 +11,15 @@ export const ResolvedReferenceSchema = z.object({
   content: z.string(),
   startLine: z.number().optional(),
   endLine: z.number().optional(),
-}) as z.ZodType<{
-  token: string;
-  path: string;
-  displayPath: string;
-  content: string;
-  startLine?: number;
-  endLine?: number;
-}>;
+});
 export type ResolvedReference = z.infer<typeof ResolvedReferenceSchema>;
 
-export const ReferenceServiceSchema = z.custom<{
-  resolveReferences(input: string): Promise<ResolvedReference[]>;
-  listReferenceCandidates(): Promise<string[]>;
-}>();
+export const ReferenceServiceSchema = createProtocolSchema({
+  resolveReferences: createFunctionSchema<(
+    input: string,
+  ) => Promise<ResolvedReference[]>>(),
+  listReferenceCandidates: createFunctionSchema<() => Promise<string[]>>(),
+});
 export type ReferenceService = z.infer<typeof ReferenceServiceSchema>;
 
 const REF_PATTERN = /(^|\s)(@[^\s]+)/g;

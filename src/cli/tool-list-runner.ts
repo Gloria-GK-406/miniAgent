@@ -13,12 +13,7 @@ export const ToolListItemSchema = z.object({
   description: z.string(),
   parameters: z.record(z.string(), z.unknown()),
   permission: z.lazy(() => CLIPermissionResultSchema).optional(),
-}) as z.ZodType<{
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-  permission?: CLIPermissionResult;
-}>;
+});
 export type ToolListItem = z.infer<typeof ToolListItemSchema>;
 
 export function toToolListItem(

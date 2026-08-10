@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { GenerationConfig, ModelRuntime } from "./config.js";
 import { createFunctionSchema } from "./function-schema.js";
+import { createProtocolSchema } from "./protocol-schema.js";
 import {
   collectLLMResponse,
   createLLMStreamHandle,
@@ -66,13 +67,13 @@ export const OneShotLLMSchema = z.custom<OneShotLLM>((value) => {
   return value instanceof OneShotLLM;
 });
 
-export const OneShotLLMFactorySchema = z.object({
+export const OneShotLLMFactorySchema = createProtocolSchema({
   create: createFunctionSchema<() => OneShotLLM>(),
 });
 
 export type OneShotLLMFactory = z.infer<typeof OneShotLLMFactorySchema>;
 
-export const OneShotLLMRequireSchema = z.object({
+export const OneShotLLMRequireSchema = createProtocolSchema({
   setOneShotLLMFactory: createFunctionSchema<(
     factory: OneShotLLMFactory,
   ) => void>(),

@@ -15,13 +15,7 @@ export const SessionExportRequestSchema = z.object({
   format: SessionExportFormatSchema.optional(),
   outputPath: z.string().optional(),
   output: SessionExportOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  sessionId?: string;
-  format?: SessionExportFormat;
-  outputPath?: string;
-  output?: SessionExportOutput;
-}>;
+});
 export type SessionExportRequest = z.infer<typeof SessionExportRequestSchema>;
 
 export const SessionExportResultSchema = z.object({
@@ -29,12 +23,7 @@ export const SessionExportResultSchema = z.object({
   sessionId: z.string(),
   format: SessionExportFormatSchema,
   outputPath: z.string(),
-}) as z.ZodType<{
-  ok: boolean;
-  sessionId: string;
-  format: SessionExportFormat;
-  outputPath: string;
-}>;
+});
 export type SessionExportResult = z.infer<typeof SessionExportResultSchema>;
 
 export function formatSessionExportResultJson(result: SessionExportResult): string {

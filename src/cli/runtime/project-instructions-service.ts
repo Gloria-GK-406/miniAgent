@@ -1,20 +1,20 @@
 import { z } from "zod";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 
 export const ProjectInstructionsResultSchema = z.object({
   written: z.boolean(),
   path: z.string(),
-}) as z.ZodType<{
-  written: boolean;
-  path: string;
-}>;
+});
 export type ProjectInstructionsResult = z.infer<typeof ProjectInstructionsResultSchema>;
 
-export const ProjectInstructionsServiceSchema = z.custom<{
-  buildInstructions(): Promise<string>;
-  initialize(options: { overwrite: boolean }): Promise<ProjectInstructionsResult>;
-}>();
+export const ProjectInstructionsServiceSchema = createProtocolSchema({
+  buildInstructions: createFunctionSchema<() => Promise<string>>(),
+  initialize: createFunctionSchema<(
+    options: { overwrite: boolean },
+  ) => Promise<ProjectInstructionsResult>>(),
+});
 export type ProjectInstructionsService = z.infer<typeof ProjectInstructionsServiceSchema>;
 
 interface PackageJson {

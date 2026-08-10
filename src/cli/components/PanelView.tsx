@@ -7,10 +7,7 @@ import { MessageType } from "../../core/index.js";
 export const PanelDataSchema = z.object({
   title: z.string(),
   messages: z.array(z.lazy(() => MessageSchema)),
-}) as z.ZodType<{
-  title: string;
-  messages: Message[];
-}>;
+});
 export type PanelData = z.infer<typeof PanelDataSchema>;
 
 interface PanelViewProps {

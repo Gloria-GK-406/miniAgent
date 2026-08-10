@@ -64,7 +64,7 @@ test("generates one deterministic, isolated three-package candidate", {
   );
   const rootPackage = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8"));
   assert.deepEqual(rootPackage.repository, EXPECTED_REPOSITORY);
-  assert.equal(manifest.version, "0.9.1");
+  assert.equal(manifest.version, "0.10.0");
   assert.equal(manifest.packages.length, 3);
   assert.deepEqual(
     manifest.packages.map(({ name }) => name),
@@ -80,7 +80,7 @@ test("generates one deterministic, isolated three-package candidate", {
   for (const packageRecord of manifest.packages) {
     const packageRoot = path.join(candidateRoot, packageRecord.directory);
     const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
-    assert.equal(packageJson.version, "0.9.1");
+    assert.equal(packageJson.version, "0.10.0");
     assert.equal(packageJson.private, undefined);
     assert.equal(packageJson.publishConfig.access, "public");
     assert.deepEqual(packageJson.repository, EXPECTED_REPOSITORY);
@@ -107,8 +107,8 @@ test("generates one deterministic, isolated three-package candidate", {
   const extensionsPackage = JSON.parse(
     await readFile(path.join(candidateRoot, "packages", "extensions", "package.json"), "utf8"),
   );
-  assert.equal(enginePackage.dependencies["@piaoxianguo/miniagent-core"], "0.9.1");
-  assert.equal(extensionsPackage.dependencies["@piaoxianguo/miniagent-core"], "0.9.1");
+  assert.equal(enginePackage.dependencies["@piaoxianguo/miniagent-core"], "0.10.0");
+  assert.equal(extensionsPackage.dependencies["@piaoxianguo/miniagent-core"], "0.10.0");
   assert.equal(enginePackage.dependencies["@piaoxianguo/miniagent-extensions"], undefined);
   assert.equal(extensionsPackage.dependencies["@piaoxianguo/miniagent-engine"], undefined);
 
@@ -209,7 +209,7 @@ test("accepts only the exact frozen candidate package policy", async () => {
 
   const cases = [
     ["changed archive", async (root) => {
-      await appendFile(path.join(root, "archives", "piaoxianguo-miniagent-core-0.9.1.tgz"), "changed");
+      await appendFile(path.join(root, "archives", "piaoxianguo-miniagent-core-0.10.0.tgz"), "changed");
     }, /integrity/i],
     ["invalid inventory", async (root) => {
       const manifestPath = path.join(root, "manifest.json");
@@ -226,13 +226,13 @@ test("accepts only the exact frozen candidate package policy", async () => {
     ["wrong dependency", async (root) => {
       const packagePath = path.join(root, "packages", "engine", "package.json");
       const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
-      packageJson.dependencies["@piaoxianguo/miniagent-core"] = "^0.9.1";
+      packageJson.dependencies["@piaoxianguo/miniagent-core"] = "^0.10.0";
       await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
     }, /dependencies/i],
     ["horizontal MiniAgent dependency", async (root) => {
       const packagePath = path.join(root, "packages", "engine", "package.json");
       const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
-      packageJson.dependencies["@piaoxianguo/miniagent-extensions"] = "0.9.1";
+      packageJson.dependencies["@piaoxianguo/miniagent-extensions"] = "0.10.0";
       await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
     }, /dependencies/i],
     ["peer leakage", async (root) => {
@@ -300,9 +300,9 @@ test("accepts only the exact frozen candidate package policy", async () => {
       await symlink(path.join(candidateRoot, "packages", "core"), packageRoot, "dir");
     }, /symlink|canonical|contain/i],
     ["symlinked archive escapes the candidate", async (root) => {
-      const archivePath = path.join(root, "archives", "piaoxianguo-miniagent-core-0.9.1.tgz");
+      const archivePath = path.join(root, "archives", "piaoxianguo-miniagent-core-0.10.0.tgz");
       await rm(archivePath);
-      await symlink(path.join(candidateRoot, "archives", "piaoxianguo-miniagent-core-0.9.1.tgz"), archivePath);
+      await symlink(path.join(candidateRoot, "archives", "piaoxianguo-miniagent-core-0.10.0.tgz"), archivePath);
     }, /symlink|canonical|contain/i],
   ];
 
@@ -683,16 +683,16 @@ if (Object.keys(process.env).some((key) => /(?:^|_)(?:auth|token|otp|password|cr
 if (!process.cwd().includes("miniagent-registry-consumer-")) process.exit(96);
 appendFileSync(${JSON.stringify(logPath)}, JSON.stringify({ args, npmKeys, registry: process.env.NPM_CONFIG_REGISTRY }) + "\\n");
 if (args[0] === "install") {
-  if (args.slice(-2).join(" ") !== "@piaoxianguo/miniagent-engine@0.9.1 @piaoxianguo/miniagent-extensions@0.9.1") process.exit(97);
+  if (args.slice(-2).join(" ") !== "@piaoxianguo/miniagent-engine@0.10.0 @piaoxianguo/miniagent-extensions@0.10.0") process.exit(97);
   const coreRoot = path.join(process.cwd(), "node_modules", "@piaoxianguo", "miniagent-core");
   mkdirSync(coreRoot, { recursive: true });
-  writeFileSync(path.join(coreRoot, "package.json"), JSON.stringify({ name: "@piaoxianguo/miniagent-core", version: "0.9.1" }));
+  writeFileSync(path.join(coreRoot, "package.json"), JSON.stringify({ name: "@piaoxianguo/miniagent-core", version: "0.10.0" }));
   process.exit(0);
 }
 if (args.join(" ") === "ls --all --json") {
   process.stdout.write(JSON.stringify({ dependencies: {
-    "@piaoxianguo/miniagent-engine": { dependencies: { "@piaoxianguo/miniagent-core": { version: "0.9.1" } } },
-    "@piaoxianguo/miniagent-extensions": { dependencies: { "@piaoxianguo/miniagent-core": { version: "0.9.1" } } },
+    "@piaoxianguo/miniagent-engine": { dependencies: { "@piaoxianguo/miniagent-core": { version: "0.10.0" } } },
+    "@piaoxianguo/miniagent-extensions": { dependencies: { "@piaoxianguo/miniagent-core": { version: "0.10.0" } } },
   } }));
   process.exit(0);
 }
@@ -788,7 +788,7 @@ test("rejects a perturbed accepted tarball before publication planning", async (
   const copiedCandidate = path.join(temporaryRoot, "candidate");
   try {
     await cp(candidateRoot, copiedCandidate, { recursive: true });
-    await appendFile(path.join(copiedCandidate, "archives", "piaoxianguo-miniagent-core-0.9.1.tgz"), "perturbed");
+    await appendFile(path.join(copiedCandidate, "archives", "piaoxianguo-miniagent-core-0.10.0.tgz"), "perturbed");
     const result = spawnSync(process.execPath, [
       "scripts/publish-release-packages.mjs",
       "--candidate", path.join(copiedCandidate, "manifest.json"),
@@ -821,9 +821,9 @@ test("waits for core visibility and resolves ambiguous publication by identity",
     assert.equal(result.status, 0, result.stderr);
     const lines = result.stdout.split("\n").filter((line) => line.startsWith("npm publish "));
     assert.equal(lines.length, 3);
-    assert.match(lines[0], /miniagent-core-0\.9\.1\.tgz --provenance --access public --registry https:\/\/registry\.npmjs\.org\/$/);
-    assert.match(lines[1], /miniagent-engine-0\.9\.1\.tgz --provenance --access public --registry https:\/\/registry\.npmjs\.org\/$/);
-    assert.match(lines[2], /miniagent-extensions-0\.9\.1\.tgz --provenance --access public --registry https:\/\/registry\.npmjs\.org\/$/);
+    assert.match(lines[0], /miniagent-core-0\.10\.0\.tgz --provenance --access public --registry https:\/\/registry\.npmjs\.org\/$/);
+    assert.match(lines[1], /miniagent-engine-0\.10\.0\.tgz --provenance --access public --registry https:\/\/registry\.npmjs\.org\/$/);
+    assert.match(lines[2], /miniagent-extensions-0\.10\.0\.tgz --provenance --access public --registry https:\/\/registry\.npmjs\.org\/$/);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
@@ -833,9 +833,9 @@ test("allows only the unique complete-history addition of the exact 0.9 release 
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "miniagent-release-eligibility-test-"));
   const shallowContainer = await mkdtemp(path.join(os.tmpdir(), "miniagent-release-eligibility-shallow-"));
   try {
-    const markerPath = path.join(temporaryRoot, "scripts", "release-intent-0.9.1.json");
+    const markerPath = path.join(temporaryRoot, "scripts", "release-intent-0.10.0.json");
     const exactMarker = `${JSON.stringify({
-      version: "0.9.1",
+      version: "0.10.0",
       packages: [
         "@piaoxianguo/miniagent-core",
         "@piaoxianguo/miniagent-engine",
@@ -850,23 +850,23 @@ test("allows only the unique complete-history addition of the exact 0.9 release 
     execFileSync("git", ["add", "base.txt"], { cwd: temporaryRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "base"], { cwd: temporaryRoot });
     await writeFile(markerPath, exactMarker);
-    execFileSync("git", ["add", "scripts/release-intent-0.9.1.json"], { cwd: temporaryRoot });
+    execFileSync("git", ["add", "scripts/release-intent-0.10.0.json"], { cwd: temporaryRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "candidate A"], { cwd: temporaryRoot });
     const candidateA = execFileSync("git", ["rev-parse", "HEAD"], { cwd: temporaryRoot, encoding: "utf8" }).trim();
     await writeFile(path.join(temporaryRoot, "later.txt"), "candidate B became ready first\n");
     execFileSync("git", ["add", "later.txt"], { cwd: temporaryRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "candidate B"], { cwd: temporaryRoot });
     const candidateB = execFileSync("git", ["rev-parse", "HEAD"], { cwd: temporaryRoot, encoding: "utf8" }).trim();
-    await writeFile(markerPath, exactMarker.replace('"0.9.1"', '"0.9.2"'));
-    execFileSync("git", ["add", "scripts/release-intent-0.9.1.json"], { cwd: temporaryRoot });
+    await writeFile(markerPath, exactMarker.replace('"0.10.0"', '"0.9.2"'));
+    execFileSync("git", ["add", "scripts/release-intent-0.10.0.json"], { cwd: temporaryRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "modified marker"], { cwd: temporaryRoot });
     const modifiedMarker = execFileSync("git", ["rev-parse", "HEAD"], { cwd: temporaryRoot, encoding: "utf8" }).trim();
     await rm(markerPath);
-    execFileSync("git", ["add", "scripts/release-intent-0.9.1.json"], { cwd: temporaryRoot });
+    execFileSync("git", ["add", "scripts/release-intent-0.10.0.json"], { cwd: temporaryRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "delete marker"], { cwd: temporaryRoot });
     const deletedMarker = execFileSync("git", ["rev-parse", "HEAD"], { cwd: temporaryRoot, encoding: "utf8" }).trim();
     await writeFile(markerPath, exactMarker);
-    execFileSync("git", ["add", "scripts/release-intent-0.9.1.json"], { cwd: temporaryRoot });
+    execFileSync("git", ["add", "scripts/release-intent-0.10.0.json"], { cwd: temporaryRoot });
     execFileSync("git", ["commit", "--quiet", "-m", "candidate C re-add"], { cwd: temporaryRoot });
     const candidateC = execFileSync("git", ["rev-parse", "HEAD"], { cwd: temporaryRoot, encoding: "utf8" }).trim();
 
@@ -913,7 +913,7 @@ test("allows only the unique complete-history addition of the exact 0.9 release 
     assert.notEqual(eligibility(shallowRoot, shallowSha).status, 0, "shallow history unexpectedly eligible");
     const unavailableRoot = path.join(shallowContainer, "unavailable");
     await mkdir(path.join(unavailableRoot, "scripts"), { recursive: true });
-    await writeFile(path.join(unavailableRoot, "scripts", "release-intent-0.9.1.json"), exactMarker);
+    await writeFile(path.join(unavailableRoot, "scripts", "release-intent-0.10.0.json"), exactMarker);
     assert.notEqual(eligibility(unavailableRoot, candidateA).status, 0, "unavailable history unexpectedly eligible");
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
@@ -1056,11 +1056,11 @@ test("workflow retains and reaccepts the candidate before serialized publication
   assert.equal(publish.if, "needs.release-eligibility.outputs.eligible == 'true'");
   assert.equal(eligibility.steps[0].with["fetch-depth"], 0);
   assert.match(eligibility.steps.map(({ run = "" }) => run).join("\n"), /release-eligibility\.mjs[^\n]+github\.sha/);
-  assert.deepEqual(publish.concurrency, { group: "miniagent-npm-0.9.1", "cancel-in-progress": false });
+  assert.deepEqual(publish.concurrency, { group: "miniagent-npm-0.10.0", "cancel-in-progress": false });
   assert.deepEqual(publish.permissions, { contents: "read", actions: "read", "id-token": "write" });
   assert.match(workflowText, /node-version: 22\.22\.0/);
   assert.match(workflowText, /npm@10\.9\.4/);
-  assert.match(workflowText, /miniagent-0\.9\.1-candidate-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_id \}\}/i);
+  assert.match(workflowText, /miniagent-0\.10\.0-candidate-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_id \}\}/i);
   const uploadSteps = Object.values(workflow.jobs).flatMap((job) => job.steps ?? [])
     .filter(({ uses = "" }) => uses.startsWith("actions/upload-artifact@"));
   assert.equal(uploadSteps.length, 1);

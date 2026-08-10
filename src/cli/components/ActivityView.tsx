@@ -1,23 +1,20 @@
 import { z } from "zod";
 import { useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
+import { createFunctionSchema } from "../../core/index.js";
 import { CLIActivityEntrySchema, type CLIActivityEntry } from "../runtime/types.js";
 
 export const ActivityWindowSchema = z.object({
   visibleEntries: z.array(z.lazy(() => CLIActivityEntrySchema)),
   maxOffset: z.number(),
   scrollOffset: z.number(),
-}) as z.ZodType<{
-  visibleEntries: CLIActivityEntry[];
-  maxOffset: number;
-  scrollOffset: number;
-}>;
+});
 export type ActivityWindow = z.infer<typeof ActivityWindowSchema>;
 
-export const ActivityViewPropsSchema = z.custom<{
-  entries: CLIActivityEntry[];
-  onClose: () => void;
-}>();
+export const ActivityViewPropsSchema = z.object({
+  entries: z.array(CLIActivityEntrySchema),
+  onClose: createFunctionSchema<() => void>(),
+});
 export type ActivityViewProps = z.infer<typeof ActivityViewPropsSchema>;
 
 export function getActivityWindow(

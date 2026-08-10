@@ -3,15 +3,12 @@ import type { PrintStreams } from "./print-runner.js";
 import {
   CLIViewPanelSchema,
   type CLIAppRuntime,
-  type CLIViewPanel,
 } from "./runtime/types.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
 export const AgentListOutputSchema = z.enum(["text", "json"]);
 export type AgentListOutput = z.infer<typeof AgentListOutputSchema>;
-export const AgentListPanelSchema = CLIViewPanelSchema.refine(
-  (panel) => panel.type === "agents",
-) as z.ZodType<Extract<CLIViewPanel, { type: "agents" }>>;
+export const AgentListPanelSchema = CLIViewPanelSchema.options[16];
 export type AgentListPanel = z.infer<typeof AgentListPanelSchema>;
 
 function formatSubagent(subagent: AgentListPanel["subagents"][number]): string {

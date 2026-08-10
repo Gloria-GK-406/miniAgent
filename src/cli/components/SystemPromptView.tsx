@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { Box, Text, useInput, useStdout } from "ink";
+import { createFunctionSchema } from "../../core/index.js";
 
-export const SystemPromptViewPropsSchema = z.custom<{
-  basePrompt: string;
-  effectivePrompt: string;
-  onClose: () => void;
-}>();
+export const SystemPromptViewPropsSchema = z.object({
+  basePrompt: z.string(),
+  effectivePrompt: z.string(),
+  onClose: createFunctionSchema<() => void>(),
+});
 export type SystemPromptViewProps = z.infer<typeof SystemPromptViewPropsSchema>;
 
 function firstLines(text: string, limit: number): string[] {

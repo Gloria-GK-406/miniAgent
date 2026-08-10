@@ -1,32 +1,28 @@
 import { z } from "zod";
 import { spawn } from "node:child_process";
 import { relative } from "node:path";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import { resolveWorkspacePath } from "../tools/workspace.js";
 
 export const GitDiffOptionsSchema = z.object({
   staged: z.boolean().optional(),
   path: z.string().optional(),
-}) as z.ZodType<{
-  staged?: boolean;
-  path?: string;
-}>;
+});
 export type GitDiffOptions = z.infer<typeof GitDiffOptionsSchema>;
 
 export const GitLogOptionsSchema = z.object({
   limit: z.number().optional(),
-}) as z.ZodType<{
-  limit?: number;
-}>;
+});
 export type GitLogOptions = z.infer<typeof GitLogOptionsSchema>;
 
-export const GitServiceSchema = z.custom<{
-  isRepository(): Promise<boolean>;
-  statusShort(): Promise<string>;
-  diff(options?: GitDiffOptions): Promise<string>;
-  log(options?: GitLogOptions): Promise<string>;
-  branchName(): Promise<string>;
-  commit(message: string): Promise<string>;
-}>();
+export const GitServiceSchema = createProtocolSchema({
+  isRepository: createFunctionSchema<() => Promise<boolean>>(),
+  statusShort: createFunctionSchema<() => Promise<string>>(),
+  diff: createFunctionSchema<(options?: GitDiffOptions) => Promise<string>>(),
+  log: createFunctionSchema<(options?: GitLogOptions) => Promise<string>>(),
+  branchName: createFunctionSchema<() => Promise<string>>(),
+  commit: createFunctionSchema<(message: string) => Promise<string>>(),
+});
 export type GitService = z.infer<typeof GitServiceSchema>;
 
 interface GitCommandResult {

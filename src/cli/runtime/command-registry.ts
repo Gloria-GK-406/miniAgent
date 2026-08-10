@@ -1,12 +1,19 @@
-import { z } from "zod";
+import { type z } from "zod";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import type { CLICommand, CLICommandContext } from "./types.js";
 
-export const CommandRegistrySchema = z.custom<{
-  register(command: CLICommand): void;
-  list(): CLICommand[];
-  execute(ctx: CLICommandContext, input: string): Promise<void>;
-  complete(ctx: CLICommandContext, input: string): Promise<string[]>;
-}>();
+export const CommandRegistrySchema = createProtocolSchema({
+  register: createFunctionSchema<(command: CLICommand) => void>(),
+  list: createFunctionSchema<() => CLICommand[]>(),
+  execute: createFunctionSchema<(
+    ctx: CLICommandContext,
+    input: string,
+  ) => Promise<void>>(),
+  complete: createFunctionSchema<(
+    ctx: CLICommandContext,
+    input: string,
+  ) => Promise<string[]>>(),
+});
 export type CommandRegistry = z.infer<typeof CommandRegistrySchema>;
 
 function normalizeName(value: string): string {

@@ -9,10 +9,7 @@ export type ReferenceListOutput = z.infer<typeof ReferenceListOutputSchema>;
 export const ReferenceListRequestSchema = z.object({
   baseDir: z.string(),
   output: ReferenceListOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  output?: ReferenceListOutput;
-}>;
+});
 export type ReferenceListRequest = z.infer<typeof ReferenceListRequestSchema>;
 
 function plural(count: number, noun: string): string {

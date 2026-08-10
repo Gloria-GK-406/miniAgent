@@ -16,14 +16,7 @@ export const ConnectProviderOptionSchema = z.object({
   models: z.array(z.lazy(() => ModelPresetSchema)),
   requiresBaseURL: z.boolean(),
   requiresModel: z.boolean(),
-}) as z.ZodType<{
-  id: ConnectProviderId;
-  label: string;
-  engine: string;
-  models: ModelPreset[];
-  requiresBaseURL: boolean;
-  requiresModel: boolean;
-}>;
+});
 export type ConnectProviderOption = z.infer<typeof ConnectProviderOptionSchema>;
 
 export const BuildProviderConnectionInputSchema = z.object({
@@ -31,12 +24,7 @@ export const BuildProviderConnectionInputSchema = z.object({
   apiKey: z.string(),
   baseURL: z.string().optional(),
   modelId: z.string().optional(),
-}) as z.ZodType<{
-  providerId: ConnectProviderId;
-  apiKey: string;
-  baseURL?: string;
-  modelId?: string;
-}>;
+});
 export type BuildProviderConnectionInput = z.infer<typeof BuildProviderConnectionInputSchema>;
 
 function cloneModels(models: ModelPreset[]): ModelPreset[] {

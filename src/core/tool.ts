@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createFunctionSchema } from "./function-schema.js";
+import { createProtocolSchema } from "./protocol-schema.js";
 
-export const ToolSchema = z.object({
+export const ToolSchema = createProtocolSchema({
     name: z.string(),
     description: z.string(),
     parameters: z.instanceof(z.ZodType),
@@ -13,13 +14,13 @@ export const ToolSchema = z.object({
 
 export type Tool = z.infer<typeof ToolSchema>;
 
-export const ToolProviderSchema = z.object({
+export const ToolProviderSchema = createProtocolSchema({
     getTools: createFunctionSchema<() => Promise<Tool[]>>(),
 });
 
 export type ToolProvider = z.infer<typeof ToolProviderSchema>;
 
-export const ToolApproverSchema = z.object({
+export const ToolApproverSchema = createProtocolSchema({
     requestApproval: createFunctionSchema<(
         toolName: string,
         args: Record<string, unknown>,

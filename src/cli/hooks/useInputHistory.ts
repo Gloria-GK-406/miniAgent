@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { useCallback, useState } from "react";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 
 const DEFAULT_INPUT_HISTORY_LIMIT = 100;
 
@@ -16,20 +17,20 @@ export function appendInputHistory(
   return next.slice(-limit);
 }
 
-export const InputHistoryControllerSchema = z.custom<{
-  entries: string[];
-  remember(input: string): void;
-  previous(currentValue: string): string | null;
-  next(): string | null;
-  resetNavigation(currentValue: string): void;
-}>();
+export const InputHistoryControllerSchema = createProtocolSchema({
+  entries: z.array(z.string()),
+  remember: createFunctionSchema<(input: string) => void>(),
+  previous: createFunctionSchema<(currentValue: string) => string | null>(),
+  next: createFunctionSchema<() => string | null>(),
+  resetNavigation: createFunctionSchema<(currentValue: string) => void>(),
+});
 export type InputHistoryController = z.infer<typeof InputHistoryControllerSchema>;
 
-export const UseInputHistoryOptionsSchema = z.custom<{
-  initialEntries?: string[];
-  limit?: number;
-  onRemember?: (input: string) => void;
-}>();
+export const UseInputHistoryOptionsSchema = z.object({
+  initialEntries: z.array(z.string()).optional(),
+  limit: z.number().optional(),
+  onRemember: createFunctionSchema<(input: string) => void>().optional(),
+});
 export type UseInputHistoryOptions = z.infer<typeof UseInputHistoryOptionsSchema>;
 
 export function useInputHistory(options: UseInputHistoryOptions = {}): InputHistoryController {

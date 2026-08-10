@@ -10,20 +10,13 @@ export const SessionDeleteRequestSchema = z.object({
   baseDir: z.string(),
   sessionId: z.string(),
   output: SessionDeleteOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  sessionId: string;
-  output?: SessionDeleteOutput;
-}>;
+});
 export type SessionDeleteRequest = z.infer<typeof SessionDeleteRequestSchema>;
 
 export const SessionDeleteResultSchema = z.object({
   ok: z.boolean(),
   sessionId: z.string(),
-}) as z.ZodType<{
-  ok: boolean;
-  sessionId: string;
-}>;
+});
 export type SessionDeleteResult = z.infer<typeof SessionDeleteResultSchema>;
 
 export function formatSessionDeleteResultJson(result: SessionDeleteResult): string {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
+import { createFunctionSchema } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createSystemPromptConfigService } from "./runtime/system-prompt-config-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
@@ -11,25 +12,21 @@ export type SystemPromptUpdateAction = z.infer<typeof SystemPromptUpdateActionSc
 export const SystemPromptUpdateOutputSchema = z.enum(["text", "json"]);
 export type SystemPromptUpdateOutput = z.infer<typeof SystemPromptUpdateOutputSchema>;
 
-export const SystemPromptUpdateRequestSchema = z.custom<{
-  baseDir: string;
-  action: SystemPromptUpdateAction;
-  prompt?: string;
-  promptFile?: string;
-  output?: SystemPromptUpdateOutput;
-  readStdin?: () => Promise<string>;
-}>();
+export const SystemPromptUpdateRequestSchema = z.object({
+  baseDir: z.string(),
+  action: SystemPromptUpdateActionSchema,
+  prompt: z.string().optional(),
+  promptFile: z.string().optional(),
+  output: SystemPromptUpdateOutputSchema.optional(),
+  readStdin: createFunctionSchema<() => Promise<string>>().optional(),
+});
 export type SystemPromptUpdateRequest = z.infer<typeof SystemPromptUpdateRequestSchema>;
 
 export const SystemPromptUpdateResultSchema = z.object({
   ok: z.boolean(),
   action: SystemPromptUpdateActionSchema,
   systemPrompt: z.string().optional(),
-}) as z.ZodType<{
-  ok: boolean;
-  action: SystemPromptUpdateAction;
-  systemPrompt?: string;
-}>;
+});
 export type SystemPromptUpdateResult = z.infer<typeof SystemPromptUpdateResultSchema>;
 
 function resolvePromptFile(baseDir: string, path: string): string {

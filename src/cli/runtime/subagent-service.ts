@@ -3,6 +3,7 @@ import type { Dirent } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import { SubagentDefinitionSchema } from "../../extensions/index.js";
 import { parseFrontmatter } from "../../extensions/index.js";
 import type { CLIConfig } from "../config.js";
@@ -13,18 +14,12 @@ export const CLISubagentSummarySchema = z.object({
   description: z.string(),
   filePath: z.string(),
   model: z.string().optional(),
-}) as z.ZodType<{
-  id: string;
-  name: string;
-  description: string;
-  filePath: string;
-  model?: string;
-}>;
+});
 export type CLISubagentSummary = z.infer<typeof CLISubagentSummarySchema>;
 
-export const SubagentServiceSchema = z.custom<{
-  listSubagents(): Promise<CLISubagentSummary[]>;
-}>();
+export const SubagentServiceSchema = createProtocolSchema({
+  listSubagents: createFunctionSchema<() => Promise<CLISubagentSummary[]>>(),
+});
 export type SubagentService = z.infer<typeof SubagentServiceSchema>;
 
 function resolveSubagentRoot(baseDir: string, config: CLIConfig): string | null {

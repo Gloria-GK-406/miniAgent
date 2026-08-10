@@ -9,19 +9,13 @@ export type ConfigPathsOutput = z.infer<typeof ConfigPathsOutputSchema>;
 export const ConfigPathsRequestSchema = z.intersection(z.lazy(() => LoadConfigOptionsSchema), z.object({
   baseDir: z.string(),
   output: ConfigPathsOutputSchema.optional(),
-})) as z.ZodType<LoadConfigOptions & {
-  baseDir: string;
-  output?: ConfigPathsOutput;
-}>;
+}));
 export type ConfigPathsRequest = z.infer<typeof ConfigPathsRequestSchema>;
 
 export const ConfigPathsResultSchema = z.object({
   projectConfigPath: z.string(),
   globalConfigPath: z.string(),
-}) as z.ZodType<{
-  projectConfigPath: string;
-  globalConfigPath: string;
-}>;
+});
 export type ConfigPathsResult = z.infer<typeof ConfigPathsResultSchema>;
 
 export function resolveConfigPaths(

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CLIAgentModeSchema, loadConfig, type CLIAgentMode } from "./config.js";
+import { CLIAgentModeSchema, loadConfig } from "./config.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import {
@@ -14,11 +14,7 @@ export const SystemPromptShowRequestSchema = z.object({
   baseDir: z.string(),
   mode: z.lazy(() => CLIAgentModeSchema).optional(),
   output: SystemPromptShowOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  mode?: CLIAgentMode;
-  output?: SystemPromptShowOutput;
-}>;
+});
 export type SystemPromptShowRequest = z.infer<typeof SystemPromptShowRequestSchema>;
 
 export const SystemPromptDisplaySchema = z.object({
@@ -26,12 +22,7 @@ export const SystemPromptDisplaySchema = z.object({
   mode: z.lazy(() => CLIAgentModeSchema),
   basePrompt: z.string(),
   effectivePrompt: z.string(),
-}) as z.ZodType<{
-  ok: boolean;
-  mode: CLIAgentMode;
-  basePrompt: string;
-  effectivePrompt: string;
-}>;
+});
 export type SystemPromptDisplay = z.infer<typeof SystemPromptDisplaySchema>;
 
 export function formatSystemPromptDisplay(display: SystemPromptDisplay): string {

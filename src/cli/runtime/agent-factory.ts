@@ -1,27 +1,26 @@
 import { z } from "zod";
 import { join } from "node:path";
 
-import { getCapabilityNamespace, isCapabilityEnabled } from "../../core/index.js";
+import { createFunctionSchema, createProtocolSchema, getCapabilityNamespace, isCapabilityEnabled, MiniAgent } from "../../core/index.js";
 import type { AgentCapabilityRule, AgentCapabilitySelector } from "../../core/index.js";
 import { createDefaultBlueprint, registerBuiltinBlueprintImpls } from "../assembly/builtins.js";
 import type { AgentBlueprint, BlueprintUse } from "../assembly/blueprint.js";
 import { BlueprintManager } from "../assembly/manager.js";
-import type { MiniAgent } from "../../core/index.js";
 import type { AgentUse } from "../../core/index.js";
-import { PathConfigSchema, GenerationConfigSchema, AgentConfigSchema, JsonValueSchema, type AgentConfig, type GenerationConfig, type JsonValue, type NormalizedAgentConfig, type PathConfig } from "../../core/index.js";
+import { PathConfigSchema, GenerationConfigSchema, AgentConfigSchema, JsonValueSchema, type AgentConfig, type JsonValue, type NormalizedAgentConfig } from "../../core/index.js";
 import { SessionManager } from "../session-manager.js";
 import type { Message } from "../../core/index.js";
 import type { ConfiguredSubagentFactory, SubagentInvocation } from "../../extensions/index.js";
 import { TodoManager } from "../../extensions/index.js";
-import { CLIConfigSchema, CLIAGENT_DIR, findConfiguredModel, formatConfiguredModelPath, getConfiguredModels, loadConfig, parseDefaultModel, resolveModelRuntime, toAgentGenerationConfig, type CLIAgentMode, type CLIConfiguredModel, type CLIConfig } from "../config.js";
+import { CLIAgentModeSchema, CLIConfigSchema, CLIAGENT_DIR, findConfiguredModel, formatConfiguredModelPath, getConfiguredModels, loadConfig, parseDefaultModel, resolveModelRuntime, toAgentGenerationConfig, type CLIAgentMode, type CLIConfiguredModel, type CLIConfig } from "../config.js";
 import { createCLIToolkit } from "../tools/cli-toolkit.js";
 import { createDiagnosticsToolkit } from "../tools/diagnostics-toolkit.js";
 import { createGitToolkit } from "../tools/git-toolkit.js";
 import { createDiagnosticsService } from "./diagnostics-service.js";
 import { createGitService } from "./git-service.js";
-import { createModeAwarePermissionService, type PermissionService } from "./permission-service.js";
-import type { ShellService } from "./shell-service.js";
-import type { SnapshotService } from "./snapshot-service.js";
+import { createModeAwarePermissionService, PermissionServiceSchema } from "./permission-service.js";
+import { ShellServiceSchema } from "./shell-service.js";
+import { SnapshotServiceSchema } from "./snapshot-service.js";
 import { buildEffectiveSystemPrompt, getBaseSystemPrompt } from "./system-prompt.js";
 
 const DEFAULT_MESSAGE_FILE_NAME = "messages.jsonl";
@@ -73,53 +72,53 @@ interface CreateBuiltinBlueprintManagerOptions {
 
 const selectedModelPaths = new WeakMap<MiniAgent, string>();
 
-export const CLICompressorSchema = z.custom<{
-  getCompressedCount(): number;
-  getSummary(): string | null;
-  updateMessages(messages: Message[]): void;
-  maybeCompress(): Promise<void>;
-}>();
+export const CLICompressorSchema = createProtocolSchema({
+  getCompressedCount: createFunctionSchema<() => number>(),
+  getSummary: createFunctionSchema<() => string | null>(),
+  updateMessages: createFunctionSchema<(messages: Message[]) => void>(),
+  maybeCompress: createFunctionSchema<() => Promise<void>>(),
+});
 export type CLICompressor = z.infer<typeof CLICompressorSchema>;
 
 export const BuildSubagentAgentConfigOptionsSchema = z.object({
   generation: z.lazy(() => GenerationConfigSchema),
   paths: z.lazy(() => PathConfigSchema),
-}) as z.ZodType<{
-  generation: GenerationConfig;
-  paths: PathConfig;
-}>;
+});
 export type BuildSubagentAgentConfigOptions = z.infer<typeof BuildSubagentAgentConfigOptionsSchema>;
 
-export const CLIAgentFactoryOptionsSchema = z.custom<{
-  baseDir: string;
-  mode: CLIAgentMode | (() => CLIAgentMode);
-  getConfig?: () => CLIConfig;
-  getActiveSessionId?: () => string;
-  permissionService: PermissionService;
-  getAutoApprove: () => boolean;
-  requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
-  shellService: ShellService;
-  snapshotService?: SnapshotService;
-  onWorkspaceFilesChanged?: () => Promise<void>;
-}>();
+export const CLIAgentFactoryOptionsSchema = z.object({
+  baseDir: z.string(),
+  mode: z.union([
+    z.lazy(() => CLIAgentModeSchema),
+    createFunctionSchema<() => CLIAgentMode>(),
+  ]),
+  getConfig: createFunctionSchema<() => CLIConfig>().optional(),
+  getActiveSessionId: createFunctionSchema<() => string>().optional(),
+  permissionService: PermissionServiceSchema,
+  getAutoApprove: createFunctionSchema<() => boolean>(),
+  requestApproval: createFunctionSchema<(
+    toolName: string,
+    args: Record<string, unknown>,
+  ) => Promise<boolean>>(),
+  shellService: ShellServiceSchema,
+  snapshotService: SnapshotServiceSchema.optional(),
+  onWorkspaceFilesChanged: createFunctionSchema<() => Promise<void>>().optional(),
+});
 export type CLIAgentFactoryOptions = z.infer<typeof CLIAgentFactoryOptionsSchema>;
 
 export const BuiltRuntimeAgentSchema = z.object({
-  agent: z.custom<MiniAgent>(),
+  agent: z.instanceof(MiniAgent),
   config: z.lazy(() => CLIConfigSchema),
   compressor: CLICompressorSchema,
-  todoManager: z.custom<TodoManager>(),
-}) as z.ZodType<{
-  agent: MiniAgent;
-  config: CLIConfig;
-  compressor: CLICompressor;
-  todoManager: TodoManager;
-}>;
+  todoManager: z.instanceof(TodoManager),
+});
 export type BuiltRuntimeAgent = z.infer<typeof BuiltRuntimeAgentSchema>;
 
-export const CLIAgentFactorySchema = z.custom<{
-  build(sessionId: string): Promise<BuiltRuntimeAgent>;
-}>();
+export const CLIAgentFactorySchema = createProtocolSchema({
+  build: createFunctionSchema<(
+    sessionId: string,
+  ) => Promise<BuiltRuntimeAgent>>(),
+});
 export type CLIAgentFactory = z.infer<typeof CLIAgentFactorySchema>;
 
 interface BuiltCLIAgent {

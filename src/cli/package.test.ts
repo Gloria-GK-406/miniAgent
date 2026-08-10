@@ -64,7 +64,7 @@ describe("CLI package entry", () => {
     const scripts = pkg["scripts"] as Record<string, unknown>;
 
     expect(scripts["package:smoke"]).toBe(
-      "node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
+      "tsc -p scripts/tsconfig.package-consumer.json && node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
     );
   });
 

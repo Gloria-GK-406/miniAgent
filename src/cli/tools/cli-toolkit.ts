@@ -1,10 +1,10 @@
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
-import { ToolSchema, type Tool } from "../../core/index.js";
-import type { PermissionService } from "../runtime/permission-service.js";
-import type { ShellService } from "../runtime/shell-service.js";
-import type { SnapshotService } from "../runtime/snapshot-service.js";
+import { createFunctionSchema, ToolSchema, type Tool } from "../../core/index.js";
+import { PermissionServiceSchema } from "../runtime/permission-service.js";
+import { ShellServiceSchema } from "../runtime/shell-service.js";
+import { SnapshotServiceSchema } from "../runtime/snapshot-service.js";
 import { resolveWorkspacePath } from "./workspace.js";
 
 const PathParamsSchema = z.object({
@@ -68,22 +68,23 @@ const SEARCH_IGNORED_DIRS = new Set([
   ".turbo",
 ]);
 
-export const CLIToolkitOptionsSchema = z.custom<{
-  baseDir: string;
-  permissionService: PermissionService;
-  getAutoApprove: () => boolean;
-  requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
-  shellService: ShellService;
-  snapshotService?: SnapshotService;
-  onWorkspaceFilesChanged?: () => Promise<void>;
-}>();
+export const CLIToolkitOptionsSchema = z.object({
+  baseDir: z.string(),
+  permissionService: PermissionServiceSchema,
+  getAutoApprove: createFunctionSchema<() => boolean>(),
+  requestApproval: createFunctionSchema<(
+    toolName: string,
+    args: Record<string, unknown>,
+  ) => Promise<boolean>>(),
+  shellService: ShellServiceSchema,
+  snapshotService: SnapshotServiceSchema.optional(),
+  onWorkspaceFilesChanged: createFunctionSchema<() => Promise<void>>().optional(),
+});
 export type CLIToolkitOptions = z.infer<typeof CLIToolkitOptionsSchema>;
 
 export const CLIToolkitSchema = z.object({
   tools: z.array(z.lazy(() => ToolSchema)),
-}) as z.ZodType<{
-  tools: Tool[];
-}>;
+});
 export type CLIToolkit = z.infer<typeof CLIToolkitSchema>;
 
 async function assertPermission(

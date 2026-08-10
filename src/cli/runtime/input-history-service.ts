@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import { CLIAGENT_DIR } from "../config.js";
 
 const DEFAULT_INPUT_HISTORY_LIMIT = 100;
@@ -12,15 +13,13 @@ const InputHistoryFileSchema = z.object({
 
 export const InputHistoryServiceOptionsSchema = z.object({
   limit: z.number().optional(),
-}) as z.ZodType<{
-  limit?: number;
-}>;
+});
 export type InputHistoryServiceOptions = z.infer<typeof InputHistoryServiceOptionsSchema>;
 
-export const InputHistoryServiceSchema = z.custom<{
-  list(): Promise<string[]>;
-  append(input: string): Promise<string[]>;
-}>();
+export const InputHistoryServiceSchema = createProtocolSchema({
+  list: createFunctionSchema<() => Promise<string[]>>(),
+  append: createFunctionSchema<(input: string) => Promise<string[]>>(),
+});
 export type InputHistoryService = z.infer<typeof InputHistoryServiceSchema>;
 
 function historyPath(baseDir: string): string {

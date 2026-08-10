@@ -25,9 +25,7 @@ import type { CLIAgentMode, CLIPermissionConfig, CLIPermissionDecision } from ".
 
 export const AppPropsSchema = z.object({
   runtime: z.lazy(() => CLIAppRuntimeSchema),
-}) as z.ZodType<{
-  runtime: CLIAppRuntime;
-}>;
+});
 export type AppProps = z.infer<typeof AppPropsSchema>;
 
 const BOTTOM_RESERVED = 6;
@@ -79,15 +77,7 @@ export const MessageScrollKeySchema = z.object({
   ctrl: z.boolean().optional(),
   home: z.boolean().optional(),
   end: z.boolean().optional(),
-}) as z.ZodType<{
-  upArrow?: boolean;
-  downArrow?: boolean;
-  pageUp?: boolean;
-  pageDown?: boolean;
-  ctrl?: boolean;
-  home?: boolean;
-  end?: boolean;
-}>;
+});
 export type MessageScrollKey = z.infer<typeof MessageScrollKeySchema>;
 
 export function resolveMessageScrollAction(input: string, key: MessageScrollKey): MessageScrollAction {
@@ -110,11 +100,7 @@ export const MessageWindowSchema = z.object({
   visibleLines: z.array(z.lazy(() => RenderLineSchema)),
   maxScrollFromBottom: z.number(),
   scrollFromBottom: z.number(),
-}) as z.ZodType<{
-  visibleLines: RenderLine[];
-  maxScrollFromBottom: number;
-  scrollFromBottom: number;
-}>;
+});
 export type MessageWindow = z.infer<typeof MessageWindowSchema>;
 
 export function padMessageWindow(

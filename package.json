@@ -1,6 +1,6 @@
 {
   "name": "@piaoxianguo/miniagent",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
   "description": "A minimal, extensible TypeScript Agent framework",
   "keywords": [
@@ -115,9 +115,11 @@
     "lint:schema": "node scripts/check-schema-exports.mjs src",
     "lint:fix": "eslint src --fix",
     "test": "vitest run --exclude 'test/smoketest/**'",
+    "test:schema": "vitest run src/core/function-schema.test.ts src/core/protocol-schema.test.ts src/cli/schema-first-runtime.test.ts src/core/agent.test.ts",
     "test:watch": "vitest --exclude 'test/smoketest/**'",
     "smoketest": "vitest run --config vitest.config.ts test/smoketest/",
-    "package:smoke": "node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
+    "package:smoke": "tsc -p scripts/tsconfig.package-consumer.json && node scripts/package-smoke.mjs && node dist/cli/index.js --version && node dist/cli/index.js --help",
+    "prerelease:build": "npm run lint:schema && npm run test:schema",
     "release:toolchain": "node scripts/build-release-packages.mjs --check-toolchain",
     "release:build": "node scripts/build-release-packages.mjs",
     "release:test": "node --test scripts/release-packages.test.mjs",

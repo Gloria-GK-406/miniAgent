@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
+import { createFunctionSchema } from "../core/index.js";
 import type { CLIEntryAction } from "./entry-args.js";
 import { readStdin } from "./stdin.js";
 
-export const LoadEntryPromptOptionsSchema = z.custom<{
-  readStdin?: () => Promise<string>;
-}>();
+export const LoadEntryPromptOptionsSchema = z.object({
+  readStdin: createFunctionSchema<() => Promise<string>>().optional(),
+});
 export type LoadEntryPromptOptions = z.infer<typeof LoadEntryPromptOptionsSchema>;
 
 export async function loadEntryPrompt(

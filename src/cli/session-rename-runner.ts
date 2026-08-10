@@ -11,23 +11,14 @@ export const SessionRenameRequestSchema = z.object({
   sessionId: z.string(),
   name: z.string(),
   output: SessionRenameOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  sessionId: string;
-  name: string;
-  output?: SessionRenameOutput;
-}>;
+});
 export type SessionRenameRequest = z.infer<typeof SessionRenameRequestSchema>;
 
 export const SessionRenameResultSchema = z.object({
   ok: z.boolean(),
   sessionId: z.string(),
   sessionName: z.string(),
-}) as z.ZodType<{
-  ok: boolean;
-  sessionId: string;
-  sessionName: string;
-}>;
+});
 export type SessionRenameResult = z.infer<typeof SessionRenameResultSchema>;
 
 export function formatSessionRenameResultJson(result: SessionRenameResult): string {

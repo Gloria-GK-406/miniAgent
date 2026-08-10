@@ -5,15 +5,14 @@ import { editTool } from "../../extensions/index.js";
 import { globTool } from "../../extensions/index.js";
 import { grepTool } from "../../extensions/index.js";
 import { McpPlugin } from "../../extensions/index.js";
-import { McpPluginConfigSchema, type McpPluginConfigInput } from "../../extensions/index.js";
+import { McpPluginConfigSchema } from "../../extensions/index.js";
 import { readTool } from "../../extensions/index.js";
 import { SkillPlugin } from "../../extensions/index.js";
-import { SkillPluginConfigSchema, type SkillPluginConfigInput } from "../../extensions/index.js";
+import { SkillPluginConfigSchema } from "../../extensions/index.js";
 import {
     SubagentPlugin,
     SubagentPluginConfigSchema,
-    type ConfiguredSubagentFactory,
-    type SubagentPluginConfigInput,
+    ConfiguredSubagentFactorySchema,
 } from "../../extensions/index.js";
 import { TodoManager } from "../../extensions/index.js";
 import { writeTool } from "../../extensions/index.js";
@@ -28,7 +27,7 @@ import {
 } from "../../engine/index.js";
 import { FileMessageSource } from "../../extensions/index.js";
 import { FileStore } from "../../extensions/index.js";
-import { MessageType, type ContextProvider } from "../../core/index.js";
+import { createFunctionSchema, MessageType, type ContextProvider } from "../../core/index.js";
 import type { JsonValue } from "../../core/index.js";
 import type { BlueprintManager } from "./manager.js";
 import type { AgentBlueprint, BlueprintUse } from "./blueprint.js";
@@ -64,11 +63,13 @@ type StaticAutoApproveConfig = z.output<typeof StaticAutoApproveConfigSchema>;
 type SystemPromptConfig = z.output<typeof SystemPromptConfigSchema>;
 type AgentContextConfig = z.output<typeof AgentContextConfigSchema>;
 
-export const RegisterBuiltinBlueprintImplsOptionsSchema = z.custom<{
-  subagentFactory: ConfiguredSubagentFactory;
-  getHITL?: () => boolean;
-  onCompressor?: (compressor: ContextCompressor) => void;
-}>();
+export const RegisterBuiltinBlueprintImplsOptionsSchema = z.object({
+  subagentFactory: ConfiguredSubagentFactorySchema,
+  getHITL: createFunctionSchema<() => boolean>().optional(),
+  onCompressor: createFunctionSchema<(
+    compressor: ContextCompressor,
+  ) => void>().optional(),
+});
 export type RegisterBuiltinBlueprintImplsOptions = z.infer<typeof RegisterBuiltinBlueprintImplsOptionsSchema>;
 
 export const DefaultBlueprintOptionsSchema = z.object({
@@ -79,15 +80,7 @@ export const DefaultBlueprintOptionsSchema = z.object({
   subagent: SubagentPluginConfigSchema.optional(),
   systemPrompt: SystemPromptConfigSchema.optional(),
   agentContext: AgentContextConfigSchema.optional(),
-}) as z.ZodType<{
-  engines: string[];
-  persistence: z.input<typeof FilePersistenceConfigSchema>;
-  mcp?: McpPluginConfigInput;
-  skill?: SkillPluginConfigInput;
-  subagent?: SubagentPluginConfigInput;
-  systemPrompt?: z.input<typeof SystemPromptConfigSchema>;
-  agentContext?: z.input<typeof AgentContextConfigSchema>;
-}>;
+});
 export type DefaultBlueprintOptions = z.infer<typeof DefaultBlueprintOptionsSchema>;
 
 function blueprintUse(use: string, config?: JsonValue): BlueprintUse {

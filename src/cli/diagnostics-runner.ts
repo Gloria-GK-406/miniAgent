@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createFunctionSchema, createProtocolSchema } from "../core/index.js";
 import { ConfigTemplateCreatedError, loadConfig } from "./config.js";
 import { writeCLIEntryConfigTemplateCreated } from "./entry-fatal.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
@@ -12,13 +13,12 @@ export type DiagnosticsOutput = z.infer<typeof DiagnosticsOutputSchema>;
 export const HeadlessDiagnosticsRequestSchema = z.object({
   baseDir: z.string(),
   output: DiagnosticsOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  output?: DiagnosticsOutput;
-}>;
+});
 export type HeadlessDiagnosticsRequest = z.infer<typeof HeadlessDiagnosticsRequestSchema>;
 
-export const HeadlessDiagnosticsDepsSchema = z.custom<Pick<DiagnosticsService, "runDiagnostics">>();
+export const HeadlessDiagnosticsDepsSchema = createProtocolSchema({
+  runDiagnostics: createFunctionSchema<DiagnosticsService["runDiagnostics"]>(),
+});
 export type HeadlessDiagnosticsDeps = z.infer<typeof HeadlessDiagnosticsDepsSchema>;
 
 function diagnosticPassed(result: DiagnosticResult): boolean {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LoadConfigOptionsSchema, loadConfig, parseModelSelector, type CLIConfig, type LoadConfigOptions } from "./config.js";
+import { LoadConfigOptionsSchema, loadConfig, parseModelSelector, type CLIConfig } from "./config.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
@@ -9,10 +9,7 @@ export type ModelListOutput = z.infer<typeof ModelListOutputSchema>;
 export const ModelListRequestSchema = z.intersection(z.lazy(() => LoadConfigOptionsSchema), z.object({
   baseDir: z.string(),
   output: ModelListOutputSchema.optional(),
-})) as z.ZodType<LoadConfigOptions & {
-  baseDir: string;
-  output?: ModelListOutput;
-}>;
+}));
 export type ModelListRequest = z.infer<typeof ModelListRequestSchema>;
 
 export const ConfiguredModelInfoSchema = z.object({
@@ -22,14 +19,7 @@ export const ConfiguredModelInfoSchema = z.object({
   name: z.string(),
   displayName: z.string().optional(),
   default: z.boolean(),
-}) as z.ZodType<{
-  selector: string;
-  provider: string;
-  id: string;
-  name: string;
-  displayName?: string;
-  default: boolean;
-}>;
+});
 export type ConfiguredModelInfo = z.infer<typeof ConfiguredModelInfoSchema>;
 
 function isDefaultModel(

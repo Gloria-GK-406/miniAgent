@@ -1,31 +1,26 @@
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { CLIDiagnosticsConfigSchema, type CLIDiagnosticsConfig } from "../config.js";
-import { ShellServiceSchema, ShellExecuteResultSchema, type ShellExecuteResult, type ShellService } from "./shell-service.js";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
+import { CLIDiagnosticsConfigSchema } from "../config.js";
+import { ShellServiceSchema, ShellExecuteResultSchema } from "./shell-service.js";
 
 export const DiagnosticResultSchema = z.intersection(z.lazy(() => ShellExecuteResultSchema), z.object({
   command: z.string(),
-})) as z.ZodType<ShellExecuteResult & {
-  command: string;
-}>;
+}));
 export type DiagnosticResult = z.infer<typeof DiagnosticResultSchema>;
 
-export const DiagnosticsServiceSchema = z.custom<{
-  discoverCommands(): Promise<string[]>;
-  runDiagnostics(): Promise<DiagnosticResult[]>;
-}>();
+export const DiagnosticsServiceSchema = createProtocolSchema({
+  discoverCommands: createFunctionSchema<() => Promise<string[]>>(),
+  runDiagnostics: createFunctionSchema<() => Promise<DiagnosticResult[]>>(),
+});
 export type DiagnosticsService = z.infer<typeof DiagnosticsServiceSchema>;
 
 export const CreateDiagnosticsServiceOptionsSchema = z.object({
   baseDir: z.string(),
   config: CLIDiagnosticsConfigSchema.removeDefault().partial(),
   shellService: z.lazy(() => ShellServiceSchema),
-}) as z.ZodType<{
-  baseDir: string;
-  config: Partial<CLIDiagnosticsConfig>;
-  shellService: ShellService;
-}>;
+});
 export type CreateDiagnosticsServiceOptions = z.infer<typeof CreateDiagnosticsServiceOptionsSchema>;
 
 function hasScript(scripts: Record<string, unknown>, name: string): boolean {

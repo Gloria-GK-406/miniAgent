@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { AgentUseSchema, createMiniAgent, type AgentUse } from "../../core/index.js";
+import { AgentUseSchema, createFunctionSchema, createMiniAgent, createProtocolSchema, type AgentUse } from "../../core/index.js";
 import type { MiniAgent, MiniAgentOptions } from "../../core/index.js";
-import { AgentConfigSchema, type AgentConfig } from "../../core/index.js";
+import { AgentConfigSchema } from "../../core/index.js";
 import { LLMEngineManager } from "../../core/index.js";
 import type { LLMEngine } from "../../core/index.js";
 import { AgentBlueprintSchema, type AgentBlueprint, type BlueprintUse } from "./blueprint.js";
@@ -22,37 +22,39 @@ export type PresetBlueprintDomain = z.infer<typeof PresetBlueprintDomainSchema>;
 type AgentUseBlueprintDomain = Exclude<PresetBlueprintDomain, "engine" | "persistence">;
 
 export function BlueprintImplSchema<C, R>() {
-  return z.custom<{
-  configSchema: z.ZodType<C>;
-  create: (config: C) => R | Promise<R>;
-}>();
+  return createProtocolSchema({
+    configSchema: z.custom<z.ZodType<C>>(
+      (value) => value instanceof z.ZodType,
+    ),
+    create: createFunctionSchema<(config: C) => R | Promise<R>>(),
+  });
 }
 export type BlueprintImpl<C, R> = z.infer<ReturnType<typeof BlueprintImplSchema<C, R>>>;
 
 export const AgentUseFactoryResultSchema = z.union([AgentUseSchema, z.array(AgentUseSchema)]);
 export type AgentUseFactoryResult = z.infer<typeof AgentUseFactoryResultSchema>;
 export function AgentUseBlueprintFactorySchema<C>() {
-  return z.custom<BlueprintImpl<C, AgentUseFactoryResult>>();
+  return BlueprintImplSchema<C, AgentUseFactoryResult>();
 }
 export type AgentUseBlueprintFactory<C> = z.infer<ReturnType<typeof AgentUseBlueprintFactorySchema<C>>>;
 export function EngineBlueprintFactorySchema<C>() {
-  return z.custom<BlueprintImpl<C, LLMEngine>>();
+  return BlueprintImplSchema<C, LLMEngine>();
 }
 export type EngineBlueprintFactory<C> = z.infer<ReturnType<typeof EngineBlueprintFactorySchema<C>>>;
 export function PersistenceBlueprintFactorySchema<C>() {
-  return z.custom<BlueprintImpl<C, MiniAgentOptions>>();
+  return BlueprintImplSchema<C, MiniAgentOptions>();
 }
 export type PersistenceBlueprintFactory<C> = z.infer<ReturnType<typeof PersistenceBlueprintFactorySchema<C>>>;
 export function AgentUseBlueprintImplSchema<C>() {
-  return z.custom<AgentUseBlueprintFactory<C>>();
+  return AgentUseBlueprintFactorySchema<C>();
 }
 export type AgentUseBlueprintImpl<C> = z.infer<ReturnType<typeof AgentUseBlueprintImplSchema<C>>>;
 export function EngineBlueprintImplSchema<C>() {
-  return z.custom<EngineBlueprintFactory<C>>();
+  return EngineBlueprintFactorySchema<C>();
 }
 export type EngineBlueprintImpl<C> = z.infer<ReturnType<typeof EngineBlueprintImplSchema<C>>>;
 export function PersistenceBlueprintImplSchema<C>() {
-  return z.custom<PersistenceBlueprintFactory<C>>();
+  return PersistenceBlueprintFactorySchema<C>();
 }
 export type PersistenceBlueprintImpl<C> = z.infer<ReturnType<typeof PersistenceBlueprintImplSchema<C>>>;
 
@@ -81,12 +83,8 @@ export const AssembleBlueprintOptionsSchema = z.object({
   blueprint: z.lazy(() => AgentBlueprintSchema),
   config: z.lazy(() => AgentConfigSchema),
   extraUses: z.array(z.lazy(() => AgentUseSchema)).optional(),
-}) as z.ZodType<{
-  blueprint: AgentBlueprint;
-  config: AgentConfig;
-  extraUses?: AgentUse[];
-}>;
-export type AssembleBlueprintOptions = z.infer<typeof AssembleBlueprintOptionsSchema>;
+});
+export type AssembleBlueprintOptions = z.input<typeof AssembleBlueprintOptionsSchema>;
 
 function storeImpl<C, R>(impl: BlueprintImpl<C, R>): StoredBlueprintImpl<R> {
     return {

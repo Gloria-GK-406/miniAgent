@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { SessionMetaSchema, type SessionMeta } from "../session-manager.js";
-import { CLIConfigSchema, type CLIConfig } from "../config.js";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
+import { SessionMetaSchema } from "../session-manager.js";
+import { CLIConfigSchema } from "../config.js";
 import type { DiagnosticsService } from "./diagnostics-service.js";
 import type { GitService } from "./git-service.js";
 
@@ -12,12 +13,7 @@ export const CLIDoctorCheckSchema = z.object({
   label: z.string(),
   status: CLIDoctorStatusSchema,
   detail: z.string(),
-}) as z.ZodType<{
-  id: string;
-  label: string;
-  status: CLIDoctorStatus;
-  detail: string;
-}>;
+});
 export type CLIDoctorCheck = z.infer<typeof CLIDoctorCheckSchema>;
 
 export const CLIDoctorSnapshotSchema = z.object({
@@ -29,30 +25,25 @@ export const CLIDoctorSnapshotSchema = z.object({
   referencePaths: z.array(z.string()),
   inputHistory: z.array(z.string()),
   autoApprove: z.boolean(),
-}) as z.ZodType<{
-  config: CLIConfig;
-  modelName: string;
-  modelPaths: string[];
-  sessionId: string;
-  sessions: SessionMeta[];
-  referencePaths: string[];
-  inputHistory: string[];
-  autoApprove: boolean;
-}>;
+});
 export type CLIDoctorSnapshot = z.infer<typeof CLIDoctorSnapshotSchema>;
 
-export const DoctorServiceSchema = z.custom<{
-  run(snapshot: CLIDoctorSnapshot): Promise<CLIDoctorCheck[]>;
-}>();
+export const DoctorServiceSchema = createProtocolSchema({
+  run: createFunctionSchema<(
+    snapshot: CLIDoctorSnapshot,
+  ) => Promise<CLIDoctorCheck[]>>(),
+});
 export type DoctorService = z.infer<typeof DoctorServiceSchema>;
 
 export const CreateDoctorServiceOptionsSchema = z.object({
-  gitService: z.custom<Pick<GitService, "isRepository" | "branchName">>(),
-  diagnosticsService: z.custom<Pick<DiagnosticsService, "discoverCommands">>(),
-}) as z.ZodType<{
-  gitService: Pick<GitService, "isRepository" | "branchName">;
-  diagnosticsService: Pick<DiagnosticsService, "discoverCommands">;
-}>;
+  gitService: createProtocolSchema({
+    isRepository: createFunctionSchema<GitService["isRepository"]>(),
+    branchName: createFunctionSchema<GitService["branchName"]>(),
+  }),
+  diagnosticsService: createProtocolSchema({
+    discoverCommands: createFunctionSchema<DiagnosticsService["discoverCommands"]>(),
+  }),
+});
 export type CreateDoctorServiceOptions = z.infer<typeof CreateDoctorServiceOptionsSchema>;
 
 function plural(count: number, noun: string): string {

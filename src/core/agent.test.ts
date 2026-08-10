@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -375,6 +375,143 @@ describe("MiniAgent", () => {
       MessageType.ToolResult,
       MessageType.Assist,
     ]);
+  });
+
+  it("rejects invalid tool arguments before approval and execution", async () => {
+    const requestApproval = vi.fn(async () => true);
+    const execute = vi.fn(async () => "unexpected");
+    const agent = new MiniAgent({
+      llm: createLLM({
+        responses: [
+          [{
+            type: LLMStreamChunkType.ToolCallArgumentsDelta,
+            index: 0,
+            argsText: "{\"count\":\"not-a-number\"}",
+            toolCallId: "call-invalid",
+            toolName: "validated_tool",
+          }],
+          [chunkText("done")],
+        ],
+      }),
+      config: createConfig(testDir),
+    });
+    agent.register({
+      name: "validated_tool",
+      description: "Requires a number",
+      parameters: z.object({ count: z.number() }),
+      execute,
+    });
+    agent.register({ requestApproval });
+
+    setTestModel(agent);
+    const messages = await agent.run(userMessage());
+
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(messages).toContainEqual(expect.objectContaining({
+      type: MessageType.ToolResult,
+      toolCallId: "call-invalid",
+    }));
+  });
+
+  it("shares one parsed tool argument value with approval and execution", async () => {
+    const approvedArgs: Record<string, unknown>[] = [];
+    const executedArgs: Record<string, unknown>[] = [];
+    const agent = new MiniAgent({
+      llm: createLLM({
+        responses: [
+          [{
+            type: LLMStreamChunkType.ToolCallArgumentsDelta,
+            index: 0,
+            argsText: "{\"text\":\"  hello  \"}",
+            toolCallId: "call-transformed",
+            toolName: "transform_tool",
+          }],
+          [chunkText("done")],
+        ],
+      }),
+      config: createConfig(testDir),
+    });
+    agent.register({
+      name: "transform_tool",
+      description: "Transforms arguments",
+      parameters: z.object({
+        text: z.string().trim(),
+        count: z.number().default(2),
+      }),
+      execute: async (args) => {
+        executedArgs.push(args);
+        return "ok";
+      },
+    });
+    agent.register({
+      requestApproval: async (_toolName, args) => {
+        approvedArgs.push(args);
+        return true;
+      },
+    });
+
+    setTestModel(agent);
+    await agent.run(userMessage());
+
+    expect(approvedArgs).toEqual([{ text: "hello", count: 2 }]);
+    expect(executedArgs).toEqual(approvedArgs);
+    expect(executedArgs[0]).toBe(approvedArgs[0]);
+  });
+
+  it("does not request approval for a missing tool", async () => {
+    const requestApproval = vi.fn(async () => true);
+    const agent = new MiniAgent({
+      llm: createLLM({
+        responses: [
+          [{
+            type: LLMStreamChunkType.ToolCallArgumentsDelta,
+            index: 0,
+            argsText: "{}",
+            toolCallId: "call-missing",
+            toolName: "missing_tool",
+          }],
+          [chunkText("done")],
+        ],
+      }),
+      config: createConfig(testDir),
+    });
+    agent.register({ requestApproval });
+
+    setTestModel(agent);
+    const messages = await agent.run(userMessage());
+
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(messages).toContainEqual(expect.objectContaining({
+      type: MessageType.ToolResult,
+      content: "tool not found: missing_tool",
+    }));
+  });
+
+  it("does not execute registered tools outside the current turn tool map", async () => {
+    const execute = vi.fn(async () => "unexpected");
+    const agent = new MiniAgent({
+      llm: createLLM(),
+      config: createConfig(testDir),
+    });
+    agent.register({
+      name: "pre_turn_tool",
+      description: "Must be selected for the current turn before execution",
+      parameters: z.object({ text: z.string() }),
+      execute,
+    });
+
+    const result = await agent.execute({
+      id: "pre-turn-message",
+      type: MessageType.ToolCall,
+      content: "",
+      toolCallId: "pre-turn-call",
+      toolName: "pre_turn_tool",
+      arguments: { text: "blocked" },
+    });
+
+    expect(result.content).toBe("tool not found: pre_turn_tool");
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("passes a managed control surface to after-turn processors", async () => {

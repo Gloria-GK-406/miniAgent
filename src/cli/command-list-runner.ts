@@ -19,10 +19,7 @@ export type CommandListSource = z.infer<typeof CommandListSourceSchema>;
 export const CommandListRequestSchema = z.object({
   baseDir: z.string(),
   output: CommandListOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  output?: CommandListOutput;
-}>;
+});
 export type CommandListRequest = z.infer<typeof CommandListRequestSchema>;
 
 export const CommandListItemSchema = z.object({
@@ -31,13 +28,7 @@ export const CommandListItemSchema = z.object({
   description: z.string(),
   usage: z.string(),
   source: CommandListSourceSchema,
-}) as z.ZodType<{
-  name: string;
-  aliases: string[];
-  description: string;
-  usage: string;
-  source: CommandListSource;
-}>;
+});
 export type CommandListItem = z.infer<typeof CommandListItemSchema>;
 
 function toCommandListItem(command: CLICommand, source: CommandListSource): CommandListItem {

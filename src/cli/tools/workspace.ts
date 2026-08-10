@@ -4,10 +4,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 export const WorkspacePathSchema = z.object({
   absolutePath: z.string(),
   displayPath: z.string(),
-}) as z.ZodType<{
-  absolutePath: string;
-  displayPath: string;
-}>;
+});
 export type WorkspacePath = z.infer<typeof WorkspacePathSchema>;
 
 export function resolveWorkspacePath(

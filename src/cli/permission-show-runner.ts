@@ -9,10 +9,7 @@ export type PermissionShowOutput = z.infer<typeof PermissionShowOutputSchema>;
 export const PermissionShowRequestSchema = z.object({
   baseDir: z.string(),
   output: PermissionShowOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  output?: PermissionShowOutput;
-}>;
+});
 export type PermissionShowRequest = z.infer<typeof PermissionShowRequestSchema>;
 
 export function formatPermissionPolicy(permission: CLIPermissionConfig): string {

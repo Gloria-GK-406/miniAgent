@@ -3,26 +3,22 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import {
   CLIEditorConfigSchema,
   NodePlatformSchema,
-  type CLIEditorConfig,
 } from "../config.js";
 
 export const EditorInvocationSchema = z.object({
   command: z.string(),
   args: z.array(z.string()),
   filePath: z.string(),
-}) as z.ZodType<{
-  command: string;
-  args: string[];
-  filePath: string;
-}>;
+});
 export type EditorInvocation = z.infer<typeof EditorInvocationSchema>;
 
-export const EditorServiceSchema = z.custom<{
-  openEditor(initialContent: string): Promise<string>;
-}>();
+export const EditorServiceSchema = createProtocolSchema({
+  openEditor: createFunctionSchema<(initialContent: string) => Promise<string>>(),
+});
 export type EditorService = z.infer<typeof EditorServiceSchema>;
 
 export const ResolveEditorInvocationOptionsSchema = z.object({
@@ -30,21 +26,18 @@ export const ResolveEditorInvocationOptionsSchema = z.object({
   env: z.record(z.string(), z.union([z.string(), z.undefined()])),
   platform: NodePlatformSchema,
   filePath: z.string(),
-}) as z.ZodType<{
-  config: CLIEditorConfig;
-  env: Record<string, string | undefined>;
-  platform: NodeJS.Platform;
-  filePath: string;
-}>;
+});
 export type ResolveEditorInvocationOptions = z.infer<typeof ResolveEditorInvocationOptionsSchema>;
 
-export const CreateEditorServiceOptionsSchema = z.custom<{
-  config: CLIEditorConfig;
-  env?: Record<string, string | undefined>;
-  platform?: NodeJS.Platform;
-  tempRoot?: string;
-  runner?: (invocation: EditorInvocation) => Promise<void>;
-}>();
+export const CreateEditorServiceOptionsSchema = z.object({
+  config: CLIEditorConfigSchema,
+  env: z.record(z.string(), z.union([z.string(), z.undefined()])).optional(),
+  platform: NodePlatformSchema.optional(),
+  tempRoot: z.string().optional(),
+  runner: createFunctionSchema<(
+    invocation: EditorInvocation,
+  ) => Promise<void>>().optional(),
+});
 export type CreateEditorServiceOptions = z.infer<typeof CreateEditorServiceOptionsSchema>;
 
 function splitCommandLine(value: string): string[] {

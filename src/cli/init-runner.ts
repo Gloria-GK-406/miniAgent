@@ -12,22 +12,14 @@ export const InitConfigRequestSchema = z.object({
   baseDir: z.string(),
   force: z.boolean().optional(),
   output: InitConfigOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  force?: boolean;
-  output?: InitConfigOutput;
-}>;
+});
 export type InitConfigRequest = z.infer<typeof InitConfigRequestSchema>;
 
 export const InitConfigResultSchema = z.object({
   ok: z.boolean(),
   configPath: z.string(),
   overwritten: z.boolean(),
-}) as z.ZodType<{
-  ok: boolean;
-  configPath: string;
-  overwritten: boolean;
-}>;
+});
 export type InitConfigResult = z.infer<typeof InitConfigResultSchema>;
 
 export function formatInitConfigResultJson(result: InitConfigResult): string {

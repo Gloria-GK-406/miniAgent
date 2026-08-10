@@ -319,16 +319,44 @@ async function verifyConsumer(policy, npmEnv) {
       entry === "." ? packageContract.name : `${packageContract.name}${entry.slice(1)}`
     )));
     const runtimePath = path.join(consumerRoot, "runtime.mjs");
-    await writeFile(runtimePath, `${entries.map((entry, index) => `import * as entry${index} from ${JSON.stringify(entry)};`).join("\n")}
+    await writeFile(runtimePath, `import assert from "node:assert/strict";
+import { z } from "zod";
+import { MemoryStore, StoreSchema, ToolSchema } from "@piaoxianguo/miniagent-core";
+${entries.map((entry, index) => `import * as entry${index} from ${JSON.stringify(entry)};`).join("\n")}
 const entries = [${entries.map((_, index) => `entry${index}`).join(", ")}];
 if (entries.some((entry) => typeof entry !== "object")) process.exit(1);
+const store = new MemoryStore();
+assert.equal(StoreSchema.parse(store), store);
+assert.equal(StoreSchema.safeParse({}).success, false);
+const parameters = z.object({ value: z.string() });
+const tool = {
+  name: "release-consumer",
+  description: "Published Schema contract probe",
+  parameters,
+  execute: async ({ value }) => String(value),
+};
+assert.equal(ToolSchema.parse(tool), tool);
+assert.equal(z.toJSONSchema(tool.parameters).type, "object");
 console.log(${JSON.stringify(entries)}.join("\\n"));
 `);
     const runtimeResults = execFileSync(process.execPath, [runtimePath], { cwd: consumerRoot, encoding: "utf8" }).trim().split("\n");
     assertEqual(runtimeResults, entries, "runtime entry results");
 
     const typesPath = path.join(consumerRoot, "types.ts");
-    await writeFile(typesPath, `${entries.map((entry, index) => `import type * as Entry${index} from ${JSON.stringify(entry)};\ntype Probe${index} = keyof typeof Entry${index};`).join("\n")}
+    await writeFile(typesPath, `import { z } from "zod";
+import { MemoryStore, StoreSchema, ToolSchema, type Store } from "@piaoxianguo/miniagent-core";
+${entries.map((entry, index) => `import type * as Entry${index} from ${JSON.stringify(entry)};\ntype Probe${index} = keyof typeof Entry${index};`).join("\n")}
+const store: Store = StoreSchema.parse(new MemoryStore());
+const parameters = z.object({ value: z.string() });
+const tool = ToolSchema.parse({
+  name: "release-type-consumer",
+  description: "Published Schema type probe",
+  parameters,
+  execute: async (args: Record<string, unknown>): Promise<string> => String(args["value"]),
+});
+const jsonSchema = z.toJSONSchema(tool.parameters);
+void store;
+void jsonSchema;
 export type Probes = [${entries.map((_, index) => `Probe${index}`).join(", ")}];
 `);
     await writeFile(path.join(consumerRoot, "tsconfig.json"), `${JSON.stringify({ compilerOptions: {
@@ -378,7 +406,7 @@ async function main() {
     console.log(JSON.stringify({
       candidateId: policy.manifest.candidateId,
       packages: policy.reports,
-      dependencyGraph: "engine/extensions -> core@0.9.1; no horizontal dependency",
+      dependencyGraph: "engine/extensions -> core@0.10.0; no horizontal dependency",
       zodVersion: consumer.zodVersion,
       runtimeEntries: consumer.runtimeResults,
       typeEntries: consumer.typeResults,

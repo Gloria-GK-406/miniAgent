@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createFunctionSchema } from "./function-schema.js";
+import { createProtocolSchema } from "./protocol-schema.js";
 import type {
   LLMResponse,
   LLMRequest,
@@ -15,7 +16,7 @@ import {
 } from "./types.js";
 import { type LLMGenerateRequest } from "./config.js";
 
-export const LLMEngineSchema = z.object({
+export const LLMEngineSchema = createProtocolSchema({
   name: z.string(),
   streamGenerate: createFunctionSchema<(
     request: LLMGenerateRequest,
@@ -77,7 +78,7 @@ class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
 }
 
 export function createLLMStreamControllerSchema<T>() {
-  return z.object({
+  return createProtocolSchema({
     handle: createLLMStreamHandleSchema<T>(),
     emitChunk: createFunctionSchema<(chunk: LLMStreamChunk) => void>(),
     resolve: createFunctionSchema<(value: T) => void>(),

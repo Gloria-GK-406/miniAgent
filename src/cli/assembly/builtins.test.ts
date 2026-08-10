@@ -54,14 +54,17 @@ interface CompressorProbe {
     getSummary(): string | null;
 }
 
-function createToolCall(toolName: string): ToolCallMessage {
+function createToolCall(
+    toolName: string,
+    args: Record<string, unknown> = {},
+): ToolCallMessage {
     return {
         id: crypto.randomUUID(),
         type: MessageType.ToolCall,
         content: "",
         toolCallId: crypto.randomUUID(),
         toolName,
-        arguments: {},
+        arguments: args,
     };
 }
 
@@ -160,9 +163,17 @@ describe("registerBuiltinBlueprintImpls", () => {
             subagentFactory: createSubagentFactory(),
             getHITL: () => false,
         });
+        for (const manager of [hitlManager, noHitlManager]) {
+            manager.registerEngineImpl("approval-test", {
+                configSchema: z.strictObject({}),
+                create: () => createTestEngine(() => {}),
+            });
+        }
 
         const hitlAgent = await hitlManager.assemble({
             blueprint: {
+                engines: [{ use: "approval-test" }],
+                tools: [{ use: "read" }, { use: "write" }],
                 approval: {
                     use: "static-auto-approve",
                     config: { autoApproveTools: ["read"] },
@@ -172,6 +183,8 @@ describe("registerBuiltinBlueprintImpls", () => {
         });
         const noHitlAgent = await noHitlManager.assemble({
             blueprint: {
+                engines: [{ use: "approval-test" }],
+                tools: [{ use: "write" }],
                 approval: {
                     use: "static-auto-approve",
                     config: { autoApproveTools: ["read"] },
@@ -180,12 +193,31 @@ describe("registerBuiltinBlueprintImpls", () => {
             config: createConfig(testDir),
         });
 
-        await expect(hitlAgent.execute(createToolCall("read")))
-            .resolves.toEqual(expect.objectContaining({ content: "tool not found: read" }));
-        await expect(hitlAgent.execute(createToolCall("write")))
+        for (const agent of [hitlAgent, noHitlAgent]) {
+            agent.setModel({
+                provider: "test",
+                key: "test-key",
+                model: { name: "test-model", thinkingLevels: [ThinkingLevel.None] },
+            });
+            await agent.run({
+                id: crypto.randomUUID(),
+                type: MessageType.User,
+                content: "prime the current turn tool map",
+            });
+        }
+
+        await expect(hitlAgent.execute(createToolCall("read", { path: testDir })))
+            .resolves.toEqual(expect.not.objectContaining({ content: "Tool execution denied by user." }));
+        await expect(hitlAgent.execute(createToolCall("write", {
+            path: join(testDir, "hitl-denied.txt"),
+            content: "denied",
+        })))
             .resolves.toEqual(expect.objectContaining({ content: "Tool execution denied by user." }));
-        await expect(noHitlAgent.execute(createToolCall("write")))
-            .resolves.toEqual(expect.objectContaining({ content: "tool not found: write" }));
+        await expect(noHitlAgent.execute(createToolCall("write", {
+            path: join(testDir, "no-hitl.txt"),
+            content: "allowed",
+        })))
+            .resolves.toEqual(expect.objectContaining({ content: expect.stringContaining("Successfully wrote") }));
     });
 
     it("sanitizes omitted optional fields in default blueprint configs", () => {

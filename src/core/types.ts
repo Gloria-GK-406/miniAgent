@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createFunctionSchema } from "./function-schema.js";
+import { createProtocolSchema } from "./protocol-schema.js";
 import type { LLMGenerateRequest } from "./config.js";
 import {
   AssistMessageSchema,
@@ -106,7 +107,7 @@ export type LLMStreamChunk = z.infer<typeof LLMStreamChunkSchema>;
 export type MessageChunk = z.infer<typeof LLMStreamChunkSchema>;
 
 export function createLLMStreamHandleSchema<T>() {
-  return z.object({
+  return createProtocolSchema({
     onChunk: createFunctionSchema<(
       listener: (chunk: LLMStreamChunk) => void,
     ) => () => void>(),
@@ -119,7 +120,7 @@ export type LLMStreamHandle<T> = z.infer<ReturnType<typeof createLLMStreamHandle
 
 export const LLMStreamHandleSchema = createLLMStreamHandleSchema<LLMResponse>();
 
-export const LLMRequestSchema = z.object({
+export const LLMRequestSchema = createProtocolSchema({
   streamInvoke: createFunctionSchema<(
     request: LLMGenerateRequest,
   ) => AsyncGenerator<MessageChunk>>(),
@@ -127,7 +128,7 @@ export const LLMRequestSchema = z.object({
 
 export type LLMRequest = z.infer<typeof LLMRequestSchema>;
 
-export const ContextProviderSchema = z.object({
+export const ContextProviderSchema = createProtocolSchema({
   priority: z.int(),
   collect: createFunctionSchema<() => Promise<Message[]>>(),
 });
@@ -141,7 +142,7 @@ export const TurnContextSchema = z.object({
 
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 
-export const TurnContextConsumerSchema = z.object({
+export const TurnContextConsumerSchema = createProtocolSchema({
   consumeTurnContext: createFunctionSchema<(
     context: TurnContext,
   ) => Promise<void>>(),
@@ -149,7 +150,7 @@ export const TurnContextConsumerSchema = z.object({
 
 export type TurnContextConsumer = z.infer<typeof TurnContextConsumerSchema>;
 
-export const TurnContextAppenderSchema = z.object({
+export const TurnContextAppenderSchema = createProtocolSchema({
   appendTurnContext: createFunctionSchema<() => Promise<Message[]>>(),
 });
 
@@ -196,7 +197,7 @@ export const ActionSchema = z.union([
 
 export type Action = z.infer<typeof ActionSchema>;
 
-export const ContextProcessorSchema = z.object({
+export const ContextProcessorSchema = createProtocolSchema({
   priority: z.int(),
   process: createFunctionSchema<(
     messages: Message[],
@@ -205,13 +206,13 @@ export const ContextProcessorSchema = z.object({
 
 export type ContextProcessor = z.infer<typeof ContextProcessorSchema>;
 
-export const MessageNotifierSchema = z.object({
+export const MessageNotifierSchema = createProtocolSchema({
   notify: createFunctionSchema<(message: Message) => Promise<void>>(),
 });
 
 export type MessageNotifier = z.infer<typeof MessageNotifierSchema>;
 
-export const ErrorHandlerSchema = z.object({
+export const ErrorHandlerSchema = createProtocolSchema({
   priority: z.int(),
   canHandle: createFunctionSchema<(error: unknown) => boolean>(),
   handle: createFunctionSchema<(error: unknown) => Promise<void>>(),
@@ -219,7 +220,7 @@ export const ErrorHandlerSchema = z.object({
 
 export type ErrorHandler = z.infer<typeof ErrorHandlerSchema>;
 
-export const AgentContextControlSchema = z.object({
+export const AgentContextControlSchema = createProtocolSchema({
   getMessages: createFunctionSchema<() => Promise<Message[]>>(),
   getMessage: createFunctionSchema<(
     messageId: string,
@@ -233,7 +234,7 @@ export const AgentContextControlSchema = z.object({
 
 export type AgentContextControl = z.infer<typeof AgentContextControlSchema>;
 
-export const AfterTurnProcessorSchema = z.object({
+export const AfterTurnProcessorSchema = createProtocolSchema({
   priority: z.int(),
   process: createFunctionSchema<(
     control: AgentContextControl,
@@ -243,7 +244,7 @@ export const AfterTurnProcessorSchema = z.object({
 
 export type AfterTurnProcessor = z.infer<typeof AfterTurnProcessorSchema>;
 
-export const LLMRequireSchema = z.object({
+export const LLMRequireSchema = createProtocolSchema({
   setLLMRequest: createFunctionSchema<(
     request: LLMRequest,
   ) => Promise<void>>(),
@@ -251,7 +252,7 @@ export const LLMRequireSchema = z.object({
 
 export type LLMRequire = z.infer<typeof LLMRequireSchema>;
 
-export const DestroyableSchema = z.object({
+export const DestroyableSchema = createProtocolSchema({
   destroy: createFunctionSchema<() => void | Promise<void>>(),
 });
 

@@ -11,11 +11,7 @@ export const SnapshotActionResultSchema = z.object({
   ok: z.literal(true),
   action: z.lazy(() => CLIEntrySnapshotActionSchema),
   turnId: z.string(),
-}) as z.ZodType<{
-  ok: true;
-  action: CLIEntrySnapshotAction;
-  turnId: string;
-}>;
+});
 export type SnapshotActionResult = z.infer<typeof SnapshotActionResultSchema>;
 
 export function formatSnapshotActionResult(result: SnapshotActionResult): string {

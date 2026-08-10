@@ -1,12 +1,16 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import { CLIAGENT_DIR, CLIProviderSchema, loadConfig, type CLIConfig, type CLIProvider } from "../config.js";
 import type { CLIProviderConnection } from "./types.js";
 
-export const ProviderConfigServiceSchema = z.custom<{
-  connectProvider(connection: CLIProviderConnection, effectiveConfig: CLIConfig): Promise<CLIConfig>;
-}>();
+export const ProviderConfigServiceSchema = createProtocolSchema({
+  connectProvider: createFunctionSchema<(
+    connection: CLIProviderConnection,
+    effectiveConfig: CLIConfig,
+  ) => Promise<CLIConfig>>(),
+});
 export type ProviderConfigService = z.infer<typeof ProviderConfigServiceSchema>;
 
 function projectConfigPath(baseDir: string): string {

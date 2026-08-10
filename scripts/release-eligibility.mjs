@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-const MARKER_PATH = "scripts/release-intent-0.9.1.json";
+const MARKER_PATH = "scripts/release-intent-0.10.0.json";
 const EXPECTED_MARKER = {
-  version: "0.9.1",
+  version: "0.10.0",
   packages: [
     "@piaoxianguo/miniagent-core",
     "@piaoxianguo/miniagent-engine",

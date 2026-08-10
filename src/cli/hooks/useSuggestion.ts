@@ -263,12 +263,7 @@ export const UseSuggestionOptionsSchema = z.object({
   referencePaths: z.array(z.string()).optional(),
   commandSuggestions: z.array(z.string()).optional(),
   sessionSuggestions: z.array(z.string()).optional(),
-}) as z.ZodType<{
-  modelPaths?: string[];
-  referencePaths?: string[];
-  commandSuggestions?: string[];
-  sessionSuggestions?: string[];
-}>;
+});
 export type UseSuggestionOptions = z.infer<typeof UseSuggestionOptionsSchema>;
 
 export function useSuggestion(options?: UseSuggestionOptions) {

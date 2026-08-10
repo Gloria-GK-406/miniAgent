@@ -88,7 +88,7 @@ The core does exactly one thing — the agent loop (collect context → call LLM
                     └─────────────────────────────────┘
 ```
 
-- **Schema-Driven Types** — All data structures are defined as Zod schemas. TypeScript types are derived automatically. Runtime validation comes for free.
+- **Executable Schema Contracts** — Data is fully described by Zod, protocols are structurally validated without losing instance identity, and opaque values require real runtime predicates. TypeScript types are derived from those contracts.
 - **Auto-Detection** — Components are identified by Zod schema validation, not manual type tags. You register a tool, a provider, or a processor — the agent knows what it is.
 - **Plugin Over Framework** — No inheritance hierarchies, no abstract base classes. Just plain objects that satisfy the right schema.
 
@@ -585,7 +585,7 @@ agent.on("message:notify", ({ message }) => { /* new message created */ });
 - **Test**: Vitest
 - **Lint**: ESLint (typescript-eslint)
 - **SDKs**: `@anthropic-ai/sdk`, `openai`, `@modelcontextprotocol/sdk`
-- **Utils**: `eventemitter3`, `lru-cache`, `zod-to-json-schema`
+- **Utils**: `eventemitter3`, `lru-cache`
 
 ## License
 

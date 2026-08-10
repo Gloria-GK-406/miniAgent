@@ -27,22 +27,7 @@ export const RuntimeStatusSchema = z.object({
   defaultPermission: z.lazy(() => CLIPermissionDecisionSchema),
   isRunning: z.boolean(),
   currentTool: z.union([z.string(), z.null()]),
-}) as z.ZodType<{
-  ok: boolean;
-  baseDir: string;
-  sessionId: string;
-  sessionName: string;
-  mode: CLIState["mode"];
-  modelName: string;
-  messageCount: number;
-  tokenUsage: CLIState["tokenUsage"];
-  autoApprove: boolean;
-  showReasoning: boolean;
-  showToolDetails: boolean;
-  defaultPermission: CLIPermissionDecision;
-  isRunning: boolean;
-  currentTool: string | null;
-}>;
+});
 export type RuntimeStatus = z.infer<typeof RuntimeStatusSchema>;
 
 function formatTokenCount(count: number): string {

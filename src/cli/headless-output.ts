@@ -1,8 +1,10 @@
 import { z } from "zod";
-export const HeadlessStreamsSchema = z.custom<{
-  stdout: (text: string) => void;
-  stderr: (text: string) => void;
-}>();
+import { createFunctionSchema } from "../core/index.js";
+
+export const HeadlessStreamsSchema = z.object({
+  stdout: createFunctionSchema<(text: string) => void>(),
+  stderr: createFunctionSchema<(text: string) => void>(),
+});
 export type HeadlessStreams = z.infer<typeof HeadlessStreamsSchema>;
 
 export const HeadlessOutputSchema = z.enum(["text", "json"]);

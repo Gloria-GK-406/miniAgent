@@ -1,31 +1,33 @@
 import { z } from "zod";
 import { resolve } from "node:path";
-import { CLIEntryActionSchema, type CLIEntryAction } from "./entry-args.js";
+import { createFunctionSchema, createProtocolSchema } from "../core/index.js";
+import { CLIEntryActionSchema } from "./entry-args.js";
 import { writeCLIEntryError } from "./entry-fatal.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
-import type { PrintStreams } from "./print-runner.js";
+import { PrintStreamsSchema, type PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 
-export const TUIEntryActionSchema = CLIEntryActionSchema.refine(
-  (action) => action.type === "tui",
-) as z.ZodType<Extract<CLIEntryAction, { type: "tui" }>>;
+export const TUIEntryActionSchema = CLIEntryActionSchema.options[0];
 export type TUIEntryAction = z.infer<typeof TUIEntryActionSchema>;
 
-export const TUIRenderHandleSchema = z.custom<{
-  unmount(): void;
-}>();
+export const TUIRenderHandleSchema = createProtocolSchema({
+  unmount: createFunctionSchema<() => void>(),
+});
 export type TUIRenderHandle = z.infer<typeof TUIRenderHandleSchema>;
 
-export const TUIEntryOptionsSchema = z.custom<{
-  action: TUIEntryAction;
-  createRuntime: (cwd: string) => Promise<CLIAppRuntime>;
-  renderApp: (runtime: CLIAppRuntime) => TUIRenderHandle;
-  streams: PrintStreams;
-  exit: (code: number) => void;
-  onProcessExit: (listener: () => void) => () => void;
-  loadPrompt?: (action: TUIEntryAction, cwd: string) => Promise<string | undefined>;
-}>();
+export const TUIEntryOptionsSchema = z.object({
+  action: TUIEntryActionSchema,
+  createRuntime: createFunctionSchema<(cwd: string) => Promise<CLIAppRuntime>>(),
+  renderApp: createFunctionSchema<(runtime: CLIAppRuntime) => TUIRenderHandle>(),
+  streams: z.lazy(() => PrintStreamsSchema),
+  exit: createFunctionSchema<(code: number) => void>(),
+  onProcessExit: createFunctionSchema<(listener: () => void) => () => void>(),
+  loadPrompt: createFunctionSchema<(
+    action: TUIEntryAction,
+    cwd: string,
+  ) => Promise<string | undefined>>().optional(),
+});
 export type TUIEntryOptions = z.infer<typeof TUIEntryOptionsSchema>;
 
 function createAltScreenCleanup(streams: PrintStreams): () => void {

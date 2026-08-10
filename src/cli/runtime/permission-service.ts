@@ -1,29 +1,38 @@
 import { z } from "zod";
-import type { CLIAgentMode, CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
+import { type CLIAgentModeSchema, type CLIPermissionConfig, type CLIPermissionDecision } from "../config.js";
 import type { CLIPermissionRequest, CLIPermissionResult } from "./types.js";
 
-export const PermissionServiceSchema = z.custom<{
-  resolve(request: CLIPermissionRequest, autoApprove: boolean): CLIPermissionResult;
-  updateConfig(config: CLIPermissionConfig): void;
-}>();
+export const PermissionServiceSchema = createProtocolSchema({
+  resolve: createFunctionSchema<(
+    request: CLIPermissionRequest,
+    autoApprove: boolean,
+  ) => CLIPermissionResult>(),
+  updateConfig: createFunctionSchema<(config: CLIPermissionConfig) => void>(),
+});
 export type PermissionService = z.infer<typeof PermissionServiceSchema>;
 
 export const SessionPermissionDecisionSchema = z.enum(["allow", "deny"]);
 export type SessionPermissionDecision = z.infer<typeof SessionPermissionDecisionSchema>;
 
-export const SessionPermissionServiceSchema = z.intersection(PermissionServiceSchema, z.custom<{
-  rememberSessionDecision(request: CLIPermissionRequest, decision: SessionPermissionDecision): void;
-  clearSessionDecisions(): void;
-}>()) as z.ZodType<PermissionService & {
-  rememberSessionDecision(request: CLIPermissionRequest, decision: SessionPermissionDecision): void;
-  clearSessionDecisions(): void;
-}>;
+export const SessionPermissionServiceSchema = createProtocolSchema({
+  resolve: createFunctionSchema<(
+    request: CLIPermissionRequest,
+    autoApprove: boolean,
+  ) => CLIPermissionResult>(),
+  updateConfig: createFunctionSchema<(config: CLIPermissionConfig) => void>(),
+  rememberSessionDecision: createFunctionSchema<(
+    request: CLIPermissionRequest,
+    decision: SessionPermissionDecision,
+  ) => void>(),
+  clearSessionDecisions: createFunctionSchema<() => void>(),
+});
 export type SessionPermissionService = z.infer<typeof SessionPermissionServiceSchema>;
 
-export const ModeAwarePermissionServiceOptionsSchema = z.custom<{
-  base: PermissionService;
-  getMode: () => CLIAgentMode;
-}>();
+export const ModeAwarePermissionServiceOptionsSchema = z.object({
+  base: PermissionServiceSchema,
+  getMode: createFunctionSchema<() => z.infer<typeof CLIAgentModeSchema>>(),
+});
 export type ModeAwarePermissionServiceOptions = z.infer<typeof ModeAwarePermissionServiceOptionsSchema>;
 
 const PLAN_MUTATING_TOOL_NAMES = new Set([

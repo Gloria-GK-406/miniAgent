@@ -1,8 +1,9 @@
-import { z } from "zod";
+import { type z } from "zod";
 import { createFunctionSchema } from "./function-schema.js";
+import { createProtocolSchema } from "./protocol-schema.js";
 import type { Message } from "./message.js";
 
-export const StoreSchema = z.object({
+export const StoreSchema = createProtocolSchema({
     readFile: createFunctionSchema<(path: string) => Promise<string>>(),
     writeFile: createFunctionSchema<(path: string, data: string) => Promise<void>>(),
     writeJsonTo: createFunctionSchema<<T>(path: string, data: T) => Promise<void>>(),
@@ -12,7 +13,7 @@ export const StoreSchema = z.object({
 
 export type Store = z.infer<typeof StoreSchema>;
 
-export const MessageSourceSchema = z.object({
+export const MessageSourceSchema = createProtocolSchema({
     add: createFunctionSchema<(message: Message) => Promise<void>>(),
     append: createFunctionSchema<(messages: Message[]) => Promise<void>>(),
     setDiscardBefore: createFunctionSchema<(messageId: string) => Promise<void>>(),
@@ -23,7 +24,7 @@ export const MessageSourceSchema = z.object({
 
 export type MessageSource = z.infer<typeof MessageSourceSchema>;
 
-export const PersistRequireSchema = z.object({
+export const PersistRequireSchema = createProtocolSchema({
     setStore: createFunctionSchema<(store: Store) => Promise<void>>(),
 });
 

@@ -24,8 +24,7 @@ export const TabInputActionSchema = z.union([z.object({
   value: z.string(),
 }), z.object({
   type: z.literal("toggle-mode"),
-})]) as z.ZodType<| { type: "complete"; value: string }
-  | { type: "toggle-mode" }>;
+})]);
 export type TabInputAction = z.infer<typeof TabInputActionSchema>;
 
 export function resolveTabInputAction(

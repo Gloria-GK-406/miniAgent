@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import type { CommandRegistry } from "./command-registry.js";
 import type { PermissionService } from "./permission-service.js";
-import { ResolvedReferenceSchema, type ReferenceService, type ResolvedReference } from "./reference-service.js";
+import { ResolvedReferenceSchema, type ReferenceService } from "./reference-service.js";
 import type { ShellExecuteResult, ShellService } from "./shell-service.js";
 import type { CLICommandContext } from "./types.js";
 
@@ -14,25 +15,37 @@ export const RoutedInputResultSchema = z.union([z.object({
   type: z.literal("prompt"),
   content: z.string(),
   references: z.array(z.lazy(() => ResolvedReferenceSchema)),
-})]) as z.ZodType<| { type: "command" }
-  | { type: "shell"; content: string }
-  | { type: "prompt"; content: string; references: ResolvedReference[] }>;
+})]);
 export type RoutedInputResult = z.infer<typeof RoutedInputResultSchema>;
 
-export const InputRouterDepsSchema = z.custom<{
-  commandRegistry: Pick<CommandRegistry, "execute">;
-  permissionService?: Pick<PermissionService, "resolve">;
-  getAutoApprove?: () => boolean;
-  requestApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
-  shellService: Pick<ShellService, "execute">;
-  referenceService: Pick<ReferenceService, "resolveReferences">;
-  cwd?: string;
-}>();
+export const InputRouterDepsSchema = z.object({
+  commandRegistry: createProtocolSchema({
+    execute: createFunctionSchema<CommandRegistry["execute"]>(),
+  }),
+  permissionService: createProtocolSchema({
+    resolve: createFunctionSchema<PermissionService["resolve"]>(),
+  }).optional(),
+  getAutoApprove: createFunctionSchema<() => boolean>().optional(),
+  requestApproval: createFunctionSchema<(
+    toolName: string,
+    args: Record<string, unknown>,
+  ) => Promise<boolean>>().optional(),
+  shellService: createProtocolSchema({
+    execute: createFunctionSchema<ShellService["execute"]>(),
+  }),
+  referenceService: createProtocolSchema({
+    resolveReferences: createFunctionSchema<ReferenceService["resolveReferences"]>(),
+  }),
+  cwd: z.string().optional(),
+});
 export type InputRouterDeps = z.infer<typeof InputRouterDepsSchema>;
 
-export const InputRouterSchema = z.custom<{
-  route(ctx: CLICommandContext, input: string): Promise<RoutedInputResult>;
-}>();
+export const InputRouterSchema = createProtocolSchema({
+  route: createFunctionSchema<(
+    ctx: CLICommandContext,
+    input: string,
+  ) => Promise<RoutedInputResult>>(),
+});
 export type InputRouter = z.infer<typeof InputRouterSchema>;
 
 async function assertShellPermission(deps: InputRouterDeps, command: string): Promise<void> {

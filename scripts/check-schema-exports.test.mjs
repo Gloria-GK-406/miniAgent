@@ -126,3 +126,77 @@ test("rejects handwritten declarations exported through a public namespace", asy
   assert.equal(result.status, 1);
   assert.match(result.stderr, /nested\.ts:2:\d+.*NestedInterface/);
 });
+
+test("rejects a ZodType assertion that launders an incompatible structure", async () => {
+  const result = await runDetector({
+    "asserted.ts": [
+      'import { z } from "zod";',
+      "export const ItemSchema = z.string() as z.ZodType<{ id: string }>;",
+      "export type Item = z.infer<typeof ItemSchema>;",
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /asserted\.ts:2:\d+.*asserted ZodType.*forbidden/);
+});
+
+test("rejects named and angle-bracket ZodType assertion variants", async () => {
+  const result = await runDetector({
+    "assertion-variants.ts": [
+      'import { z, ZodType as SchemaType } from "zod";',
+      "export const NamespaceSchema = <z.ZodType<{ id: string }>>z.string();",
+      "export const NamedSchema = z.string() as SchemaType<{ id: string }>;",
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /assertion-variants\.ts:2:\d+.*asserted ZodType/);
+  assert.match(result.stderr, /assertion-variants\.ts:3:\d+.*asserted ZodType/);
+});
+
+test("rejects predicate-free structural and service custom Schemas", async () => {
+  const result = await runDetector({
+    "custom.ts": [
+      'import { z } from "zod";',
+      "export const ItemSchema = z.custom<{ id: string }>();",
+      "export type Item = z.infer<typeof ItemSchema>;",
+      "type SomeService = { run(): void };",
+      "export const SomeServiceSchema = z.custom<SomeService>();",
+      "export type PublicService = z.infer<typeof SomeServiceSchema>;",
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /custom\.ts:2:\d+.*predicate-free z\.custom/);
+  assert.match(result.stderr, /custom\.ts:2:\d+.*structural z\.custom/);
+  assert.match(result.stderr, /custom\.ts:5:\d+.*predicate-free z\.custom/);
+});
+
+test("rejects predicate-free custom Schemas through named imports", async () => {
+  const result = await runDetector({
+    "named-custom.ts": [
+      'import { custom as defineCustom } from "zod";',
+      "export const ItemSchema = defineCustom<{ id: string }>();",
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /named-custom\.ts:2:\d+.*predicate-free z\.custom/);
+  assert.match(result.stderr, /named-custom\.ts:2:\d+.*structural z\.custom/);
+});
+
+test("accepts Schema factories, function checks, and real opaque predicates", async () => {
+  const result = await runDetector({
+    "valid-custom.ts": [
+      'import { z } from "zod";',
+      "class ExternalClient {}",
+      "export const ExternalClientSchema = z.custom<ExternalClient>((value) => value instanceof ExternalClient);",
+      "export type PublicClient = z.infer<typeof ExternalClientSchema>;",
+      "export function createFactory<T extends z.ZodType>(schema: T) { return z.array(schema); }",
+      "export const FunctionSchema = z.custom<() => void>((value) => typeof value === 'function');",
+      "export type PublicFunction = z.infer<typeof FunctionSchema>;",
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+});

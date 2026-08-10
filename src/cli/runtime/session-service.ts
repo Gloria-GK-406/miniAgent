@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { SessionManager, SessionMetaSchema, type SessionMeta } from "../session-manager.js";
-import { MessageSchema, TokenCountSchema, type Message, type TokenCount } from "../../core/index.js";
+import { createFunctionSchema, createProtocolSchema, MessageSchema, TokenCountSchema, type Message, type TokenCount } from "../../core/index.js";
 import { CLIAGENT_DIR, CLIAgentModeSchema, type CLIAgentMode } from "../config.js";
 
 const MESSAGE_FILE = "messages.jsonl";
@@ -20,26 +20,51 @@ export const CLISessionRuntimeMetadataSchema = z.strictObject({
 
 export type CLISessionRuntimeMetadata = z.infer<typeof CLISessionRuntimeMetadataSchema>;
 
-export const CLISessionServiceSchema = z.custom<{
-  ensureActiveSession(): Promise<SessionMeta>;
-  getActiveSession(): SessionMeta;
-  getSession(id: string): SessionMeta;
-  listSessions(): SessionMeta[];
-  createSession(name?: string): Promise<SessionMeta>;
-  switchSession(id: string): Promise<SessionMeta>;
-  renameSession(id: string, name: string): Promise<SessionMeta>;
-  deleteSession(id: string): Promise<void>;
-  forkSession(id: string, name?: string): Promise<SessionMeta>;
-  updateSessionModel(id: string, model: string): Promise<SessionMeta>;
-  readSessionRuntimeMetadata(id: string): Promise<CLISessionRuntimeMetadata>;
-  updateSessionMode(id: string, mode: CLIAgentMode): Promise<CLISessionRuntimeMetadata>;
-  updateSessionTokenUsage(id: string, tokenUsage: TokenCount): Promise<CLISessionRuntimeMetadata>;
-  getSessionPersistDir(id: string): string;
-  readMessages(id: string): Promise<Message[]>;
-  writeMessages(id: string, messages: Message[]): Promise<void>;
-  removeLastUserTurn(id: string): Promise<{ turnId: string; messages: Message[] }>;
-  appendMessages(id: string, messages: Message[]): Promise<void>;
-}>();
+export const CLISessionServiceSchema = createProtocolSchema({
+  ensureActiveSession: createFunctionSchema<() => Promise<SessionMeta>>(),
+  getActiveSession: createFunctionSchema<() => SessionMeta>(),
+  getSession: createFunctionSchema<(id: string) => SessionMeta>(),
+  listSessions: createFunctionSchema<() => SessionMeta[]>(),
+  createSession: createFunctionSchema<(name?: string) => Promise<SessionMeta>>(),
+  switchSession: createFunctionSchema<(id: string) => Promise<SessionMeta>>(),
+  renameSession: createFunctionSchema<(
+    id: string,
+    name: string,
+  ) => Promise<SessionMeta>>(),
+  deleteSession: createFunctionSchema<(id: string) => Promise<void>>(),
+  forkSession: createFunctionSchema<(
+    id: string,
+    name?: string,
+  ) => Promise<SessionMeta>>(),
+  updateSessionModel: createFunctionSchema<(
+    id: string,
+    model: string,
+  ) => Promise<SessionMeta>>(),
+  readSessionRuntimeMetadata: createFunctionSchema<(
+    id: string,
+  ) => Promise<CLISessionRuntimeMetadata>>(),
+  updateSessionMode: createFunctionSchema<(
+    id: string,
+    mode: CLIAgentMode,
+  ) => Promise<CLISessionRuntimeMetadata>>(),
+  updateSessionTokenUsage: createFunctionSchema<(
+    id: string,
+    tokenUsage: TokenCount,
+  ) => Promise<CLISessionRuntimeMetadata>>(),
+  getSessionPersistDir: createFunctionSchema<(id: string) => string>(),
+  readMessages: createFunctionSchema<(id: string) => Promise<Message[]>>(),
+  writeMessages: createFunctionSchema<(
+    id: string,
+    messages: Message[],
+  ) => Promise<void>>(),
+  removeLastUserTurn: createFunctionSchema<(
+    id: string,
+  ) => Promise<{ turnId: string; messages: Message[] }>>(),
+  appendMessages: createFunctionSchema<(
+    id: string,
+    messages: Message[],
+  ) => Promise<void>>(),
+});
 export type CLISessionService = z.infer<typeof CLISessionServiceSchema>;
 
 function parseMessagesJsonl(content: string): Message[] {

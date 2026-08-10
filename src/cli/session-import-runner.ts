@@ -12,12 +12,7 @@ export const SessionImportRequestSchema = z.object({
   inputPath: z.string(),
   name: z.string().optional(),
   output: SessionImportOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  inputPath: string;
-  name?: string;
-  output?: SessionImportOutput;
-}>;
+});
 export type SessionImportRequest = z.infer<typeof SessionImportRequestSchema>;
 
 export const SessionImportResultSchema = z.object({
@@ -25,12 +20,7 @@ export const SessionImportResultSchema = z.object({
   sessionId: z.string(),
   sessionName: z.string(),
   messageCount: z.number(),
-}) as z.ZodType<{
-  ok: boolean;
-  sessionId: string;
-  sessionName: string;
-  messageCount: number;
-}>;
+});
 export type SessionImportResult = z.infer<typeof SessionImportResultSchema>;
 
 export function formatSessionImportResultJson(result: SessionImportResult): string {

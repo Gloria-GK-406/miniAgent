@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CLIPermissionDecisionSchema, loadConfig, type CLIPermissionDecision } from "./config.js";
+import { CLIPermissionDecisionSchema, loadConfig } from "./config.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createPermissionConfigService } from "./runtime/permission-config-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
@@ -15,13 +15,7 @@ export const PermissionUpdateRequestSchema = z.object({
   target: z.string(),
   decision: z.lazy(() => CLIPermissionDecisionSchema).optional(),
   output: PermissionUpdateOutputSchema.optional(),
-}) as z.ZodType<{
-  baseDir: string;
-  action: PermissionUpdateAction;
-  target: string;
-  decision?: CLIPermissionDecision;
-  output?: PermissionUpdateOutput;
-}>;
+});
 export type PermissionUpdateRequest = z.infer<typeof PermissionUpdateRequestSchema>;
 
 export const PermissionUpdateResultSchema = z.object({
@@ -29,12 +23,7 @@ export const PermissionUpdateResultSchema = z.object({
   action: PermissionUpdateActionSchema,
   target: z.string(),
   decision: z.lazy(() => CLIPermissionDecisionSchema).optional(),
-}) as z.ZodType<{
-  ok: boolean;
-  action: PermissionUpdateAction;
-  target: string;
-  decision?: CLIPermissionDecision;
-}>;
+});
 export type PermissionUpdateResult = z.infer<typeof PermissionUpdateResultSchema>;
 
 export function formatPermissionUpdateResultJson(result: PermissionUpdateResult): string {

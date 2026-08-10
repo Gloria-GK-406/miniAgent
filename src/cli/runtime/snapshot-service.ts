@@ -1,9 +1,10 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import { createFunctionSchema, createProtocolSchema } from "../../core/index.js";
 import { CLIAGENT_DIR } from "../config.js";
 import { resolveWorkspacePath } from "../tools/workspace.js";
-import type { CLISessionService } from "./session-service.js";
+import { CLISessionServiceSchema } from "./session-service.js";
 
 export const SnapshotRecordSchema = z.object({
   turnId: z.string(),
@@ -28,22 +29,29 @@ interface FileState {
   content?: string;
 }
 
-export const SnapshotServiceOptionsSchema = z.custom<{
-  baseDir: string;
-  sessionService: CLISessionService;
-  getActiveSessionId: () => string;
-  getActiveTurnId: () => string | null;
-}>();
+export const SnapshotServiceOptionsSchema = z.object({
+  baseDir: z.string(),
+  sessionService: CLISessionServiceSchema,
+  getActiveSessionId: createFunctionSchema<() => string>(),
+  getActiveTurnId: createFunctionSchema<() => string | null>(),
+});
 export type SnapshotServiceOptions = z.infer<typeof SnapshotServiceOptionsSchema>;
 
-export const SnapshotServiceSchema = z.custom<{
-  recordBeforeMutation(path: string, mutate: () => Promise<void>): Promise<void>;
-  restoreTurn(turnId: string): Promise<void>;
-  reapplyTurn(turnId: string): Promise<void>;
-  captureRedo(turnId: string): Promise<SnapshotRecord[]>;
-  listSnapshots(): Promise<SnapshotRecord[]>;
-  listTurnSnapshots(turnId: string): Promise<SnapshotRecord[]>;
-}>();
+export const SnapshotServiceSchema = createProtocolSchema({
+  recordBeforeMutation: createFunctionSchema<(
+    path: string,
+    mutate: () => Promise<void>,
+  ) => Promise<void>>(),
+  restoreTurn: createFunctionSchema<(turnId: string) => Promise<void>>(),
+  reapplyTurn: createFunctionSchema<(turnId: string) => Promise<void>>(),
+  captureRedo: createFunctionSchema<(
+    turnId: string,
+  ) => Promise<SnapshotRecord[]>>(),
+  listSnapshots: createFunctionSchema<() => Promise<SnapshotRecord[]>>(),
+  listTurnSnapshots: createFunctionSchema<(
+    turnId: string,
+  ) => Promise<SnapshotRecord[]>>(),
+});
 export type SnapshotService = z.infer<typeof SnapshotServiceSchema>;
 
 async function readFileState(path: string): Promise<FileState> {

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { useState, useEffect, useCallback } from "react";
-import type { Message, TokenCount } from "../../core/index.js";
-import { MessageType } from "../../core/index.js";
+import { createFunctionSchema, MessageSchema, MessageType, TokenCountSchema, type Message, type TokenCount } from "../../core/index.js";
 
 interface AgentLike {
   on(event: string, listener: (...args: unknown[]) => void): unknown;
@@ -12,17 +11,17 @@ interface AgentLike {
   getContextCount(): TokenCount;
 }
 
-export const UseAgentReturnSchema = z.custom<{
-  messages: Message[];
-  isRunning: boolean;
-  streamingText: string;
-  reasoningText: string;
-  currentTool: string | null;
-  error: string | null;
-  turnCount: number;
-  tokenUsage: TokenCount;
-  sendMessage: (text: string) => Promise<void>;
-}>();
+export const UseAgentReturnSchema = z.object({
+  messages: z.array(MessageSchema),
+  isRunning: z.boolean(),
+  streamingText: z.string(),
+  reasoningText: z.string(),
+  currentTool: z.string().nullable(),
+  error: z.string().nullable(),
+  turnCount: z.number(),
+  tokenUsage: TokenCountSchema,
+  sendMessage: createFunctionSchema<(text: string) => Promise<void>>(),
+});
 export type UseAgentReturn = z.infer<typeof UseAgentReturnSchema>;
 
 export function useAgent(agent: AgentLike): UseAgentReturn {
