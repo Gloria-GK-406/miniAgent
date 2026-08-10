@@ -1,9 +1,12 @@
-export interface HeadlessStreams {
+import { z } from "zod";
+export const HeadlessStreamsSchema = z.custom<{
   stdout: (text: string) => void;
   stderr: (text: string) => void;
-}
+}>();
+export type HeadlessStreams = z.infer<typeof HeadlessStreamsSchema>;
 
-export type HeadlessOutput = "text" | "json";
+export const HeadlessOutputSchema = z.enum(["text", "json"]);
+export type HeadlessOutput = z.infer<typeof HeadlessOutputSchema>;
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

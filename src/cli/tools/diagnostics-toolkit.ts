@@ -1,20 +1,24 @@
 import { z } from "zod";
-import type { Tool } from "../../core/index.js";
+import { ToolSchema, type Tool } from "../../core/index.js";
 import type { DiagnosticResult, DiagnosticsService } from "../runtime/diagnostics-service.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 
 const EmptyParamsSchema = z.strictObject({});
 
-export interface DiagnosticsToolkitOptions {
+export const DiagnosticsToolkitOptionsSchema = z.custom<{
   diagnosticsService: DiagnosticsService;
   permissionService: PermissionService;
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
-}
+}>();
+export type DiagnosticsToolkitOptions = z.infer<typeof DiagnosticsToolkitOptionsSchema>;
 
-export interface DiagnosticsToolkit {
+export const DiagnosticsToolkitSchema = z.object({
+  tools: z.array(z.lazy(() => ToolSchema)),
+}) as z.ZodType<{
   tools: Tool[];
-}
+}>;
+export type DiagnosticsToolkit = z.infer<typeof DiagnosticsToolkitSchema>;
 
 async function assertPermission(
   options: DiagnosticsToolkitOptions,

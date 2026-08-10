@@ -1,39 +1,28 @@
 import { z } from "zod";
-import type { Tool } from "./tool.js";
-import type { Message } from "./message.js";
+import { ToolSchema } from "./tool.js";
+import { MessageSchema } from "./message.js";
 
-export type JsonValue =
-    | string
-    | number
-    | boolean
-    | null
-    | JsonValue[]
-    | { [key: string]: JsonValue };
+export const JsonValueSchema = z.json();
 
-const JsonPrimitiveSchema = z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
+export type JsonValue = z.infer<typeof JsonValueSchema>;
+
+export const ThinkingLevelSchema = z.enum([
+    "none",
+    "low",
+    "medium",
+    "high",
+    "max",
 ]);
 
-export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-    z.union([
-        JsonPrimitiveSchema,
-        z.array(JsonValueSchema),
-        z.record(z.string(), JsonValueSchema),
-    ]),
-);
+export type ThinkingLevel = z.infer<typeof ThinkingLevelSchema>;
 
-export enum ThinkingLevel {
-    None = "none",
-    Low = "low",
-    Medium = "medium",
-    High = "high",
-    Max = "max",
-}
-
-export const ThinkingLevelSchema = z.enum(ThinkingLevel);
+export const ThinkingLevel = {
+    None: "none" as ThinkingLevel,
+    Low: "low" as ThinkingLevel,
+    Medium: "medium" as ThinkingLevel,
+    High: "high" as ThinkingLevel,
+    Max: "max" as ThinkingLevel,
+} as const;
 
 export const ModelPresetSchema = z
     .strictObject({
@@ -99,8 +88,8 @@ export function normalizeGenerationConfig(
 }
 
 export const LLMGenerateRequestSchema = z.object({
-    messages: z.array(z.custom<Message>()),
-    tools: z.array(z.custom<Tool>()),
+    messages: z.array(MessageSchema),
+    tools: z.array(ToolSchema),
     runtime: ModelRuntimeSchema,
     generation: GenerationConfigSchema,
 });

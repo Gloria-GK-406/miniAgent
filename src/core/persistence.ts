@@ -2,22 +2,26 @@ import { z } from "zod";
 import { createFunctionSchema } from "./function-schema.js";
 import type { Message } from "./message.js";
 
-export interface Store {
-    readFile(path: string): Promise<string>;
-    writeFile(path: string, data: string): Promise<void>;
-    writeJsonTo<T>(path: string, data: T): Promise<void>;
-    readJsonFrom<T>(path: string): Promise<T>;
-    appendFile(path: string, data: string): Promise<void>;
-}
+export const StoreSchema = z.object({
+    readFile: createFunctionSchema<(path: string) => Promise<string>>(),
+    writeFile: createFunctionSchema<(path: string, data: string) => Promise<void>>(),
+    writeJsonTo: createFunctionSchema<<T>(path: string, data: T) => Promise<void>>(),
+    readJsonFrom: createFunctionSchema<<T>(path: string) => Promise<T>>(),
+    appendFile: createFunctionSchema<(path: string, data: string) => Promise<void>>(),
+});
 
-export interface MessageSource {
-    add(message: Message): Promise<void>;
-    append(messages: Message[]): Promise<void>;
-    setDiscardBefore(messageId: string): Promise<void>;
-    clearDiscardBefore(): Promise<void>;
-    get(id: string): Promise<Message | undefined>;
-    getAll(): Promise<Message[]>;
-}
+export type Store = z.infer<typeof StoreSchema>;
+
+export const MessageSourceSchema = z.object({
+    add: createFunctionSchema<(message: Message) => Promise<void>>(),
+    append: createFunctionSchema<(messages: Message[]) => Promise<void>>(),
+    setDiscardBefore: createFunctionSchema<(messageId: string) => Promise<void>>(),
+    clearDiscardBefore: createFunctionSchema<() => Promise<void>>(),
+    get: createFunctionSchema<(id: string) => Promise<Message | undefined>>(),
+    getAll: createFunctionSchema<() => Promise<Message[]>>(),
+});
+
+export type MessageSource = z.infer<typeof MessageSourceSchema>;
 
 export const PersistRequireSchema = z.object({
     setStore: createFunctionSchema<(store: Store) => Promise<void>>(),

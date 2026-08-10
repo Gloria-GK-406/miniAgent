@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Tool } from "../../core/index.js";
+import { ToolSchema, type Tool } from "../../core/index.js";
 import type { GitService } from "../runtime/git-service.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 
@@ -18,16 +18,20 @@ const GitCommitParamsSchema = z.strictObject({
   message: z.string().min(1),
 });
 
-export interface GitToolkitOptions {
+export const GitToolkitOptionsSchema = z.custom<{
   gitService: GitService;
   permissionService: PermissionService;
   getAutoApprove: () => boolean;
   requestApproval: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
-}
+}>();
+export type GitToolkitOptions = z.infer<typeof GitToolkitOptionsSchema>;
 
-export interface GitToolkit {
+export const GitToolkitSchema = z.object({
+  tools: z.array(z.lazy(() => ToolSchema)),
+}) as z.ZodType<{
   tools: Tool[];
-}
+}>;
+export type GitToolkit = z.infer<typeof GitToolkitSchema>;
 
 async function assertPermission(
   options: GitToolkitOptions,

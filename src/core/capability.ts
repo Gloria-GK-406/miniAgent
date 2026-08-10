@@ -12,9 +12,7 @@ export const AgentCapabilitySelectorSchema = z.object({
     tool: AgentCapabilityRuleSchema.optional(),
 }).catchall(JsonValueSchema);
 
-type AgentCapabilitySelectorBase = z.infer<typeof AgentCapabilitySelectorSchema>;
-
-export type AgentCapabilitySelector = AgentCapabilitySelectorBase & Record<string, unknown>;
+export type AgentCapabilitySelector = z.infer<typeof AgentCapabilitySelectorSchema>;
 
 export function getCapabilityNamespace(
     selector: AgentCapabilitySelector,

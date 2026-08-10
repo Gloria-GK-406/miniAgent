@@ -1,12 +1,17 @@
+import { z } from "zod";
 import { useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
-import type { Message, MessageContent, ToolCallMessage } from "../../core/index.js";
+import { MessageSchema, type Message, type MessageContent, type ToolCallMessage } from "../../core/index.js";
 import { MessageType } from "../../core/index.js";
 
-export interface PanelData {
+export const PanelDataSchema = z.object({
+  title: z.string(),
+  messages: z.array(z.lazy(() => MessageSchema)),
+}) as z.ZodType<{
   title: string;
   messages: Message[];
-}
+}>;
+export type PanelData = z.infer<typeof PanelDataSchema>;
 
 interface PanelViewProps {
   data: PanelData;

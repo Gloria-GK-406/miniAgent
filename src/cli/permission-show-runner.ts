@@ -1,13 +1,19 @@
+import { z } from "zod";
 import { loadConfig, type CLIPermissionConfig } from "./config.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
-export type PermissionShowOutput = "text" | "json";
+export const PermissionShowOutputSchema = z.enum(["text", "json"]);
+export type PermissionShowOutput = z.infer<typeof PermissionShowOutputSchema>;
 
-export interface PermissionShowRequest {
+export const PermissionShowRequestSchema = z.object({
+  baseDir: z.string(),
+  output: PermissionShowOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   output?: PermissionShowOutput;
-}
+}>;
+export type PermissionShowRequest = z.infer<typeof PermissionShowRequestSchema>;
 
 export function formatPermissionPolicy(permission: CLIPermissionConfig): string {
   const lines = ["Permissions"];

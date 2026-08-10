@@ -1,25 +1,41 @@
+import { z } from "zod";
 import { createExportService } from "./runtime/export-service.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
-export type SessionExportFormat = "json" | "markdown";
-export type SessionExportOutput = "text" | "json";
+export const SessionExportFormatSchema = z.enum(["json", "markdown"]);
+export type SessionExportFormat = z.infer<typeof SessionExportFormatSchema>;
+export const SessionExportOutputSchema = z.enum(["text", "json"]);
+export type SessionExportOutput = z.infer<typeof SessionExportOutputSchema>;
 
-export interface SessionExportRequest {
+export const SessionExportRequestSchema = z.object({
+  baseDir: z.string(),
+  sessionId: z.string().optional(),
+  format: SessionExportFormatSchema.optional(),
+  outputPath: z.string().optional(),
+  output: SessionExportOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   sessionId?: string;
   format?: SessionExportFormat;
   outputPath?: string;
   output?: SessionExportOutput;
-}
+}>;
+export type SessionExportRequest = z.infer<typeof SessionExportRequestSchema>;
 
-export interface SessionExportResult {
+export const SessionExportResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  format: SessionExportFormatSchema,
+  outputPath: z.string(),
+}) as z.ZodType<{
   ok: boolean;
   sessionId: string;
   format: SessionExportFormat;
   outputPath: string;
-}
+}>;
+export type SessionExportResult = z.infer<typeof SessionExportResultSchema>;
 
 export function formatSessionExportResultJson(result: SessionExportResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;

@@ -1,18 +1,14 @@
+import { z } from "zod";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import type { SessionMeta } from "../session-manager.js";
 import type { Message } from "../../core/index.js";
 import { useRuntime } from "../hooks/useRuntime.js";
 import { useSuggestion } from "../hooks/useSuggestion.js";
-import type {
-  CLIAppRuntime,
-  CLIApprovalDecision,
-  CLICommandHelpItem,
-  CLIViewPanel,
-} from "../runtime/types.js";
+import { CLIAppRuntimeSchema, type CLIAppRuntime, type CLIApprovalDecision, type CLICommandHelpItem, type CLIViewPanel } from "../runtime/types.js";
 import type { SnapshotRecord } from "../runtime/snapshot-service.js";
 import { buildRenderableLines } from "./MessageList.js";
-import type { RenderLine } from "./MessageList.js";
+import { RenderLineSchema, type RenderLine } from "./MessageList.js";
 import { StatusIndicator } from "./StatusIndicator.js";
 import { CommandPalette } from "./CommandPalette.js";
 import { ConnectProviderView } from "./ConnectProviderView.js";
@@ -27,16 +23,20 @@ import { SystemPromptView } from "./SystemPromptView.js";
 import { createModeAwarePermissionService, createPermissionService } from "../runtime/permission-service.js";
 import type { CLIAgentMode, CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
 
-export interface AppProps {
+export const AppPropsSchema = z.object({
+  runtime: z.lazy(() => CLIAppRuntimeSchema),
+}) as z.ZodType<{
   runtime: CLIAppRuntime;
-}
+}>;
+export type AppProps = z.infer<typeof AppPropsSchema>;
 
 const BOTTOM_RESERVED = 6;
 const EXIT_CONFIRM_MS = 2000;
 export const EXIT_CONFIRM_TEXT = "Press Ctrl+C again to exit";
 export const STATIC_PANEL_CLOSE_TEXT = "ESC close";
 
-export type CtrlCAction = "stop" | "arm-exit" | "exit";
+export const CtrlCActionSchema = z.enum(["stop", "arm-exit", "exit"]);
+export type CtrlCAction = z.infer<typeof CtrlCActionSchema>;
 
 export function nextAgentMode(mode: CLIAgentMode): CLIAgentMode {
   return mode === "build" ? "plan" : "build";
@@ -68,9 +68,18 @@ export function getSessionSelectorSuggestions(sessions: SessionMeta[]): string[]
   return sessions.flatMap((session) => [session.id, session.name]);
 }
 
-export type MessageScrollAction = "none" | "page-up" | "page-down" | "home" | "end";
+export const MessageScrollActionSchema = z.enum(["none", "page-up", "page-down", "home", "end"]);
+export type MessageScrollAction = z.infer<typeof MessageScrollActionSchema>;
 
-export interface MessageScrollKey {
+export const MessageScrollKeySchema = z.object({
+  upArrow: z.boolean().optional(),
+  downArrow: z.boolean().optional(),
+  pageUp: z.boolean().optional(),
+  pageDown: z.boolean().optional(),
+  ctrl: z.boolean().optional(),
+  home: z.boolean().optional(),
+  end: z.boolean().optional(),
+}) as z.ZodType<{
   upArrow?: boolean;
   downArrow?: boolean;
   pageUp?: boolean;
@@ -78,7 +87,8 @@ export interface MessageScrollKey {
   ctrl?: boolean;
   home?: boolean;
   end?: boolean;
-}
+}>;
+export type MessageScrollKey = z.infer<typeof MessageScrollKeySchema>;
 
 export function resolveMessageScrollAction(input: string, key: MessageScrollKey): MessageScrollAction {
   if (key.pageUp || (key.ctrl === true && input === "u")) {
@@ -96,11 +106,16 @@ export function resolveMessageScrollAction(input: string, key: MessageScrollKey)
   return "none";
 }
 
-export interface MessageWindow {
+export const MessageWindowSchema = z.object({
+  visibleLines: z.array(z.lazy(() => RenderLineSchema)),
+  maxScrollFromBottom: z.number(),
+  scrollFromBottom: z.number(),
+}) as z.ZodType<{
   visibleLines: RenderLine[];
   maxScrollFromBottom: number;
   scrollFromBottom: number;
-}
+}>;
+export type MessageWindow = z.infer<typeof MessageWindowSchema>;
 
 export function padMessageWindow(
   lines: RenderLine[],

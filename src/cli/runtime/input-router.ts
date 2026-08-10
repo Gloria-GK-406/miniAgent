@@ -1,15 +1,25 @@
+import { z } from "zod";
 import type { CommandRegistry } from "./command-registry.js";
 import type { PermissionService } from "./permission-service.js";
-import type { ReferenceService, ResolvedReference } from "./reference-service.js";
+import { ResolvedReferenceSchema, type ReferenceService, type ResolvedReference } from "./reference-service.js";
 import type { ShellExecuteResult, ShellService } from "./shell-service.js";
 import type { CLICommandContext } from "./types.js";
 
-export type RoutedInputResult =
-  | { type: "command" }
+export const RoutedInputResultSchema = z.union([z.object({
+  type: z.literal("command"),
+}), z.object({
+  type: z.literal("shell"),
+  content: z.string(),
+}), z.object({
+  type: z.literal("prompt"),
+  content: z.string(),
+  references: z.array(z.lazy(() => ResolvedReferenceSchema)),
+})]) as z.ZodType<| { type: "command" }
   | { type: "shell"; content: string }
-  | { type: "prompt"; content: string; references: ResolvedReference[] };
+  | { type: "prompt"; content: string; references: ResolvedReference[] }>;
+export type RoutedInputResult = z.infer<typeof RoutedInputResultSchema>;
 
-export interface InputRouterDeps {
+export const InputRouterDepsSchema = z.custom<{
   commandRegistry: Pick<CommandRegistry, "execute">;
   permissionService?: Pick<PermissionService, "resolve">;
   getAutoApprove?: () => boolean;
@@ -17,11 +27,13 @@ export interface InputRouterDeps {
   shellService: Pick<ShellService, "execute">;
   referenceService: Pick<ReferenceService, "resolveReferences">;
   cwd?: string;
-}
+}>();
+export type InputRouterDeps = z.infer<typeof InputRouterDepsSchema>;
 
-export interface InputRouter {
+export const InputRouterSchema = z.custom<{
   route(ctx: CLICommandContext, input: string): Promise<RoutedInputResult>;
-}
+}>();
+export type InputRouter = z.infer<typeof InputRouterSchema>;
 
 async function assertShellPermission(deps: InputRouterDeps, command: string): Promise<void> {
   if (deps.permissionService === undefined) {

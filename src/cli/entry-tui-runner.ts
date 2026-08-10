@@ -1,18 +1,23 @@
+import { z } from "zod";
 import { resolve } from "node:path";
-import type { CLIEntryAction } from "./entry-args.js";
+import { CLIEntryActionSchema, type CLIEntryAction } from "./entry-args.js";
 import { writeCLIEntryError } from "./entry-fatal.js";
 import { loadEntryPrompt } from "./entry-prompt.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 
-export type TUIEntryAction = Extract<CLIEntryAction, { type: "tui" }>;
+export const TUIEntryActionSchema = CLIEntryActionSchema.refine(
+  (action) => action.type === "tui",
+) as z.ZodType<Extract<CLIEntryAction, { type: "tui" }>>;
+export type TUIEntryAction = z.infer<typeof TUIEntryActionSchema>;
 
-export interface TUIRenderHandle {
+export const TUIRenderHandleSchema = z.custom<{
   unmount(): void;
-}
+}>();
+export type TUIRenderHandle = z.infer<typeof TUIRenderHandleSchema>;
 
-export interface TUIEntryOptions {
+export const TUIEntryOptionsSchema = z.custom<{
   action: TUIEntryAction;
   createRuntime: (cwd: string) => Promise<CLIAppRuntime>;
   renderApp: (runtime: CLIAppRuntime) => TUIRenderHandle;
@@ -20,7 +25,8 @@ export interface TUIEntryOptions {
   exit: (code: number) => void;
   onProcessExit: (listener: () => void) => () => void;
   loadPrompt?: (action: TUIEntryAction, cwd: string) => Promise<string | undefined>;
-}
+}>();
+export type TUIEntryOptions = z.infer<typeof TUIEntryOptionsSchema>;
 
 function createAltScreenCleanup(streams: PrintStreams): () => void {
   let cleaned = false;

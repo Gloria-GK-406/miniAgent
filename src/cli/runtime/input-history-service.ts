@@ -10,14 +10,18 @@ const InputHistoryFileSchema = z.object({
   entries: z.array(z.string()),
 });
 
-export interface InputHistoryServiceOptions {
+export const InputHistoryServiceOptionsSchema = z.object({
+  limit: z.number().optional(),
+}) as z.ZodType<{
   limit?: number;
-}
+}>;
+export type InputHistoryServiceOptions = z.infer<typeof InputHistoryServiceOptionsSchema>;
 
-export interface InputHistoryService {
+export const InputHistoryServiceSchema = z.custom<{
   list(): Promise<string[]>;
   append(input: string): Promise<string[]>;
-}
+}>();
+export type InputHistoryService = z.infer<typeof InputHistoryServiceSchema>;
 
 function historyPath(baseDir: string): string {
   return join(baseDir, CLIAGENT_DIR, "input-history.json");

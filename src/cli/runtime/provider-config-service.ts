@@ -4,9 +4,10 @@ import { z } from "zod";
 import { CLIAGENT_DIR, CLIProviderSchema, loadConfig, type CLIConfig, type CLIProvider } from "../config.js";
 import type { CLIProviderConnection } from "./types.js";
 
-export interface ProviderConfigService {
+export const ProviderConfigServiceSchema = z.custom<{
   connectProvider(connection: CLIProviderConnection, effectiveConfig: CLIConfig): Promise<CLIConfig>;
-}
+}>();
+export type ProviderConfigService = z.infer<typeof ProviderConfigServiceSchema>;
 
 function projectConfigPath(baseDir: string): string {
   return join(baseDir, CLIAGENT_DIR, "config.json");

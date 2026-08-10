@@ -1,22 +1,32 @@
+import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { CLIDiagnosticsConfig } from "../config.js";
-import type { ShellExecuteResult, ShellService } from "./shell-service.js";
+import { CLIDiagnosticsConfigSchema, type CLIDiagnosticsConfig } from "../config.js";
+import { ShellServiceSchema, ShellExecuteResultSchema, type ShellExecuteResult, type ShellService } from "./shell-service.js";
 
-export interface DiagnosticResult extends ShellExecuteResult {
+export const DiagnosticResultSchema = z.intersection(z.lazy(() => ShellExecuteResultSchema), z.object({
+  command: z.string(),
+})) as z.ZodType<ShellExecuteResult & {
   command: string;
-}
+}>;
+export type DiagnosticResult = z.infer<typeof DiagnosticResultSchema>;
 
-export interface DiagnosticsService {
+export const DiagnosticsServiceSchema = z.custom<{
   discoverCommands(): Promise<string[]>;
   runDiagnostics(): Promise<DiagnosticResult[]>;
-}
+}>();
+export type DiagnosticsService = z.infer<typeof DiagnosticsServiceSchema>;
 
-export interface CreateDiagnosticsServiceOptions {
+export const CreateDiagnosticsServiceOptionsSchema = z.object({
+  baseDir: z.string(),
+  config: CLIDiagnosticsConfigSchema.removeDefault().partial(),
+  shellService: z.lazy(() => ShellServiceSchema),
+}) as z.ZodType<{
   baseDir: string;
   config: Partial<CLIDiagnosticsConfig>;
   shellService: ShellService;
-}
+}>;
+export type CreateDiagnosticsServiceOptions = z.infer<typeof CreateDiagnosticsServiceOptionsSchema>;
 
 function hasScript(scripts: Record<string, unknown>, name: string): boolean {
   return typeof scripts[name] === "string";

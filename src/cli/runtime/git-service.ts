@@ -1,24 +1,33 @@
+import { z } from "zod";
 import { spawn } from "node:child_process";
 import { relative } from "node:path";
 import { resolveWorkspacePath } from "../tools/workspace.js";
 
-export interface GitDiffOptions {
+export const GitDiffOptionsSchema = z.object({
+  staged: z.boolean().optional(),
+  path: z.string().optional(),
+}) as z.ZodType<{
   staged?: boolean;
   path?: string;
-}
+}>;
+export type GitDiffOptions = z.infer<typeof GitDiffOptionsSchema>;
 
-export interface GitLogOptions {
+export const GitLogOptionsSchema = z.object({
+  limit: z.number().optional(),
+}) as z.ZodType<{
   limit?: number;
-}
+}>;
+export type GitLogOptions = z.infer<typeof GitLogOptionsSchema>;
 
-export interface GitService {
+export const GitServiceSchema = z.custom<{
   isRepository(): Promise<boolean>;
   statusShort(): Promise<string>;
   diff(options?: GitDiffOptions): Promise<string>;
   log(options?: GitLogOptions): Promise<string>;
   branchName(): Promise<string>;
   commit(message: string): Promise<string>;
-}
+}>();
+export type GitService = z.infer<typeof GitServiceSchema>;
 
 interface GitCommandResult {
   stdout: string;

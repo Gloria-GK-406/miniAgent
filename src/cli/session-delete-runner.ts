@@ -1,19 +1,30 @@
+import { z } from "zod";
 import type { PrintStreams } from "./print-runner.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type SessionDeleteOutput = "text" | "json";
+export const SessionDeleteOutputSchema = z.enum(["text", "json"]);
+export type SessionDeleteOutput = z.infer<typeof SessionDeleteOutputSchema>;
 
-export interface SessionDeleteRequest {
+export const SessionDeleteRequestSchema = z.object({
+  baseDir: z.string(),
+  sessionId: z.string(),
+  output: SessionDeleteOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   sessionId: string;
   output?: SessionDeleteOutput;
-}
+}>;
+export type SessionDeleteRequest = z.infer<typeof SessionDeleteRequestSchema>;
 
-export interface SessionDeleteResult {
+export const SessionDeleteResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+}) as z.ZodType<{
   ok: boolean;
   sessionId: string;
-}
+}>;
+export type SessionDeleteResult = z.infer<typeof SessionDeleteResultSchema>;
 
 export function formatSessionDeleteResultJson(result: SessionDeleteResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;

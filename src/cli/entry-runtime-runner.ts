@@ -1,5 +1,10 @@
+import { z } from "zod";
 import { resolve } from "node:path";
-import type { CLIEntryAction, CLIEntryOutput } from "./entry-args.js";
+import {
+  CLIEntryActionSchema,
+  type CLIEntryAction,
+  type CLIEntryOutput,
+} from "./entry-args.js";
 import { writeCLIEntryError } from "./entry-fatal.js";
 import { applyCLIEntryRuntimeOptions } from "./entry-runtime-options.js";
 import type { PrintStreams } from "./print-runner.js";
@@ -19,15 +24,36 @@ type RuntimeBackedCLIEntryActionType =
   | "list-snapshots"
   | "snapshot-action";
 
-export type RuntimeBackedCLIEntryAction = Extract<CLIEntryAction, { type: RuntimeBackedCLIEntryActionType }>;
+const RUNTIME_BACKED_ACTION_TYPES = new Set<RuntimeBackedCLIEntryActionType>([
+  "print",
+  "doctor",
+  "status",
+  "overview",
+  "list-tools",
+  "list-todos",
+  "list-agents",
+  "preview-context",
+  "show-history",
+  "search-all",
+  "list-snapshots",
+  "snapshot-action",
+]);
 
-export interface RuntimeBackedCLIEntryOptions<TPrepared = void> {
+export const RuntimeBackedCLIEntryActionSchema = CLIEntryActionSchema.refine(
+  (action) => RUNTIME_BACKED_ACTION_TYPES.has(action.type as RuntimeBackedCLIEntryActionType),
+) as z.ZodType<Extract<CLIEntryAction, { type: RuntimeBackedCLIEntryActionType }>>;
+export type RuntimeBackedCLIEntryAction = z.infer<typeof RuntimeBackedCLIEntryActionSchema>;
+
+export function RuntimeBackedCLIEntryOptionsSchema<TPrepared = void>() {
+  return z.custom<{
   action: RuntimeBackedCLIEntryAction;
   createRuntime: (cwd: string) => Promise<CLIAppRuntime>;
   streams: PrintStreams;
   prepare?: (runtime: CLIAppRuntime, cwd: string) => Promise<TPrepared>;
   run: (runtime: CLIAppRuntime, prepared: TPrepared, cwd: string) => Promise<number>;
+}>();
 }
+export type RuntimeBackedCLIEntryOptions<TPrepared = void> = z.infer<ReturnType<typeof RuntimeBackedCLIEntryOptionsSchema<TPrepared>>>;
 
 function outputFor(action: RuntimeBackedCLIEntryAction): CLIEntryOutput {
   return action.output ?? "text";

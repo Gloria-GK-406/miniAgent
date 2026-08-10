@@ -4,11 +4,7 @@ import { z } from "zod";
 import { SessionMetaSchema, type SessionMeta } from "../session-manager.js";
 import { MessageSchema, type Message, type MessageContent } from "../../core/index.js";
 import { resolveWorkspacePath } from "../tools/workspace.js";
-import {
-  CLISessionRuntimeMetadataSchema,
-  type CLISessionRuntimeMetadata,
-  type CLISessionService,
-} from "./session-service.js";
+import { CLISessionServiceSchema, CLISessionRuntimeMetadataSchema, type CLISessionRuntimeMetadata, type CLISessionService } from "./session-service.js";
 
 export const CLISessionExportSchema = z.object({
   version: z.literal(1),
@@ -20,16 +16,21 @@ export const CLISessionExportSchema = z.object({
 
 export type CLISessionExport = z.infer<typeof CLISessionExportSchema>;
 
-export interface ExportServiceOptions {
+export const ExportServiceOptionsSchema = z.object({
+  baseDir: z.string(),
+  sessionService: z.lazy(() => CLISessionServiceSchema),
+}) as z.ZodType<{
   baseDir: string;
   sessionService: CLISessionService;
-}
+}>;
+export type ExportServiceOptions = z.infer<typeof ExportServiceOptionsSchema>;
 
-export interface ExportService {
+export const ExportServiceSchema = z.custom<{
   exportJson(sessionId: string, outputPath?: string): Promise<string>;
   exportMarkdown(sessionId: string, outputPath?: string): Promise<string>;
   importJson(inputPath: string, name?: string): Promise<SessionMeta>;
-}
+}>();
+export type ExportService = z.infer<typeof ExportServiceSchema>;
 
 function safeFileName(value: string): string {
   const safe = value.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");

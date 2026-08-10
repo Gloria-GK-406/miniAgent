@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
     Action,
     AfterTurnProcessor,
@@ -26,6 +27,7 @@ import {
     DestroyableSchema,
     ErrorHandlerSchema,
     LLMRequireSchema,
+    LLMRequestSchema,
     MessageNotifierSchema,
     MessageType,
     ToolResultMessageSchema,
@@ -34,13 +36,13 @@ import {
 } from "./types.js";
 import {
     AgentConfigSchema,
+    type AgentConfig,
     ModelRuntimeSchema,
     PublicModelRuntimeSchema,
     ThinkingLevel,
     normalizeGenerationConfig,
 } from "./config.js";
 import type {
-    AgentConfig,
     GenerationConfig,
     GenerationConfigInput,
     LLMGenerateRequest,
@@ -58,7 +60,9 @@ import {
 import {
     MemoryMessageSource,
     MemoryStore,
+    MessageSourceSchema,
     PersistRequireSchema,
+    StoreSchema,
     type MessageSource,
     type PersistRequire,
     type Store,
@@ -75,19 +79,24 @@ import {
 } from "./one-shot-llm.js";
 import {
     createTokenUsageService,
+    TokenUsageServiceSchema,
     type TokenUsageService,
 } from "./token-usage.js";
 
-export interface MiniAgentOptions {
-    store?: Store;
-    messageSource?: MessageSource;
-    tokenUsage?: TokenUsageService;
-}
+export const MiniAgentOptionsSchema = z.object({
+    store: StoreSchema.optional(),
+    messageSource: MessageSourceSchema.optional(),
+    tokenUsage: TokenUsageServiceSchema.optional(),
+});
 
-export interface MiniAgentCreateOptions extends MiniAgentOptions {
-    llm: LLMRequest;
-    config: AgentConfig;
-}
+export type MiniAgentOptions = z.infer<typeof MiniAgentOptionsSchema>;
+
+export const MiniAgentCreateOptionsSchema = MiniAgentOptionsSchema.extend({
+    llm: LLMRequestSchema,
+    config: AgentConfigSchema,
+});
+
+export type MiniAgentCreateOptions = z.input<typeof MiniAgentCreateOptionsSchema>;
 
 const DEFAULT_GENERATION_CONFIG = {
     temperature: 0.7,
@@ -489,12 +498,12 @@ export class MiniAgent {
         }
 
         const addFirst: Message[] = actions
-            .filter((action): action is Extract<Action, { type: ActionType.AddFirst }> =>
+            .filter((action): action is Extract<Action, { type: typeof ActionType.AddFirst }> =>
                 action.type === ActionType.AddFirst)
             .map((action) => action.message);
 
         const addLast: Message[] = actions
-            .filter((action): action is Extract<Action, { type: ActionType.AddLast }> =>
+            .filter((action): action is Extract<Action, { type: typeof ActionType.AddLast }> =>
                 action.type === ActionType.AddLast)
             .map((action) => action.message);
 

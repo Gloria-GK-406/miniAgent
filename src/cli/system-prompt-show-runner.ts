@@ -1,4 +1,5 @@
-import { loadConfig, type CLIAgentMode } from "./config.js";
+import { z } from "zod";
+import { CLIAgentModeSchema, loadConfig, type CLIAgentMode } from "./config.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import {
@@ -6,20 +7,32 @@ import {
   getBaseSystemPrompt,
 } from "./runtime/system-prompt.js";
 
-export type SystemPromptShowOutput = "text" | "json";
+export const SystemPromptShowOutputSchema = z.enum(["text", "json"]);
+export type SystemPromptShowOutput = z.infer<typeof SystemPromptShowOutputSchema>;
 
-export interface SystemPromptShowRequest {
+export const SystemPromptShowRequestSchema = z.object({
+  baseDir: z.string(),
+  mode: z.lazy(() => CLIAgentModeSchema).optional(),
+  output: SystemPromptShowOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   mode?: CLIAgentMode;
   output?: SystemPromptShowOutput;
-}
+}>;
+export type SystemPromptShowRequest = z.infer<typeof SystemPromptShowRequestSchema>;
 
-export interface SystemPromptDisplay {
+export const SystemPromptDisplaySchema = z.object({
+  ok: z.boolean(),
+  mode: z.lazy(() => CLIAgentModeSchema),
+  basePrompt: z.string(),
+  effectivePrompt: z.string(),
+}) as z.ZodType<{
   ok: boolean;
   mode: CLIAgentMode;
   basePrompt: string;
   effectivePrompt: string;
-}
+}>;
+export type SystemPromptDisplay = z.infer<typeof SystemPromptDisplaySchema>;
 
 export function formatSystemPromptDisplay(display: SystemPromptDisplay): string {
   return [

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useCallback, useState } from "react";
 
 const COMMANDS = [
@@ -257,12 +258,18 @@ export function applySuggestion(input: string, suggestion: string): string {
   return `${leadingWhitespace}${prefix} ${suggestion} `;
 }
 
-export interface UseSuggestionOptions {
+export const UseSuggestionOptionsSchema = z.object({
+  modelPaths: z.array(z.string()).optional(),
+  referencePaths: z.array(z.string()).optional(),
+  commandSuggestions: z.array(z.string()).optional(),
+  sessionSuggestions: z.array(z.string()).optional(),
+}) as z.ZodType<{
   modelPaths?: string[];
   referencePaths?: string[];
   commandSuggestions?: string[];
   sessionSuggestions?: string[];
-}
+}>;
+export type UseSuggestionOptions = z.infer<typeof UseSuggestionOptionsSchema>;
 
 export function useSuggestion(options?: UseSuggestionOptions) {
   const modelPaths = options?.modelPaths;

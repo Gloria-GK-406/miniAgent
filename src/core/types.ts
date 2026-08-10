@@ -57,12 +57,16 @@ export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 
 export type { Tool } from "./tool.js";
 
-export enum LLMStreamChunkType {
-  TextDelta = "text-delta",
-  ReasoningDelta = "reasoning-delta",
-  ToolCallArgumentsDelta = "tool-call-arguments-delta",
-  Usage = "usage",
-}
+export const LLMStreamChunkType = {
+  TextDelta: "text-delta",
+  ReasoningDelta: "reasoning-delta",
+  ToolCallArgumentsDelta: "tool-call-arguments-delta",
+  Usage: "usage",
+} as const;
+
+export const LLMStreamChunkTypeSchema = z.enum(LLMStreamChunkType);
+
+export type LLMStreamChunkType = z.infer<typeof LLMStreamChunkTypeSchema>;
 
 export const TextDeltaChunkSchema = z.object({
   type: z.literal(LLMStreamChunkType.TextDelta),
@@ -99,27 +103,29 @@ export type ReasoningDeltaChunk = z.infer<typeof ReasoningDeltaChunkSchema>;
 export type ToolCallArgumentsDeltaChunk = z.infer<typeof ToolCallArgumentsDeltaChunkSchema>;
 export type UsageChunk = z.infer<typeof UsageChunkSchema>;
 export type LLMStreamChunk = z.infer<typeof LLMStreamChunkSchema>;
-export type MessageChunk = LLMStreamChunk;
+export type MessageChunk = z.infer<typeof LLMStreamChunkSchema>;
 
-export interface LLMStreamHandle<T> extends PromiseLike<T> {
-  onChunk(listener: (chunk: LLMStreamChunk) => void): () => void;
-  abort(): void;
+export function createLLMStreamHandleSchema<T>() {
+  return z.object({
+    onChunk: createFunctionSchema<(
+      listener: (chunk: LLMStreamChunk) => void,
+    ) => () => void>(),
+    abort: createFunctionSchema<() => void>(),
+    then: createFunctionSchema<PromiseLike<T>["then"]>(),
+  });
 }
 
-export const LLMStreamHandleSchema = z.custom<LLMStreamHandle<LLMResponse>>();
+export type LLMStreamHandle<T> = z.infer<ReturnType<typeof createLLMStreamHandleSchema<T>>>;
 
-export interface LLMRequest {
-  streamInvoke(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
-}
+export const LLMStreamHandleSchema = createLLMStreamHandleSchema<LLMResponse>();
 
-export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "streamInvoke" in value &&
-    typeof (value as { streamInvoke?: unknown }).streamInvoke === "function"
-  );
+export const LLMRequestSchema = z.object({
+  streamInvoke: createFunctionSchema<(
+    request: LLMGenerateRequest,
+  ) => AsyncGenerator<MessageChunk>>(),
 });
+
+export type LLMRequest = z.infer<typeof LLMRequestSchema>;
 
 export const ContextProviderSchema = z.object({
   priority: z.int(),
@@ -149,12 +155,16 @@ export const TurnContextAppenderSchema = z.object({
 
 export type TurnContextAppender = z.infer<typeof TurnContextAppenderSchema>;
 
-export enum ActionType {
-  Delete = "delete",
-  Replace = "replace",
-  AddFirst = "addfirst",
-  AddLast = "addlast",
-}
+export const ActionType = {
+  Delete: "delete",
+  Replace: "replace",
+  AddFirst: "addfirst",
+  AddLast: "addlast",
+} as const;
+
+export const ActionTypeSchema = z.enum(ActionType);
+
+export type ActionType = z.infer<typeof ActionTypeSchema>;
 
 export const DeleteActionSchema = z.object({
   type: z.literal(ActionType.Delete),

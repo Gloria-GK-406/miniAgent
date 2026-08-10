@@ -131,6 +131,7 @@ function mapOpenAIReasoningEffort(level: ThinkingLevel): ChatCompletionReasoning
     case ThinkingLevel.None:
       return "none";
   }
+  throw new Error(`Unsupported thinking level: ${String(level)}`);
 }
 
 const ORDERED_THINKING_LEVELS = [

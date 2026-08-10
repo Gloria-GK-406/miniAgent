@@ -4,17 +4,22 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServerConfig } from "./types.js";
+import { z } from "zod";
 
-export interface McpToolEntry {
-    name: string;
-    description?: string;
-    inputSchema: {
-        type: "object";
-        properties?: Record<string, object>;
-        required?: string[];
-        [key: string]: unknown;
-    };
-}
+export const McpToolEntrySchema = z.object({
+    name: z.string(),
+    description: z.string().optional(),
+    inputSchema: z.looseObject({
+        type: z.literal("object"),
+        properties: z.record(
+            z.string(),
+            z.custom<object>((value) => typeof value === "object" && value !== null),
+        ).optional(),
+        required: z.array(z.string()).optional(),
+    }),
+});
+
+export type McpToolEntry = z.infer<typeof McpToolEntrySchema>;
 
 export class McpClient {
     private client: Client;

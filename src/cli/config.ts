@@ -18,12 +18,32 @@ import { SubagentPluginConfigSchema } from "../extensions/index.js";
 
 export const CLIAGENT_DIR = ".cliagent";
 
-export interface LoadConfigOptions {
+export const NodePlatformSchema = z.enum([
+  "aix",
+  "android",
+  "darwin",
+  "freebsd",
+  "haiku",
+  "linux",
+  "openbsd",
+  "sunos",
+  "win32",
+  "cygwin",
+  "netbsd",
+]);
+
+export const LoadConfigOptionsSchema = z.object({
+  env: z.record(z.string(), z.union([z.string(), z.undefined()])).optional(),
+  platform: NodePlatformSchema.optional(),
+  homeDir: z.string().optional(),
+  createTemplateIfMissing: z.boolean().optional(),
+}) as z.ZodType<{
   env?: Record<string, string | undefined>;
   platform?: NodeJS.Platform;
   homeDir?: string;
   createTemplateIfMissing?: boolean;
-}
+}>;
+export type LoadConfigOptions = z.infer<typeof LoadConfigOptionsSchema>;
 
 export class ConfigTemplateCreatedError extends Error {
   constructor(public readonly configPath: string) {

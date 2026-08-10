@@ -4,6 +4,7 @@ import type {
 import type { LLMResponse, LLMStreamChunk } from "../../core/index.js";
 import { LLMStreamChunkType, MessageType } from "../../core/index.js";
 import { createTokenCount, emptyTokenCount } from "../../core/index.js";
+import { z } from "zod";
 
 interface OpenAIToolCallBuffer {
   id?: string;
@@ -12,15 +13,31 @@ interface OpenAIToolCallBuffer {
   startEmitted: boolean;
 }
 
-export interface ConsumeOpenAIStreamOptions {
-  emitChunk: (chunk: LLMStreamChunk) => void;
-  extractReasoningDelta?: (chunk: ChatCompletionChunk) => string | undefined;
-  shouldBreak?: () => boolean;
-}
+const ExtractReasoningDeltaSchema = z.custom<
+  (chunk: ChatCompletionChunk) => string | undefined
+>((value) => typeof value === "function");
 
-export interface StreamOpenAIChunksOptions {
-  extractReasoningDelta?: (chunk: ChatCompletionChunk) => string | undefined;
-}
+export const ConsumeOpenAIStreamOptionsSchema = z.object({
+  emitChunk: z.custom<(chunk: LLMStreamChunk) => void>(
+    (value) => typeof value === "function",
+  ),
+  extractReasoningDelta: ExtractReasoningDeltaSchema.optional(),
+  shouldBreak: z.custom<() => boolean>(
+    (value) => typeof value === "function",
+  ).optional(),
+});
+
+export type ConsumeOpenAIStreamOptions = z.infer<
+  typeof ConsumeOpenAIStreamOptionsSchema
+>;
+
+export const StreamOpenAIChunksOptionsSchema = z.object({
+  extractReasoningDelta: ExtractReasoningDeltaSchema.optional(),
+});
+
+export type StreamOpenAIChunksOptions = z.infer<
+  typeof StreamOpenAIChunksOptionsSchema
+>;
 
 function getToolCallBuffer(
   buffers: OpenAIToolCallBuffer[],

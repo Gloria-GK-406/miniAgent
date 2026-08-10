@@ -1,20 +1,30 @@
+import { z } from "zod";
 import type { Dirent } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
 
-export interface ResolvedReference {
+export const ResolvedReferenceSchema = z.object({
+  token: z.string(),
+  path: z.string(),
+  displayPath: z.string(),
+  content: z.string(),
+  startLine: z.number().optional(),
+  endLine: z.number().optional(),
+}) as z.ZodType<{
   token: string;
   path: string;
   displayPath: string;
   content: string;
   startLine?: number;
   endLine?: number;
-}
+}>;
+export type ResolvedReference = z.infer<typeof ResolvedReferenceSchema>;
 
-export interface ReferenceService {
+export const ReferenceServiceSchema = z.custom<{
   resolveReferences(input: string): Promise<ResolvedReference[]>;
   listReferenceCandidates(): Promise<string[]>;
-}
+}>();
+export type ReferenceService = z.infer<typeof ReferenceServiceSchema>;
 
 const REF_PATTERN = /(^|\s)(@[^\s]+)/g;
 const IGNORED_REFERENCE_DIRS = new Set([

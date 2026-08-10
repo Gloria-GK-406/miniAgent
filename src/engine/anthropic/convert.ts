@@ -218,6 +218,7 @@ function mapAnthropicEffort(level: ThinkingLevel): AnthropicEffort {
     case ThinkingLevel.None:
       return "low";
   }
+  throw new Error(`Unsupported thinking level: ${String(level)}`);
 }
 
 export function buildCreateParamsFromRequest(

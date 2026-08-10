@@ -1,15 +1,22 @@
-import type { CLIEntrySnapshotAction } from "./entry-args.js";
+import { z } from "zod";
+import { CLIEntrySnapshotActionSchema, type CLIEntrySnapshotAction } from "./entry-args.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 
-export type SnapshotActionOutput = "text" | "json";
+export const SnapshotActionOutputSchema = z.enum(["text", "json"]);
+export type SnapshotActionOutput = z.infer<typeof SnapshotActionOutputSchema>;
 
-export interface SnapshotActionResult {
+export const SnapshotActionResultSchema = z.object({
+  ok: z.literal(true),
+  action: z.lazy(() => CLIEntrySnapshotActionSchema),
+  turnId: z.string(),
+}) as z.ZodType<{
   ok: true;
   action: CLIEntrySnapshotAction;
   turnId: string;
-}
+}>;
+export type SnapshotActionResult = z.infer<typeof SnapshotActionResultSchema>;
 
 export function formatSnapshotActionResult(result: SnapshotActionResult): string {
   const verb = result.action === "restore" ? "Restored" : "Reapplied";

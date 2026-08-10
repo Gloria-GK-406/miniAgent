@@ -1,9 +1,11 @@
+import { z } from "zod";
 import type { Message, MessageContent } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type HistoryOutput = "text" | "json";
+export const HistoryOutputSchema = z.enum(["text", "json"]);
+export type HistoryOutput = z.infer<typeof HistoryOutputSchema>;
 
 function formatContent(content: MessageContent): string {
   if (typeof content === "string") {

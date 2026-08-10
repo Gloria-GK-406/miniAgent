@@ -1,13 +1,19 @@
+import { z } from "zod";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import { createReferenceService } from "./runtime/reference-service.js";
 
-export type ReferenceListOutput = "text" | "json";
+export const ReferenceListOutputSchema = z.enum(["text", "json"]);
+export type ReferenceListOutput = z.infer<typeof ReferenceListOutputSchema>;
 
-export interface ReferenceListRequest {
+export const ReferenceListRequestSchema = z.object({
+  baseDir: z.string(),
+  output: ReferenceListOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   output?: ReferenceListOutput;
-}
+}>;
+export type ReferenceListRequest = z.infer<typeof ReferenceListRequestSchema>;
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;

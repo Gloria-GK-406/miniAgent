@@ -20,7 +20,7 @@ export const CLISessionRuntimeMetadataSchema = z.strictObject({
 
 export type CLISessionRuntimeMetadata = z.infer<typeof CLISessionRuntimeMetadataSchema>;
 
-export interface CLISessionService {
+export const CLISessionServiceSchema = z.custom<{
   ensureActiveSession(): Promise<SessionMeta>;
   getActiveSession(): SessionMeta;
   getSession(id: string): SessionMeta;
@@ -39,7 +39,8 @@ export interface CLISessionService {
   writeMessages(id: string, messages: Message[]): Promise<void>;
   removeLastUserTurn(id: string): Promise<{ turnId: string; messages: Message[] }>;
   appendMessages(id: string, messages: Message[]): Promise<void>;
-}
+}>();
+export type CLISessionService = z.infer<typeof CLISessionServiceSchema>;
 
 function parseMessagesJsonl(content: string): Message[] {
   if (content.trim().length === 0) {

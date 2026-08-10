@@ -1,23 +1,126 @@
+import { z } from "zod";
 import type { MiniAgent } from "../../core/index.js";
-import type { ModelPreset } from "../../core/index.js";
-import type { SessionMeta } from "../session-manager.js";
-import type {
-  Message,
-  TokenCount,
-  ToolCallMessage,
-  ToolResultMessage,
+import { ModelPresetSchema, type ModelPreset } from "../../core/index.js";
+import { SessionMetaSchema, type SessionMeta } from "../session-manager.js";
+import {
+  MessageSchema,
+  TokenCountSchema,
+  ToolCallMessageSchema,
+  ToolResultMessageSchema,
+  type Message,
+  type TokenCount,
+  type ToolCallMessage,
+  type ToolResultMessage,
 } from "../../core/index.js";
-import type { Tool } from "../../core/index.js";
-import type { TodoItemSnapshot } from "../../extensions/index.js";
-import type { CLIAgentMode, CLIConfig, CLIPermissionDecision } from "../config.js";
-import type { DiagnosticResult } from "./diagnostics-service.js";
-import type { CLIDoctorCheck } from "./doctor-service.js";
+import { ToolSchema, type Tool } from "../../core/index.js";
+import { TodoItemSnapshotSchema, type TodoItemSnapshot } from "../../extensions/index.js";
+import {
+  CLIAgentModeSchema,
+  CLIConfigSchema,
+  CLIPermissionDecisionSchema,
+  NodePlatformSchema,
+  type CLIAgentMode,
+  type CLIConfig,
+  type CLIPermissionDecision,
+} from "../config.js";
+import { DiagnosticResultSchema, type DiagnosticResult } from "./diagnostics-service.js";
+import { CLIDoctorCheckSchema, type CLIDoctorCheck } from "./doctor-service.js";
 import type { ProjectInstructionsResult } from "./project-instructions-service.js";
-import type { SnapshotRecord } from "./snapshot-service.js";
-import type { CLISubagentSummary } from "./subagent-service.js";
+import { SnapshotRecordSchema, type SnapshotRecord } from "./snapshot-service.js";
+import { CLISubagentSummarySchema, type CLISubagentSummary } from "./subagent-service.js";
 
-export type CLIViewPanel =
-  | { type: "none" }
+export const CLIViewPanelSchema = z.union([z.object({
+  type: z.literal("none"),
+}), z.object({
+  type: z.literal("about"),
+  info: z.lazy(() => CLIAboutInfoSchema),
+}), z.object({
+  type: z.literal("overview"),
+  info: z.lazy(() => CLIOverviewInfoSchema),
+}), z.object({
+  type: z.literal("status"),
+}), z.object({
+  type: z.literal("help"),
+  query: z.string().optional(),
+}), z.object({
+  type: z.literal("keybindings"),
+}), z.object({
+  type: z.literal("history"),
+  messages: z.array(MessageSchema),
+}), z.object({
+  type: z.literal("context"),
+  messages: z.array(MessageSchema),
+}), z.object({
+  type: z.literal("input-history"),
+  query: z.string().optional(),
+  entries: z.array(z.lazy(() => CLIInputHistoryPanelEntrySchema)),
+}), z.object({
+  type: z.literal("todos"),
+  todos: z.array(TodoItemSnapshotSchema),
+  query: z.string().optional(),
+}), z.object({
+  type: z.literal("search"),
+  query: z.string(),
+  hits: z.array(z.lazy(() => CLITranscriptSearchHitSchema)),
+}), z.object({
+  type: z.literal("search-all"),
+  query: z.string(),
+  hits: z.array(z.lazy(() => CLISessionSearchHitSchema)),
+}), z.object({
+  type: z.literal("references"),
+  references: z.array(z.string()),
+}), z.object({
+  type: z.literal("models"),
+}), z.object({
+  type: z.literal("connect"),
+}), z.object({
+  type: z.literal("sessions"),
+  sessions: z.array(SessionMetaSchema),
+  query: z.string().optional(),
+}), z.object({
+  type: z.literal("agents"),
+  mode: CLIAgentModeSchema,
+  subagents: z.array(CLISubagentSummarySchema),
+}), z.object({
+  type: z.literal("tools"),
+  tools: z.array(ToolSchema),
+  query: z.string().optional(),
+}), z.object({
+  type: z.literal("permissions"),
+  permission: CLIConfigSchema.shape.permission,
+  autoApprove: z.boolean(),
+}), z.object({
+  type: z.literal("system"),
+  basePrompt: z.string(),
+  effectivePrompt: z.string(),
+}), z.object({
+  type: z.literal("config"),
+  title: z.string(),
+  content: z.string(),
+}), z.object({
+  type: z.literal("git"),
+  title: z.string(),
+  content: z.string(),
+}), z.object({
+  type: z.literal("diff"),
+  title: z.string(),
+  content: z.string(),
+}), z.object({
+  type: z.literal("snapshots"),
+  records: z.array(SnapshotRecordSchema),
+}), z.object({
+  type: z.literal("diagnostics"),
+  results: z.array(DiagnosticResultSchema),
+}), z.object({
+  type: z.literal("doctor"),
+  checks: z.array(CLIDoctorCheckSchema),
+}), z.object({
+  type: z.literal("activity"),
+  entries: z.array(z.lazy(() => CLIActivityEntrySchema)),
+}), z.object({
+  type: z.literal("error"),
+  message: z.string(),
+})]) as z.ZodType<| { type: "none" }
   | { type: "about"; info: CLIAboutInfo }
   | { type: "overview"; info: CLIOverviewInfo }
   | { type: "status" }
@@ -44,32 +147,68 @@ export type CLIViewPanel =
   | { type: "diagnostics"; results: DiagnosticResult[] }
   | { type: "doctor"; checks: CLIDoctorCheck[] }
   | { type: "activity"; entries: CLIActivityEntry[] }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }>;
+export type CLIViewPanel = z.infer<typeof CLIViewPanelSchema>;
 
-export interface CLIAboutInfo {
-  packageVersion: string;
-  nodeVersion: string;
-  platform: NodeJS.Platform;
-  arch: string;
-  baseDir: string;
-  projectConfigPath: string;
-  globalConfigPath: string;
-  modelCount: number;
-  sessionCount: number;
-  builtinCommandCount: number;
-  customCommandCount: number;
-}
+export const CLIAboutInfoSchema = z.object({
+  packageVersion: z.string(),
+  nodeVersion: z.string(),
+  platform: NodePlatformSchema,
+  arch: z.string(),
+  baseDir: z.string(),
+  projectConfigPath: z.string(),
+  globalConfigPath: z.string(),
+  modelCount: z.number(),
+  sessionCount: z.number(),
+  builtinCommandCount: z.number(),
+  customCommandCount: z.number(),
+});
+export type CLIAboutInfo = z.infer<typeof CLIAboutInfoSchema>;
 
-export interface CLIOverviewGitInfo {
+export const CLIOverviewGitInfoSchema = z.object({
+  repository: z.boolean(),
+  branch: z.string().optional(),
+  changedFiles: z.number(),
+  stagedFiles: z.number(),
+  untrackedFiles: z.number(),
+  summary: z.string(),
+}) as z.ZodType<{
   repository: boolean;
   branch?: string;
   changedFiles: number;
   stagedFiles: number;
   untrackedFiles: number;
   summary: string;
-}
+}>;
+export type CLIOverviewGitInfo = z.infer<typeof CLIOverviewGitInfoSchema>;
 
-export interface CLIOverviewInfo {
+export const CLIOverviewInfoSchema = z.object({
+  workspace: z.string(),
+  sessionId: z.string(),
+  sessionName: z.string(),
+  sessionCount: z.number(),
+  mode: CLIAgentModeSchema,
+  modelName: z.string(),
+  messageCount: z.number(),
+  tokenUsage: TokenCountSchema,
+  autoApprove: z.boolean(),
+  showReasoning: z.boolean(),
+  showToolDetails: z.boolean(),
+  defaultPermission: CLIPermissionDecisionSchema,
+  todoCounts: z.object({
+  pending: z.number(),
+  inProgress: z.number(),
+  completed: z.number(),
+  total: z.number(),
+}),
+  activityCounts: z.object({
+  running: z.number(),
+  done: z.number(),
+  error: z.number(),
+  total: z.number(),
+}),
+  git: CLIOverviewGitInfoSchema,
+}) as z.ZodType<{
   workspace: string;
   sessionId: string;
   sessionName: string;
@@ -95,24 +234,32 @@ export interface CLIOverviewInfo {
     total: number;
   };
   git: CLIOverviewGitInfo;
-}
+}>;
+export type CLIOverviewInfo = z.infer<typeof CLIOverviewInfoSchema>;
 
-export interface CLIApprovalRequest {
-  id: string;
-  toolName: string;
-  args: Record<string, unknown>;
-  decision: "pending";
-}
+export const CLIApprovalRequestSchema = z.object({
+  id: z.string(),
+  toolName: z.string(),
+  args: z.record(z.string(), z.unknown()),
+  decision: z.literal("pending"),
+});
+export type CLIApprovalRequest = z.infer<typeof CLIApprovalRequestSchema>;
 
-export type CLIApprovalDecision =
-  | "allow"
-  | "deny"
-  | "allow-session"
-  | "deny-session";
+export const CLIApprovalDecisionSchema = z.enum(["allow", "deny", "allow-session", "deny-session"]);
+export type CLIApprovalDecision = z.infer<typeof CLIApprovalDecisionSchema>;
 
-export type CLIApprovalAnswer = CLIApprovalDecision | boolean;
+export const CLIApprovalAnswerSchema = z.union([CLIApprovalDecisionSchema, z.boolean()]);
+export type CLIApprovalAnswer = z.infer<typeof CLIApprovalAnswerSchema>;
 
-export interface CLIActivityEntry {
+export const CLIActivityEntrySchema = z.object({
+  id: z.string(),
+  kind: z.enum(["tool", "subagent", "approval"]),
+  name: z.string(),
+  status: z.enum(["running", "done", "error"]),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+  summary: z.string(),
+}) as z.ZodType<{
   id: string;
   kind: "tool" | "subagent" | "approval";
   name: string;
@@ -120,36 +267,73 @@ export interface CLIActivityEntry {
   startedAt: string;
   endedAt?: string;
   summary: string;
-}
+}>;
+export type CLIActivityEntry = z.infer<typeof CLIActivityEntrySchema>;
 
-export interface CLIInputHistoryPanelEntry {
-  index: number;
-  text: string;
-}
+export const CLIInputHistoryPanelEntrySchema = z.object({
+  index: z.number(),
+  text: z.string(),
+});
+export type CLIInputHistoryPanelEntry = z.infer<typeof CLIInputHistoryPanelEntrySchema>;
 
-export interface CLITranscriptSearchHit {
-  id: string;
-  index: number;
-  role: "system" | "user" | "assistant" | "tool-call" | "tool-result";
-  preview: string;
-}
+export const CLITranscriptSearchHitSchema = z.object({
+  id: z.string(),
+  index: z.number(),
+  role: z.enum(["system", "user", "assistant", "tool-call", "tool-result"]),
+  preview: z.string(),
+});
+export type CLITranscriptSearchHit = z.infer<typeof CLITranscriptSearchHitSchema>;
 
-export interface CLISessionSearchHit extends CLITranscriptSearchHit {
+export const CLISessionSearchHitSchema = z.intersection(CLITranscriptSearchHitSchema, z.object({
+  sessionId: z.string(),
+  sessionName: z.string(),
+})) as z.ZodType<CLITranscriptSearchHit & {
   sessionId: string;
   sessionName: string;
-}
+}>;
+export type CLISessionSearchHit = z.infer<typeof CLISessionSearchHitSchema>;
 
-export type CLICommandHelpSource = "builtin" | "custom";
+export const CLICommandHelpSourceSchema = z.enum(["builtin", "custom"]);
+export type CLICommandHelpSource = z.infer<typeof CLICommandHelpSourceSchema>;
 
-export interface CLICommandHelpItem {
-  name: string;
-  aliases: string[];
-  description: string;
-  usage: string;
-  source: CLICommandHelpSource;
-}
+export const CLICommandHelpItemSchema = z.object({
+  name: z.string(),
+  aliases: z.array(z.string()),
+  description: z.string(),
+  usage: z.string(),
+  source: CLICommandHelpSourceSchema,
+});
+export type CLICommandHelpItem = z.infer<typeof CLICommandHelpItemSchema>;
 
-export interface CLIState {
+export const CLIStateSchema = z.object({
+  baseDir: z.string(),
+  config: CLIConfigSchema,
+  mode: CLIAgentModeSchema,
+  modelName: z.string(),
+  modelPaths: z.array(z.string()),
+  commandSuggestions: z.array(z.string()),
+  commandHelp: z.array(CLICommandHelpItemSchema),
+  referencePaths: z.array(z.string()),
+  inputHistory: z.array(z.string()),
+  sessionId: z.string(),
+  sessionName: z.string(),
+  sessions: z.array(SessionMetaSchema),
+  autoApprove: z.boolean(),
+  showReasoning: z.boolean(),
+  showToolDetails: z.boolean(),
+  isRunning: z.boolean(),
+  currentTool: z.union([z.string(), z.null()]),
+  messages: z.array(MessageSchema),
+  streamingText: z.string(),
+  reasoningText: z.string(),
+  turnCount: z.number(),
+  tokenUsage: TokenCountSchema,
+  activity: z.array(CLIActivityEntrySchema),
+  panel: CLIViewPanelSchema,
+  approval: z.union([CLIApprovalRequestSchema, z.null()]),
+  error: z.union([z.string(), z.null()]),
+  exitRequested: z.boolean(),
+}) as z.ZodType<{
   baseDir: string;
   config: CLIConfig;
   mode: CLIAgentMode;
@@ -177,36 +361,66 @@ export interface CLIState {
   approval: CLIApprovalRequest | null;
   error: string | null;
   exitRequested: boolean;
-}
+}>;
+export type CLIState = z.infer<typeof CLIStateSchema>;
 
-export interface CLIInputOverrides {
+export const CLIInputOverridesSchema = z.object({
+  mode: CLIAgentModeSchema.optional(),
+  model: z.string().optional(),
+}) as z.ZodType<{
   mode?: CLIAgentMode;
   model?: string;
-}
+}>;
+export type CLIInputOverrides = z.infer<typeof CLIInputOverridesSchema>;
 
-export interface CLIProviderConnection {
+export const CLIProviderConnectionSchema = z.object({
+  engine: z.string(),
+  key: z.string(),
+  baseURL: z.string().optional(),
+  models: z.array(ModelPresetSchema),
+  defaultModel: z.string(),
+}) as z.ZodType<{
   engine: string;
   key: string;
   baseURL?: string;
   models: ModelPreset[];
   defaultModel: string;
-}
+}>;
+export type CLIProviderConnection = z.infer<typeof CLIProviderConnectionSchema>;
 
-export interface CLIDiffOptions {
+export const CLIDiffOptionsSchema = z.object({
+  staged: z.boolean().optional(),
+}) as z.ZodType<{
   staged?: boolean;
-}
+}>;
+export type CLIDiffOptions = z.infer<typeof CLIDiffOptionsSchema>;
 
-export type CLIEvent =
-  | { type: "state"; state: CLIState }
+export const CLIEventSchema = z.union([z.object({
+  type: z.literal("state"),
+  state: CLIStateSchema,
+}), z.object({
+  type: z.literal("notice"),
+  level: z.union([z.literal("info"), z.literal("warn"), z.literal("error")]),
+  message: z.string(),
+}), z.object({
+  type: z.literal("tool:start"),
+  toolCall: ToolCallMessageSchema,
+}), z.object({
+  type: z.literal("tool:result"),
+  toolCall: ToolCallMessageSchema,
+  result: ToolResultMessageSchema,
+})]) as z.ZodType<| { type: "state"; state: CLIState }
   | { type: "notice"; level: "info" | "warn" | "error"; message: string }
   | { type: "tool:start"; toolCall: ToolCallMessage }
-  | { type: "tool:result"; toolCall: ToolCallMessage; result: ToolResultMessage };
+  | { type: "tool:result"; toolCall: ToolCallMessage; result: ToolResultMessage }>;
+export type CLIEvent = z.infer<typeof CLIEventSchema>;
 
-export interface CLIRuntimeSubscriber {
+export const CLIRuntimeSubscriberSchema = z.custom<{
   (event: CLIEvent): void;
-}
+}>();
+export type CLIRuntimeSubscriber = z.infer<typeof CLIRuntimeSubscriberSchema>;
 
-export interface CLIAppRuntime {
+export const CLIAppRuntimeSchema = z.custom<{
   getState(): CLIState;
   subscribe(listener: CLIRuntimeSubscriber): () => void;
   submitInput(input: string): Promise<void>;
@@ -252,17 +466,19 @@ export interface CLIAppRuntime {
   requestExit(): Promise<void>;
   rebuildAgent(reason: string): Promise<void>;
   destroy(): Promise<void>;
-}
+}>();
+export type CLIAppRuntime = z.infer<typeof CLIAppRuntimeSchema>;
 
-export interface CLICommandContext {
+export const CLICommandContextSchema = z.custom<{
   runtime: CLIAppRuntime;
   agent: MiniAgent;
   getState: () => CLIState;
   updateState: (patch: Partial<CLIState>) => void;
   notice: (level: "info" | "warn" | "error", message: string) => void;
-}
+}>();
+export type CLICommandContext = z.infer<typeof CLICommandContextSchema>;
 
-export interface CLICommand {
+export const CLICommandSchema = z.custom<{
   name: string;
   aliases?: string[];
   description: string;
@@ -270,14 +486,17 @@ export interface CLICommand {
   hidden?: boolean;
   execute(ctx: CLICommandContext, args: string): Promise<void>;
   complete?(ctx: CLICommandContext, args: string): Promise<string[]>;
-}
+}>();
+export type CLICommand = z.infer<typeof CLICommandSchema>;
 
-export interface CLIPermissionRequest {
-  toolName: string;
-  args: Record<string, unknown>;
-}
+export const CLIPermissionRequestSchema = z.object({
+  toolName: z.string(),
+  args: z.record(z.string(), z.unknown()),
+});
+export type CLIPermissionRequest = z.infer<typeof CLIPermissionRequestSchema>;
 
-export interface CLIPermissionResult {
-  decision: CLIPermissionDecision;
-  reason: string;
-}
+export const CLIPermissionResultSchema = z.object({
+  decision: CLIPermissionDecisionSchema,
+  reason: z.string(),
+});
+export type CLIPermissionResult = z.infer<typeof CLIPermissionResultSchema>;

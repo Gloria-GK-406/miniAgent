@@ -1,9 +1,11 @@
+import { z } from "zod";
 import type { SnapshotRecord } from "./runtime/snapshot-service.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 import type { PrintStreams } from "./print-runner.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type SnapshotListOutput = "text" | "json";
+export const SnapshotListOutputSchema = z.enum(["text", "json"]);
+export type SnapshotListOutput = z.infer<typeof SnapshotListOutputSchema>;
 
 interface SnapshotGroup {
   turnId: string;

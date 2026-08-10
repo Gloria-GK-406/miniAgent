@@ -4,6 +4,7 @@ import type {
 } from "../../core/index.js";
 import { MessageType } from "../../core/index.js";
 import type { OneShotLLMFactory, OneShotLLMRequire } from "../../core/index.js";
+import { z } from "zod";
 
 const SUMMARIZE_PROMPT = `You are a conversation summarizer. Summarize the following conversation into a concise summary that preserves:
 1. Key decisions made
@@ -28,12 +29,16 @@ function buildFallbackSummary(messages: Message[]): string {
         .join("\n");
 }
 
-export interface CompressionConfig {
-    maxMessages: number;
-    keepRecent: number;
-}
+export const CompressionConfigSchema = z.object({
+    maxMessages: z.number(),
+    keepRecent: z.number(),
+});
 
-export type ContextCompressorOptions = Partial<CompressionConfig>;
+export type CompressionConfig = z.infer<typeof CompressionConfigSchema>;
+
+export const ContextCompressorOptionsSchema = CompressionConfigSchema.partial();
+
+export type ContextCompressorOptions = z.input<typeof ContextCompressorOptionsSchema>;
 
 export class ContextCompressor implements ContextProvider, OneShotLLMRequire {
     priority = -1000;

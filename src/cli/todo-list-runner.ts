@@ -1,9 +1,11 @@
+import { z } from "zod";
 import type { TodoItemSnapshot } from "../extensions/index.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 
-export type TodoListOutput = "text" | "json";
+export const TodoListOutputSchema = z.enum(["text", "json"]);
+export type TodoListOutput = z.infer<typeof TodoListOutputSchema>;
 
 export function filterTodos(todos: TodoItemSnapshot[], query: string | undefined): TodoItemSnapshot[] {
   const normalized = query?.trim().toLowerCase() ?? "";

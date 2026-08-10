@@ -3,16 +3,23 @@ import type { Tool } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import { createModeAwarePermissionService, createPermissionService } from "./runtime/permission-service.js";
-import type { CLIAppRuntime, CLIPermissionResult } from "./runtime/types.js";
+import { CLIPermissionResultSchema, type CLIAppRuntime, type CLIPermissionResult } from "./runtime/types.js";
 
-export type ToolListOutput = "text" | "json";
+export const ToolListOutputSchema = z.enum(["text", "json"]);
+export type ToolListOutput = z.infer<typeof ToolListOutputSchema>;
 
-export interface ToolListItem {
+export const ToolListItemSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  parameters: z.record(z.string(), z.unknown()),
+  permission: z.lazy(() => CLIPermissionResultSchema).optional(),
+}) as z.ZodType<{
   name: string;
   description: string;
   parameters: Record<string, unknown>;
   permission?: CLIPermissionResult;
-}
+}>;
+export type ToolListItem = z.infer<typeof ToolListItemSchema>;
 
 export function toToolListItem(
   tool: Tool,

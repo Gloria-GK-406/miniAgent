@@ -1,11 +1,33 @@
-import type { CLIPermissionDecision } from "./config.js";
+import { z } from "zod";
+import { TokenCountSchema } from "../core/index.js";
+import {
+  CLIAgentModeSchema,
+  CLIPermissionDecisionSchema,
+  type CLIPermissionDecision,
+} from "./config.js";
 import type { PrintStreams } from "./print-runner.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
 
-export type RuntimeStatusOutput = "text" | "json";
+export const RuntimeStatusOutputSchema = z.enum(["text", "json"]);
+export type RuntimeStatusOutput = z.infer<typeof RuntimeStatusOutputSchema>;
 
-export interface RuntimeStatus {
+export const RuntimeStatusSchema = z.object({
+  ok: z.boolean(),
+  baseDir: z.string(),
+  sessionId: z.string(),
+  sessionName: z.string(),
+  mode: CLIAgentModeSchema,
+  modelName: z.string(),
+  messageCount: z.number(),
+  tokenUsage: TokenCountSchema,
+  autoApprove: z.boolean(),
+  showReasoning: z.boolean(),
+  showToolDetails: z.boolean(),
+  defaultPermission: z.lazy(() => CLIPermissionDecisionSchema),
+  isRunning: z.boolean(),
+  currentTool: z.union([z.string(), z.null()]),
+}) as z.ZodType<{
   ok: boolean;
   baseDir: string;
   sessionId: string;
@@ -20,7 +42,8 @@ export interface RuntimeStatus {
   defaultPermission: CLIPermissionDecision;
   isRunning: boolean;
   currentTool: string | null;
-}
+}>;
+export type RuntimeStatus = z.infer<typeof RuntimeStatusSchema>;
 
 function formatTokenCount(count: number): string {
   if (count >= 1000) {

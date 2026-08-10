@@ -5,6 +5,7 @@ import type {
 import type { LLMResponse, LLMStreamChunk } from "../../core/index.js";
 import { LLMStreamChunkType, MessageType } from "../../core/index.js";
 import { createTokenCount, emptyTokenCount } from "../../core/index.js";
+import { z } from "zod";
 
 interface AnthropicToolUseBuffer {
   id: string;
@@ -14,10 +15,18 @@ interface AnthropicToolUseBuffer {
   startEmitted: boolean;
 }
 
-export interface ConsumeAnthropicStreamOptions {
-  emitChunk: (chunk: LLMStreamChunk) => void;
-  shouldBreak?: () => boolean;
-}
+export const ConsumeAnthropicStreamOptionsSchema = z.object({
+  emitChunk: z.custom<(chunk: LLMStreamChunk) => void>(
+    (value) => typeof value === "function",
+  ),
+  shouldBreak: z.custom<() => boolean>(
+    (value) => typeof value === "function",
+  ).optional(),
+});
+
+export type ConsumeAnthropicStreamOptions = z.infer<
+  typeof ConsumeAnthropicStreamOptionsSchema
+>;
 
 function toToolArguments(toolUse: AnthropicToolUseBuffer): Record<string, unknown> {
   if (toolUse.inputJson !== "") {

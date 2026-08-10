@@ -1,4 +1,6 @@
-export type CompletionShell = "bash" | "zsh" | "fish" | "powershell";
+import { z } from "zod";
+export const CompletionShellSchema = z.enum(["bash", "zsh", "fish", "powershell"]);
+export type CompletionShell = z.infer<typeof CompletionShellSchema>;
 
 interface CompletionOption {
   long: string;

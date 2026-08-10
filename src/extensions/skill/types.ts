@@ -13,11 +13,13 @@ export const SkillPluginConfigSchema = z.object({
 export type SkillPluginConfig = z.infer<typeof SkillPluginConfigSchema>;
 export type SkillPluginConfigInput = z.input<typeof SkillPluginConfigSchema>;
 
-export interface SkillEntry {
-    id: string;
-    name: string;
-    description: string;
-    content: string;
-    dirPath: string;
-    files: string[];
-}
+export const SkillEntrySchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    content: z.string(),
+    dirPath: z.string(),
+    files: z.array(z.string()),
+});
+
+export type SkillEntry = z.infer<typeof SkillEntrySchema>;

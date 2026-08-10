@@ -1,29 +1,48 @@
+import { z } from "zod";
 import { spawn } from "node:child_process";
 import type { CLIShellConfig } from "../config.js";
 
-export interface ShellInvocation {
+export const ShellInvocationSchema = z.object({
+  command: z.string(),
+  args: z.array(z.string()),
+}) as z.ZodType<{
   command: string;
   args: string[];
-}
+}>;
+export type ShellInvocation = z.infer<typeof ShellInvocationSchema>;
 
-export interface ShellExecuteRequest {
+export const ShellExecuteRequestSchema = z.object({
+  command: z.string(),
+  cwd: z.string().optional(),
+  signal: z.custom<AbortSignal>().optional(),
+  timeoutMs: z.number().optional(),
+}) as z.ZodType<{
   command: string;
   cwd?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
-}
+}>;
+export type ShellExecuteRequest = z.infer<typeof ShellExecuteRequestSchema>;
 
-export interface ShellExecuteResult {
+export const ShellExecuteResultSchema = z.object({
+  stdout: z.string(),
+  stderr: z.string(),
+  exitCode: z.union([z.number(), z.null()]),
+  timedOut: z.boolean(),
+  aborted: z.boolean(),
+}) as z.ZodType<{
   stdout: string;
   stderr: string;
   exitCode: number | null;
   timedOut: boolean;
   aborted: boolean;
-}
+}>;
+export type ShellExecuteResult = z.infer<typeof ShellExecuteResultSchema>;
 
-export interface ShellService {
+export const ShellServiceSchema = z.custom<{
   execute(request: ShellExecuteRequest): Promise<ShellExecuteResult>;
-}
+}>();
+export type ShellService = z.infer<typeof ShellServiceSchema>;
 
 export function buildShellInvocation(
   commandText: string,

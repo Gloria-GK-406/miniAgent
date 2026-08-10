@@ -1,19 +1,27 @@
+import { z } from "zod";
 import { useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 
-export type DiffLineKind = "add" | "remove" | "hunk" | "file" | "context";
+export const DiffLineKindSchema = z.enum(["add", "remove", "hunk", "file", "context"]);
+export type DiffLineKind = z.infer<typeof DiffLineKindSchema>;
 
-export interface DiffWindow {
+export const DiffWindowSchema = z.object({
+  visibleLines: z.array(z.string()),
+  maxOffset: z.number(),
+  scrollOffset: z.number(),
+}) as z.ZodType<{
   visibleLines: string[];
   maxOffset: number;
   scrollOffset: number;
-}
+}>;
+export type DiffWindow = z.infer<typeof DiffWindowSchema>;
 
-export interface DiffViewProps {
+export const DiffViewPropsSchema = z.custom<{
   title: string;
   content: string;
   onClose: () => void;
-}
+}>();
+export type DiffViewProps = z.infer<typeof DiffViewPropsSchema>;
 
 export function classifyDiffLine(line: string): DiffLineKind {
   if (

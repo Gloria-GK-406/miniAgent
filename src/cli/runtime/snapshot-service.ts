@@ -28,21 +28,23 @@ interface FileState {
   content?: string;
 }
 
-export interface SnapshotServiceOptions {
+export const SnapshotServiceOptionsSchema = z.custom<{
   baseDir: string;
   sessionService: CLISessionService;
   getActiveSessionId: () => string;
   getActiveTurnId: () => string | null;
-}
+}>();
+export type SnapshotServiceOptions = z.infer<typeof SnapshotServiceOptionsSchema>;
 
-export interface SnapshotService {
+export const SnapshotServiceSchema = z.custom<{
   recordBeforeMutation(path: string, mutate: () => Promise<void>): Promise<void>;
   restoreTurn(turnId: string): Promise<void>;
   reapplyTurn(turnId: string): Promise<void>;
   captureRedo(turnId: string): Promise<SnapshotRecord[]>;
   listSnapshots(): Promise<SnapshotRecord[]>;
   listTurnSnapshots(turnId: string): Promise<SnapshotRecord[]>;
-}
+}>();
+export type SnapshotService = z.infer<typeof SnapshotServiceSchema>;
 
 async function readFileState(path: string): Promise<FileState> {
   try {

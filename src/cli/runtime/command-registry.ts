@@ -1,11 +1,13 @@
+import { z } from "zod";
 import type { CLICommand, CLICommandContext } from "./types.js";
 
-export interface CommandRegistry {
+export const CommandRegistrySchema = z.custom<{
   register(command: CLICommand): void;
   list(): CLICommand[];
   execute(ctx: CLICommandContext, input: string): Promise<void>;
   complete(ctx: CLICommandContext, input: string): Promise<string[]>;
-}
+}>();
+export type CommandRegistry = z.infer<typeof CommandRegistrySchema>;
 
 function normalizeName(value: string): string {
   return value.startsWith("/") ? value.slice(1) : value;

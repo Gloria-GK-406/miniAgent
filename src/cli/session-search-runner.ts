@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime, CLISessionSearchHit } from "./runtime/types.js";
 
-export type SessionSearchOutput = "text" | "json";
+export const SessionSearchOutputSchema = z.enum(["text", "json"]);
+export type SessionSearchOutput = z.infer<typeof SessionSearchOutputSchema>;
 
 function plural(count: number, noun: string): string {
   if (noun === "match") {

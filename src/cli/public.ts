@@ -1,5 +1,14 @@
 export {
+    AgentUseBlueprintFactorySchema,
+    AgentUseBlueprintImplSchema,
+    AgentUseFactoryResultSchema,
+    AssembleBlueprintOptionsSchema,
+    BlueprintImplSchema,
     BlueprintManager,
+    EngineBlueprintFactorySchema,
+    EngineBlueprintImplSchema,
+    PersistenceBlueprintFactorySchema,
+    PersistenceBlueprintImplSchema,
     PresetBlueprintDomainSchema,
 } from "./assembly/manager.js";
 export type {
@@ -15,6 +24,8 @@ export type {
     PresetBlueprintDomain,
 } from "./assembly/manager.js";
 export {
+    DefaultBlueprintOptionsSchema,
+    RegisterBuiltinBlueprintImplsOptionsSchema,
     createDefaultBlueprint,
     registerBuiltinBlueprintImpls,
 } from "./assembly/builtins.js";

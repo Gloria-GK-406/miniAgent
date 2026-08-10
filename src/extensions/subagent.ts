@@ -12,11 +12,13 @@ import {
     AgentCapabilitySelectorSchema,
     isCapabilityEnabled,
 } from "../core/index.js";
-import type { AgentCapabilitySelector } from "../core/index.js";
 import { parseFrontmatter } from "./frontmatter.js";
 
-export type AgentFactory = (task: string, systemPrompt: string) => Promise<MiniAgent>;
-export type ConfiguredSubagentFactory = (request: SubagentInvocation) => Promise<MiniAgent>;
+export const AgentFactorySchema = z.custom<
+    (task: string, systemPrompt: string) => Promise<MiniAgent>
+>((value) => typeof value === "function");
+
+export type AgentFactory = z.infer<typeof AgentFactorySchema>;
 
 const SubAgentParamsSchema = z.object({
     task: z.string().meta({ description: "The task description to delegate to the sub-agent" }),
@@ -45,21 +47,33 @@ export const SubagentDefinitionSchema = z.object({
 
 export type SubagentDefinition = z.infer<typeof SubagentDefinitionSchema>;
 
-export interface SubagentEntry {
-    id: string;
-    name: string;
-    description: string;
-    prompt: string;
-    model?: string;
-    capabilities?: AgentCapabilitySelector;
-    filePath: string;
-}
+export const SubagentEntrySchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    prompt: z.string(),
+    model: z.string().optional(),
+    capabilities: AgentCapabilitySelectorSchema.optional(),
+    filePath: z.string(),
+});
 
-export interface SubagentInvocation {
-    entry: SubagentEntry;
-    task: string;
-    context?: string;
-}
+export type SubagentEntry = z.infer<typeof SubagentEntrySchema>;
+
+export const SubagentInvocationSchema = z.object({
+    entry: SubagentEntrySchema,
+    task: z.string(),
+    context: z.string().optional(),
+});
+
+export type SubagentInvocation = z.infer<typeof SubagentInvocationSchema>;
+
+export const ConfiguredSubagentFactorySchema = z.custom<
+    (request: SubagentInvocation) => Promise<MiniAgent>
+>((value) => typeof value === "function");
+
+export type ConfiguredSubagentFactory = z.infer<
+    typeof ConfiguredSubagentFactorySchema
+>;
 
 const RunSubagentParamsSchema = z.object({
     agent: z.string().meta({ description: "The subagent id or name to run" }),

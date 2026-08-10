@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useInputHistory } from "../hooks/useInputHistory.js";
@@ -18,9 +19,14 @@ interface InputBoxProps {
   onModeToggle?: () => void;
 }
 
-export type TabInputAction =
-  | { type: "complete"; value: string }
-  | { type: "toggle-mode" };
+export const TabInputActionSchema = z.union([z.object({
+  type: z.literal("complete"),
+  value: z.string(),
+}), z.object({
+  type: z.literal("toggle-mode"),
+})]) as z.ZodType<| { type: "complete"; value: string }
+  | { type: "toggle-mode" }>;
+export type TabInputAction = z.infer<typeof TabInputActionSchema>;
 
 export function resolveTabInputAction(
   currentValue: string,

@@ -1,11 +1,13 @@
+import { z } from "zod";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { CLIAGENT_DIR, loadConfig, type CLIConfig } from "../config.js";
 
-export interface SystemPromptConfigService {
+export const SystemPromptConfigServiceSchema = z.custom<{
   setSystemPrompt(prompt: string): Promise<CLIConfig>;
   unsetSystemPrompt(): Promise<CLIConfig>;
-}
+}>();
+export type SystemPromptConfigService = z.infer<typeof SystemPromptConfigServiceSchema>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

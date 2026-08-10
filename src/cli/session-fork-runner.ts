@@ -1,23 +1,38 @@
+import { z } from "zod";
 import type { PrintStreams } from "./print-runner.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type SessionForkOutput = "text" | "json";
+export const SessionForkOutputSchema = z.enum(["text", "json"]);
+export type SessionForkOutput = z.infer<typeof SessionForkOutputSchema>;
 
-export interface SessionForkRequest {
+export const SessionForkRequestSchema = z.object({
+  baseDir: z.string(),
+  sessionId: z.string(),
+  name: z.string().optional(),
+  output: SessionForkOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   sessionId: string;
   name?: string;
   output?: SessionForkOutput;
-}
+}>;
+export type SessionForkRequest = z.infer<typeof SessionForkRequestSchema>;
 
-export interface SessionForkResult {
+export const SessionForkResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  sessionName: z.string(),
+  sourceSessionId: z.string(),
+  messageCount: z.number(),
+}) as z.ZodType<{
   ok: boolean;
   sessionId: string;
   sessionName: string;
   sourceSessionId: string;
   messageCount: number;
-}
+}>;
+export type SessionForkResult = z.infer<typeof SessionForkResultSchema>;
 
 export function formatSessionForkResultJson(result: SessionForkResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;

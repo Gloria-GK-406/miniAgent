@@ -47,8 +47,10 @@ export const McpPluginConfigSchema = z.object({
 export type McpPluginConfig = z.infer<typeof McpPluginConfigSchema>;
 export type McpPluginConfigInput = z.input<typeof McpPluginConfigSchema>;
 
-export interface McpToolInfo {
-    serverName: string;
-    originalName: string;
-    prefixedName: string;
-}
+export const McpToolInfoSchema = z.object({
+    serverName: z.string(),
+    originalName: z.string(),
+    prefixedName: z.string(),
+});
+
+export type McpToolInfo = z.infer<typeof McpToolInfoSchema>;

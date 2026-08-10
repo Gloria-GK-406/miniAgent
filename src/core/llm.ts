@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { createFunctionSchema } from "./function-schema.js";
 import type {
   LLMResponse,
   LLMRequest,
@@ -6,13 +8,21 @@ import type {
   LLMStreamChunk,
   LLMStreamHandle,
 } from "./types.js";
-import { LLMStreamChunkType, MessageType } from "./types.js";
-import type { LLMGenerateRequest } from "./config.js";
+import {
+  createLLMStreamHandleSchema,
+  LLMStreamChunkType,
+  MessageType,
+} from "./types.js";
+import { type LLMGenerateRequest } from "./config.js";
 
-export interface LLMEngine {
-  readonly name: string;
-  streamGenerate(request: LLMGenerateRequest): AsyncGenerator<MessageChunk>;
-}
+export const LLMEngineSchema = z.object({
+  name: z.string(),
+  streamGenerate: createFunctionSchema<(
+    request: LLMGenerateRequest,
+  ) => AsyncGenerator<MessageChunk>>(),
+});
+
+export type LLMEngine = z.infer<typeof LLMEngineSchema>;
 
 class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
   private listeners = new Set<(chunk: LLMStreamChunk) => void>();
@@ -66,13 +76,19 @@ class DeferredLLMStreamHandle<T> implements LLMStreamHandle<T> {
   }
 }
 
-export interface LLMStreamController<T> {
-  handle: LLMStreamHandle<T>;
-  emitChunk(chunk: LLMStreamChunk): void;
-  resolve(value: T): void;
-  reject(reason?: unknown): void;
-  isAborted(): boolean;
+export function createLLMStreamControllerSchema<T>() {
+  return z.object({
+    handle: createLLMStreamHandleSchema<T>(),
+    emitChunk: createFunctionSchema<(chunk: LLMStreamChunk) => void>(),
+    resolve: createFunctionSchema<(value: T) => void>(),
+    reject: createFunctionSchema<(reason?: unknown) => void>(),
+    isAborted: createFunctionSchema<() => boolean>(),
+  });
 }
+
+export type LLMStreamController<T> = z.infer<ReturnType<
+  typeof createLLMStreamControllerSchema<T>
+>>;
 
 export function createLLMStreamHandle<T>(): LLMStreamController<T> {
   const handle = new DeferredLLMStreamHandle<T>();
@@ -139,11 +155,13 @@ interface ToolCallBuffer {
   argumentsText: string;
 }
 
-export interface CollectLLMResponseOptions {
-  onChunk?: (chunk: LLMStreamChunk) => void;
-  onTokenUsage?: (tokenCount: TokenCount) => void;
-  shouldStop?: () => boolean;
-}
+export const CollectLLMResponseOptionsSchema = z.object({
+  onChunk: createFunctionSchema<(chunk: LLMStreamChunk) => void>().optional(),
+  onTokenUsage: createFunctionSchema<(tokenCount: TokenCount) => void>().optional(),
+  shouldStop: createFunctionSchema<() => boolean>().optional(),
+});
+
+export type CollectLLMResponseOptions = z.infer<typeof CollectLLMResponseOptionsSchema>;
 
 function getToolCallBuffer(buffers: ToolCallBuffer[], index: number): ToolCallBuffer {
   const existing = buffers[index];

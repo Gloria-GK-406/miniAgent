@@ -1,18 +1,27 @@
+import { z } from "zod";
 import { MessageType, type Message, type MessageContent } from "../core/index.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 
-export interface PrintStreams {
+export const PrintStreamsSchema = z.custom<{
   stdout: (text: string) => void;
   stderr: (text: string) => void;
-}
+}>();
+export type PrintStreams = z.infer<typeof PrintStreamsSchema>;
 
-export interface PrintPromptResult {
+export const PrintPromptResultSchema = z.object({
+  ok: z.boolean(),
+  response: z.union([z.string(), z.null()]),
+  error: z.union([z.string(), z.null()]),
+  sessionId: z.string(),
+  modelName: z.string(),
+}) as z.ZodType<{
   ok: boolean;
   response: string | null;
   error: string | null;
   sessionId: string;
   modelName: string;
-}
+}>;
+export type PrintPromptResult = z.infer<typeof PrintPromptResultSchema>;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

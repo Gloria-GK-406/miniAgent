@@ -1,12 +1,16 @@
 import { z } from "zod";
 
-export enum MessageType {
-    System = "system",
-    User = "user",
-    Assist = "assist",
-    ToolCall = "toolcall",
-    ToolResult = "toolresult",
-}
+export const MessageType = {
+    System: "system",
+    User: "user",
+    Assist: "assist",
+    ToolCall: "toolcall",
+    ToolResult: "toolresult",
+} as const;
+
+export const MessageTypeSchema = z.enum(MessageType);
+
+export type MessageType = z.infer<typeof MessageTypeSchema>;
 
 export const TextContentSchema = z.object({
     type: z.literal("text"),
@@ -27,7 +31,7 @@ export const MessageContentSchema = z.union([
 
 export const BaseMessageSchema = z.object({
     id: z.string(),
-    type: z.enum(MessageType),
+    type: MessageTypeSchema,
     content: MessageContentSchema,
 });
 

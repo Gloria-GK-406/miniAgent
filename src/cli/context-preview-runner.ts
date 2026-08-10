@@ -1,9 +1,11 @@
+import { z } from "zod";
 import type { Message, MessageContent } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime } from "./runtime/types.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type ContextPreviewOutput = "text" | "json";
+export const ContextPreviewOutputSchema = z.enum(["text", "json"]);
+export type ContextPreviewOutput = z.infer<typeof ContextPreviewOutputSchema>;
 
 function formatContent(content: MessageContent): string {
   if (typeof content === "string") {

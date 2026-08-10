@@ -1,17 +1,24 @@
+import { z } from "zod";
 import { useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
-import type { CLIActivityEntry } from "../runtime/types.js";
+import { CLIActivityEntrySchema, type CLIActivityEntry } from "../runtime/types.js";
 
-export interface ActivityWindow {
+export const ActivityWindowSchema = z.object({
+  visibleEntries: z.array(z.lazy(() => CLIActivityEntrySchema)),
+  maxOffset: z.number(),
+  scrollOffset: z.number(),
+}) as z.ZodType<{
   visibleEntries: CLIActivityEntry[];
   maxOffset: number;
   scrollOffset: number;
-}
+}>;
+export type ActivityWindow = z.infer<typeof ActivityWindowSchema>;
 
-export interface ActivityViewProps {
+export const ActivityViewPropsSchema = z.custom<{
   entries: CLIActivityEntry[];
   onClose: () => void;
-}
+}>();
+export type ActivityViewProps = z.infer<typeof ActivityViewPropsSchema>;
 
 export function getActivityWindow(
   entries: CLIActivityEntry[],

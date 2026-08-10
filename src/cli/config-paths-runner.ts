@@ -1,18 +1,28 @@
+import { z } from "zod";
 import { join } from "node:path";
-import { CLIAGENT_DIR, getGlobalConfigPath, type LoadConfigOptions } from "./config.js";
+import { LoadConfigOptionsSchema, CLIAGENT_DIR, getGlobalConfigPath, type LoadConfigOptions } from "./config.js";
 import type { PrintStreams } from "./print-runner.js";
 
-export type ConfigPathsOutput = "text" | "json";
+export const ConfigPathsOutputSchema = z.enum(["text", "json"]);
+export type ConfigPathsOutput = z.infer<typeof ConfigPathsOutputSchema>;
 
-export interface ConfigPathsRequest extends LoadConfigOptions {
+export const ConfigPathsRequestSchema = z.intersection(z.lazy(() => LoadConfigOptionsSchema), z.object({
+  baseDir: z.string(),
+  output: ConfigPathsOutputSchema.optional(),
+})) as z.ZodType<LoadConfigOptions & {
   baseDir: string;
   output?: ConfigPathsOutput;
-}
+}>;
+export type ConfigPathsRequest = z.infer<typeof ConfigPathsRequestSchema>;
 
-export interface ConfigPathsResult {
+export const ConfigPathsResultSchema = z.object({
+  projectConfigPath: z.string(),
+  globalConfigPath: z.string(),
+}) as z.ZodType<{
   projectConfigPath: string;
   globalConfigPath: string;
-}
+}>;
+export type ConfigPathsResult = z.infer<typeof ConfigPathsResultSchema>;
 
 export function resolveConfigPaths(
   baseDir: string,

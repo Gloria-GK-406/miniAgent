@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useCallback, useState } from "react";
 
 const DEFAULT_INPUT_HISTORY_LIMIT = 100;
@@ -15,19 +16,21 @@ export function appendInputHistory(
   return next.slice(-limit);
 }
 
-export interface InputHistoryController {
+export const InputHistoryControllerSchema = z.custom<{
   entries: string[];
   remember(input: string): void;
   previous(currentValue: string): string | null;
   next(): string | null;
   resetNavigation(currentValue: string): void;
-}
+}>();
+export type InputHistoryController = z.infer<typeof InputHistoryControllerSchema>;
 
-export interface UseInputHistoryOptions {
+export const UseInputHistoryOptionsSchema = z.custom<{
   initialEntries?: string[];
   limit?: number;
   onRemember?: (input: string) => void;
-}
+}>();
+export type UseInputHistoryOptions = z.infer<typeof UseInputHistoryOptionsSchema>;
 
 export function useInputHistory(options: UseInputHistoryOptions = {}): InputHistoryController {
   const limit = options.limit ?? DEFAULT_INPUT_HISTORY_LIMIT;

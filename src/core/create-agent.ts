@@ -1,18 +1,29 @@
-import type { AgentConfig } from "./config.js";
-import { MiniAgent } from "./agent.js";
-import type { MiniAgentOptions } from "./agent.js";
-import type { LLMRequest } from "./types.js";
-import type { AgentModule, AgentRegistrable } from "./module.js";
+import { z } from "zod";
+import { AgentConfigSchema } from "./config.js";
+import { MiniAgent, MiniAgentOptionsSchema } from "./agent.js";
+import { createFunctionSchema } from "./function-schema.js";
+import { LLMRequestSchema } from "./types.js";
+import { AgentModuleSchema, AgentRegistrableSchema } from "./module.js";
 
-export type AgentInstaller = (agent: MiniAgent) => void;
+export const AgentInstallerSchema = createFunctionSchema<(agent: MiniAgent) => void>();
 
-export type AgentUse = AgentRegistrable | AgentModule | AgentInstaller;
+export type AgentInstaller = z.infer<typeof AgentInstallerSchema>;
 
-export interface CreateMiniAgentOptions extends MiniAgentOptions {
-    llm: LLMRequest;
-    config: AgentConfig;
-    use?: AgentUse[];
-}
+export const AgentUseSchema = z.union([
+    AgentRegistrableSchema,
+    AgentModuleSchema,
+    AgentInstallerSchema,
+]);
+
+export type AgentUse = z.infer<typeof AgentUseSchema>;
+
+export const CreateMiniAgentOptionsSchema = MiniAgentOptionsSchema.extend({
+    llm: LLMRequestSchema,
+    config: AgentConfigSchema,
+    use: z.array(AgentUseSchema).optional(),
+});
+
+export type CreateMiniAgentOptions = z.input<typeof CreateMiniAgentOptionsSchema>;
 
 export function createMiniAgent(options: CreateMiniAgentOptions): MiniAgent {
     const agent = new MiniAgent(options.llm, options.config, {

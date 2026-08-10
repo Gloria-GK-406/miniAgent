@@ -1,22 +1,34 @@
+import { z } from "zod";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { CLIAGENT_DIR, createDefaultConfigTemplate } from "./config.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
-export type InitConfigOutput = "text" | "json";
+export const InitConfigOutputSchema = z.enum(["text", "json"]);
+export type InitConfigOutput = z.infer<typeof InitConfigOutputSchema>;
 
-export interface InitConfigRequest {
+export const InitConfigRequestSchema = z.object({
+  baseDir: z.string(),
+  force: z.boolean().optional(),
+  output: InitConfigOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   force?: boolean;
   output?: InitConfigOutput;
-}
+}>;
+export type InitConfigRequest = z.infer<typeof InitConfigRequestSchema>;
 
-export interface InitConfigResult {
+export const InitConfigResultSchema = z.object({
+  ok: z.boolean(),
+  configPath: z.string(),
+  overwritten: z.boolean(),
+}) as z.ZodType<{
   ok: boolean;
   configPath: string;
   overwritten: boolean;
-}
+}>;
+export type InitConfigResult = z.infer<typeof InitConfigResultSchema>;
 
 export function formatInitConfigResultJson(result: InitConfigResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;

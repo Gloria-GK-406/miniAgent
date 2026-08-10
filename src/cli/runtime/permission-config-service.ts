@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
@@ -9,19 +10,24 @@ import {
   type CLIPermissionDecision,
 } from "../config.js";
 
-export interface PermissionRuleTarget {
+export const PermissionRuleTargetSchema = z.object({
+  toolName: z.string(),
+  pattern: z.string().optional(),
+}) as z.ZodType<{
   toolName: string;
   pattern?: string;
-}
+}>;
+export type PermissionRuleTarget = z.infer<typeof PermissionRuleTargetSchema>;
 
-export interface PermissionConfigService {
+export const PermissionConfigServiceSchema = z.custom<{
   setRule(
     target: string,
     decision: CLIPermissionDecision,
     effectivePermission: CLIPermissionConfig,
   ): Promise<CLIConfig>;
   unsetRule(target: string): Promise<CLIConfig>;
-}
+}>();
+export type PermissionConfigService = z.infer<typeof PermissionConfigServiceSchema>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

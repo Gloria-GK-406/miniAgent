@@ -1,13 +1,243 @@
-export type CLIEntryAgentMode = "build" | "plan";
-export type CLIEntryOutput = "text" | "json";
-export type CLIEntryExportFormat = "json" | "markdown";
-export type CLIEntryCompletionShell = "bash" | "zsh" | "fish" | "powershell";
-export type CLIEntryPermissionDecision = "allow" | "ask" | "deny";
-export type CLIEntryGitAction = "status" | "log" | "diff";
-export type CLIEntrySnapshotAction = "restore" | "reapply";
+import { z } from "zod";
+export const CLIEntryAgentModeSchema = z.enum(["build", "plan"]);
+export type CLIEntryAgentMode = z.infer<typeof CLIEntryAgentModeSchema>;
+export const CLIEntryOutputSchema = z.enum(["text", "json"]);
+export type CLIEntryOutput = z.infer<typeof CLIEntryOutputSchema>;
+export const CLIEntryExportFormatSchema = z.enum(["json", "markdown"]);
+export type CLIEntryExportFormat = z.infer<typeof CLIEntryExportFormatSchema>;
+export const CLIEntryCompletionShellSchema = z.enum(["bash", "zsh", "fish", "powershell"]);
+export type CLIEntryCompletionShell = z.infer<typeof CLIEntryCompletionShellSchema>;
+export const CLIEntryPermissionDecisionSchema = z.enum(["allow", "ask", "deny"]);
+export type CLIEntryPermissionDecision = z.infer<typeof CLIEntryPermissionDecisionSchema>;
+export const CLIEntryGitActionSchema = z.enum(["status", "log", "diff"]);
+export type CLIEntryGitAction = z.infer<typeof CLIEntryGitActionSchema>;
+export const CLIEntrySnapshotActionSchema = z.enum(["restore", "reapply"]);
+export type CLIEntrySnapshotAction = z.infer<typeof CLIEntrySnapshotActionSchema>;
 
-export type CLIEntryAction =
-  | {
+export const CLIEntryActionSchema = z.union([z.object({
+  type: z.literal("tui"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  promptFile: z.string().optional(),
+  prompt: z.string().optional(),
+}), z.object({
+  type: z.literal("print"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+  prompt: z.string().optional(),
+  promptFile: z.string().optional(),
+}), z.object({
+  type: z.literal("doctor"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("diagnostics"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("status"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("overview"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-sessions"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("export-session"),
+  cwd: z.string().optional(),
+  sessionId: z.string().optional(),
+  format: CLIEntryExportFormatSchema.optional(),
+  outputPath: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("import-session"),
+  cwd: z.string().optional(),
+  inputPath: z.string(),
+  name: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("delete-session"),
+  cwd: z.string().optional(),
+  sessionId: z.string(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("clear-session"),
+  cwd: z.string().optional(),
+  sessionId: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("rename-session"),
+  cwd: z.string().optional(),
+  sessionId: z.string(),
+  name: z.string(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("fork-session"),
+  cwd: z.string().optional(),
+  sessionId: z.string(),
+  name: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("completion"),
+  shell: CLIEntryCompletionShellSchema,
+}), z.object({
+  type: z.literal("config-paths"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("show-config"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("init"),
+  cwd: z.string().optional(),
+  force: z.boolean().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("init-instructions"),
+  cwd: z.string().optional(),
+  force: z.boolean().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("show-permissions"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-models"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-commands"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("git-headless"),
+  action: CLIEntryGitActionSchema,
+  cwd: z.string().optional(),
+  limit: z.number().optional(),
+  path: z.string().optional(),
+  staged: z.boolean().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-tools"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-todos"),
+  cwd: z.string().optional(),
+  sessionId: z.string().optional(),
+  query: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-agents"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("preview-context"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("show-history"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  autoApprove: z.boolean().optional(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
+  sessionId: z.string().optional(),
+  newSession: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("search-all"),
+  cwd: z.string().optional(),
+  sessionId: z.string().optional(),
+  query: z.string(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-references"),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("list-snapshots"),
+  cwd: z.string().optional(),
+  sessionId: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("snapshot-action"),
+  action: CLIEntrySnapshotActionSchema,
+  cwd: z.string().optional(),
+  sessionId: z.string().optional(),
+  turnId: z.string(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("permission-update"),
+  action: z.union([z.literal("set"), z.literal("unset")]),
+  cwd: z.string().optional(),
+  target: z.string(),
+  decision: CLIEntryPermissionDecisionSchema.optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("system-prompt-update"),
+  action: z.union([z.literal("set"), z.literal("unset")]),
+  cwd: z.string().optional(),
+  prompt: z.string().optional(),
+  promptFile: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("show-system-prompt"),
+  agent: CLIEntryAgentModeSchema.optional(),
+  cwd: z.string().optional(),
+  output: CLIEntryOutputSchema.optional(),
+}), z.object({
+  type: z.literal("help"),
+}), z.object({
+  type: z.literal("version"),
+}), z.object({
+  type: z.literal("error"),
+  message: z.string(),
+  output: CLIEntryOutputSchema.optional(),
+})]) as z.ZodType<| {
     type: "tui";
     agent?: CLIEntryAgentMode;
     autoApprove?: boolean;
@@ -213,7 +443,8 @@ export type CLIEntryAction =
   }
   | { type: "help" }
   | { type: "version" }
-  | { type: "error"; message: string; output?: CLIEntryOutput };
+  | { type: "error"; message: string; output?: CLIEntryOutput }>;
+export type CLIEntryAction = z.infer<typeof CLIEntryActionSchema>;
 
 export function parseCLIEntryArgs(args: string[]): CLIEntryAction {
   let agent: CLIEntryAgentMode | undefined;

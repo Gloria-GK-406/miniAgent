@@ -1,21 +1,34 @@
+import { z } from "zod";
 import type { PrintStreams } from "./print-runner.js";
 import { createCLISessionService } from "./runtime/session-service.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type SessionRenameOutput = "text" | "json";
+export const SessionRenameOutputSchema = z.enum(["text", "json"]);
+export type SessionRenameOutput = z.infer<typeof SessionRenameOutputSchema>;
 
-export interface SessionRenameRequest {
+export const SessionRenameRequestSchema = z.object({
+  baseDir: z.string(),
+  sessionId: z.string(),
+  name: z.string(),
+  output: SessionRenameOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   sessionId: string;
   name: string;
   output?: SessionRenameOutput;
-}
+}>;
+export type SessionRenameRequest = z.infer<typeof SessionRenameRequestSchema>;
 
-export interface SessionRenameResult {
+export const SessionRenameResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  sessionName: z.string(),
+}) as z.ZodType<{
   ok: boolean;
   sessionId: string;
   sessionName: string;
-}
+}>;
+export type SessionRenameResult = z.infer<typeof SessionRenameResultSchema>;
 
 export function formatSessionRenameResultJson(result: SessionRenameResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;

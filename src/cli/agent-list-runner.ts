@@ -1,9 +1,18 @@
+import { z } from "zod";
 import type { PrintStreams } from "./print-runner.js";
-import type { CLIAppRuntime, CLIState } from "./runtime/types.js";
+import {
+  CLIViewPanelSchema,
+  type CLIAppRuntime,
+  type CLIViewPanel,
+} from "./runtime/types.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 
-export type AgentListOutput = "text" | "json";
-export type AgentListPanel = Extract<CLIState["panel"], { type: "agents" }>;
+export const AgentListOutputSchema = z.enum(["text", "json"]);
+export type AgentListOutput = z.infer<typeof AgentListOutputSchema>;
+export const AgentListPanelSchema = CLIViewPanelSchema.refine(
+  (panel) => panel.type === "agents",
+) as z.ZodType<Extract<CLIViewPanel, { type: "agents" }>>;
+export type AgentListPanel = z.infer<typeof AgentListPanelSchema>;
 
 function formatSubagent(subagent: AgentListPanel["subagents"][number]): string {
   const name = subagent.name !== subagent.id ? ` (${subagent.name})` : "";

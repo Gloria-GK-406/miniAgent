@@ -1,10 +1,13 @@
 import JSON5 from "json5";
 import { parse as parseYaml } from "yaml";
+import { z } from "zod";
 
-export interface FrontmatterParseResult {
-    data: Record<string, unknown>;
-    content: string;
-}
+export const FrontmatterParseResultSchema = z.object({
+    data: z.record(z.string(), z.unknown()),
+    content: z.string(),
+});
+
+export type FrontmatterParseResult = z.infer<typeof FrontmatterParseResultSchema>;
 
 export function parseFrontmatter(raw: string): FrontmatterParseResult {
     const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);

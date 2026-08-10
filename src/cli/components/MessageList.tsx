@@ -1,13 +1,20 @@
+import { z } from "zod";
 import { Box, Text } from "ink";
 import type { Message, MessageContent } from "../../core/index.js";
 import { MessageType } from "../../core/index.js";
 
-export interface RenderLine {
+export const RenderLineSchema = z.object({
+  key: z.string(),
+  text: z.string(),
+  color: z.string().optional(),
+  dimColor: z.boolean().optional(),
+}) as z.ZodType<{
   key: string;
   text: string;
   color?: string;
   dimColor?: boolean;
-}
+}>;
+export type RenderLine = z.infer<typeof RenderLineSchema>;
 
 interface MessageListProps {
   messages: Message[];
@@ -18,10 +25,14 @@ interface MessageListProps {
   showToolDetails?: boolean;
 }
 
-export interface MessageRenderOptions {
+export const MessageRenderOptionsSchema = z.object({
+  showReasoning: z.boolean().optional(),
+  showToolDetails: z.boolean().optional(),
+}) as z.ZodType<{
   showReasoning?: boolean;
   showToolDetails?: boolean;
-}
+}>;
+export type MessageRenderOptions = z.infer<typeof MessageRenderOptionsSchema>;
 
 function getContentText(content: MessageContent): string {
   if (typeof content === "string") return content;

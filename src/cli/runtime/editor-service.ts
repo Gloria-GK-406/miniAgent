@@ -1,33 +1,51 @@
+import { z } from "zod";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import type { CLIEditorConfig } from "../config.js";
+import {
+  CLIEditorConfigSchema,
+  NodePlatformSchema,
+  type CLIEditorConfig,
+} from "../config.js";
 
-export interface EditorInvocation {
+export const EditorInvocationSchema = z.object({
+  command: z.string(),
+  args: z.array(z.string()),
+  filePath: z.string(),
+}) as z.ZodType<{
   command: string;
   args: string[];
   filePath: string;
-}
+}>;
+export type EditorInvocation = z.infer<typeof EditorInvocationSchema>;
 
-export interface EditorService {
+export const EditorServiceSchema = z.custom<{
   openEditor(initialContent: string): Promise<string>;
-}
+}>();
+export type EditorService = z.infer<typeof EditorServiceSchema>;
 
-export interface ResolveEditorInvocationOptions {
+export const ResolveEditorInvocationOptionsSchema = z.object({
+  config: z.lazy(() => CLIEditorConfigSchema),
+  env: z.record(z.string(), z.union([z.string(), z.undefined()])),
+  platform: NodePlatformSchema,
+  filePath: z.string(),
+}) as z.ZodType<{
   config: CLIEditorConfig;
   env: Record<string, string | undefined>;
   platform: NodeJS.Platform;
   filePath: string;
-}
+}>;
+export type ResolveEditorInvocationOptions = z.infer<typeof ResolveEditorInvocationOptionsSchema>;
 
-export interface CreateEditorServiceOptions {
+export const CreateEditorServiceOptionsSchema = z.custom<{
   config: CLIEditorConfig;
   env?: Record<string, string | undefined>;
   platform?: NodeJS.Platform;
   tempRoot?: string;
   runner?: (invocation: EditorInvocation) => Promise<void>;
-}
+}>();
+export type CreateEditorServiceOptions = z.infer<typeof CreateEditorServiceOptionsSchema>;
 
 function splitCommandLine(value: string): string[] {
   return Array.from(value.matchAll(/"([^"]*)"|'([^']*)'|[^\s]+/g), (match) => (

@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 import type { CLIAppRuntime, CLIOverviewInfo, CLIState } from "./runtime/types.js";
 
-export type OverviewOutput = "text" | "json";
+export const OverviewOutputSchema = z.enum(["text", "json"]);
+export type OverviewOutput = z.infer<typeof OverviewOutputSchema>;
 
 function formatTokenCount(count: number): string {
   if (count >= 1000) {

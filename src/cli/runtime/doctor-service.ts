@@ -1,18 +1,35 @@
-import type { SessionMeta } from "../session-manager.js";
-import type { CLIConfig } from "../config.js";
+import { z } from "zod";
+import { SessionMetaSchema, type SessionMeta } from "../session-manager.js";
+import { CLIConfigSchema, type CLIConfig } from "../config.js";
 import type { DiagnosticsService } from "./diagnostics-service.js";
 import type { GitService } from "./git-service.js";
 
-export type CLIDoctorStatus = "pass" | "warn" | "fail";
+export const CLIDoctorStatusSchema = z.enum(["pass", "warn", "fail"]);
+export type CLIDoctorStatus = z.infer<typeof CLIDoctorStatusSchema>;
 
-export interface CLIDoctorCheck {
+export const CLIDoctorCheckSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: CLIDoctorStatusSchema,
+  detail: z.string(),
+}) as z.ZodType<{
   id: string;
   label: string;
   status: CLIDoctorStatus;
   detail: string;
-}
+}>;
+export type CLIDoctorCheck = z.infer<typeof CLIDoctorCheckSchema>;
 
-export interface CLIDoctorSnapshot {
+export const CLIDoctorSnapshotSchema = z.object({
+  config: z.lazy(() => CLIConfigSchema),
+  modelName: z.string(),
+  modelPaths: z.array(z.string()),
+  sessionId: z.string(),
+  sessions: z.array(z.lazy(() => SessionMetaSchema)),
+  referencePaths: z.array(z.string()),
+  inputHistory: z.array(z.string()),
+  autoApprove: z.boolean(),
+}) as z.ZodType<{
   config: CLIConfig;
   modelName: string;
   modelPaths: string[];
@@ -21,16 +38,22 @@ export interface CLIDoctorSnapshot {
   referencePaths: string[];
   inputHistory: string[];
   autoApprove: boolean;
-}
+}>;
+export type CLIDoctorSnapshot = z.infer<typeof CLIDoctorSnapshotSchema>;
 
-export interface DoctorService {
+export const DoctorServiceSchema = z.custom<{
   run(snapshot: CLIDoctorSnapshot): Promise<CLIDoctorCheck[]>;
-}
+}>();
+export type DoctorService = z.infer<typeof DoctorServiceSchema>;
 
-export interface CreateDoctorServiceOptions {
+export const CreateDoctorServiceOptionsSchema = z.object({
+  gitService: z.custom<Pick<GitService, "isRepository" | "branchName">>(),
+  diagnosticsService: z.custom<Pick<DiagnosticsService, "discoverCommands">>(),
+}) as z.ZodType<{
   gitService: Pick<GitService, "isRepository" | "branchName">;
   diagnosticsService: Pick<DiagnosticsService, "discoverCommands">;
-}
+}>;
+export type CreateDoctorServiceOptions = z.infer<typeof CreateDoctorServiceOptionsSchema>;
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;

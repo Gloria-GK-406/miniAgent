@@ -1,24 +1,40 @@
+import { z } from "zod";
 import type { PrintStreams } from "./print-runner.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import { createGitService } from "./runtime/git-service.js";
 
-export type GitHeadlessAction = "status" | "log" | "diff";
-export type GitHeadlessOutput = "text" | "json";
+export const GitHeadlessActionSchema = z.enum(["status", "log", "diff"]);
+export type GitHeadlessAction = z.infer<typeof GitHeadlessActionSchema>;
+export const GitHeadlessOutputSchema = z.enum(["text", "json"]);
+export type GitHeadlessOutput = z.infer<typeof GitHeadlessOutputSchema>;
 
-export interface GitHeadlessRequest {
+export const GitHeadlessRequestSchema = z.object({
+  baseDir: z.string(),
+  action: GitHeadlessActionSchema,
+  limit: z.number().optional(),
+  path: z.string().optional(),
+  staged: z.boolean().optional(),
+  output: GitHeadlessOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   action: GitHeadlessAction;
   limit?: number;
   path?: string;
   staged?: boolean;
   output?: GitHeadlessOutput;
-}
+}>;
+export type GitHeadlessRequest = z.infer<typeof GitHeadlessRequestSchema>;
 
-export interface GitHeadlessResult {
+export const GitHeadlessResultSchema = z.object({
+  ok: z.boolean(),
+  action: GitHeadlessActionSchema,
+  content: z.string(),
+}) as z.ZodType<{
   ok: boolean;
   action: GitHeadlessAction;
   content: string;
-}
+}>;
+export type GitHeadlessResult = z.infer<typeof GitHeadlessResultSchema>;
 
 function ensureTrailingNewline(text: string): string {
   return text.endsWith("\n") ? text : `${text}\n`;

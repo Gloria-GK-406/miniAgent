@@ -4,19 +4,19 @@ import type { ContextProcessor, Action, Message } from "../core/index.js";
 import { ActionType, MessageType } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
-interface TodoItem {
-    id: string;
-    content: string;
-    status: "pending" | "in_progress" | "completed";
-}
+export const TodoStatusSchema = z.enum(["pending", "in_progress", "completed"]);
 
-export type TodoStatus = TodoItem["status"];
+export type TodoStatus = z.infer<typeof TodoStatusSchema>;
 
-export interface TodoItemSnapshot {
-    id: string;
-    content: string;
-    status: TodoStatus;
-}
+export const TodoItemSnapshotSchema = z.object({
+    id: z.string(),
+    content: z.string(),
+    status: TodoStatusSchema,
+});
+
+export type TodoItemSnapshot = z.infer<typeof TodoItemSnapshotSchema>;
+
+type TodoItem = z.infer<typeof TodoItemSnapshotSchema>;
 
 export class TodoManager implements ToolProvider, ContextProcessor {
     priority = 100;

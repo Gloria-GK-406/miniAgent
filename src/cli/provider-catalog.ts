@@ -1,33 +1,43 @@
-import { ThinkingLevel, type ModelPreset } from "../core/index.js";
+import { z } from "zod";
+import { ModelPresetSchema, ThinkingLevel, type ModelPreset } from "../core/index.js";
 import { ANTHROPIC_MODEL_PRESETS } from "../engine/index.js";
 import { GLM_CODEPLAN_MODEL_PRESETS } from "../engine/index.js";
 import { GLM_MODEL_PRESETS } from "../engine/index.js";
 import { OPENAI_MODEL_PRESETS } from "../engine/index.js";
 import type { CLIProviderConnection } from "./runtime/types.js";
 
-export type ConnectProviderId =
-  | "openai"
-  | "anthropic"
-  | "glm"
-  | "glm-codeplan"
-  | "nvidia"
-  | "custom";
+export const ConnectProviderIdSchema = z.enum(["openai", "anthropic", "glm", "glm-codeplan", "nvidia", "custom"]);
+export type ConnectProviderId = z.infer<typeof ConnectProviderIdSchema>;
 
-export interface ConnectProviderOption {
+export const ConnectProviderOptionSchema = z.object({
+  id: ConnectProviderIdSchema,
+  label: z.string(),
+  engine: z.string(),
+  models: z.array(z.lazy(() => ModelPresetSchema)),
+  requiresBaseURL: z.boolean(),
+  requiresModel: z.boolean(),
+}) as z.ZodType<{
   id: ConnectProviderId;
   label: string;
   engine: string;
   models: ModelPreset[];
   requiresBaseURL: boolean;
   requiresModel: boolean;
-}
+}>;
+export type ConnectProviderOption = z.infer<typeof ConnectProviderOptionSchema>;
 
-export interface BuildProviderConnectionInput {
+export const BuildProviderConnectionInputSchema = z.object({
+  providerId: ConnectProviderIdSchema,
+  apiKey: z.string(),
+  baseURL: z.string().optional(),
+  modelId: z.string().optional(),
+}) as z.ZodType<{
   providerId: ConnectProviderId;
   apiKey: string;
   baseURL?: string;
   modelId?: string;
-}
+}>;
+export type BuildProviderConnectionInput = z.infer<typeof BuildProviderConnectionInputSchema>;
 
 function cloneModels(models: ModelPreset[]): ModelPreset[] {
   return models.map((model) => structuredClone(model));

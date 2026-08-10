@@ -184,6 +184,7 @@ function mapGLMReasoningEffort(
     case ThinkingLevel.None:
       return "high";
   }
+  throw new Error(`Unsupported thinking level: ${String(level)}`);
 }
 
 export function buildCreateParamsFromRequest(request: LLMGenerateRequest) {

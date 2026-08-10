@@ -1,12 +1,10 @@
 import { z } from "zod";
-import { createMiniAgent } from "../../core/index.js";
-import type { AgentUse } from "../../core/index.js";
+import { AgentUseSchema, createMiniAgent, type AgentUse } from "../../core/index.js";
 import type { MiniAgent, MiniAgentOptions } from "../../core/index.js";
-import type { AgentConfig } from "../../core/index.js";
+import { AgentConfigSchema, type AgentConfig } from "../../core/index.js";
 import { LLMEngineManager } from "../../core/index.js";
 import type { LLMEngine } from "../../core/index.js";
-import { AgentBlueprintSchema } from "./blueprint.js";
-import type { AgentBlueprint, BlueprintUse } from "./blueprint.js";
+import { AgentBlueprintSchema, type AgentBlueprint, type BlueprintUse } from "./blueprint.js";
 
 export const PresetBlueprintDomainSchema = z.enum([
     "engine",
@@ -23,18 +21,40 @@ export const PresetBlueprintDomainSchema = z.enum([
 export type PresetBlueprintDomain = z.infer<typeof PresetBlueprintDomainSchema>;
 type AgentUseBlueprintDomain = Exclude<PresetBlueprintDomain, "engine" | "persistence">;
 
-export interface BlueprintImpl<C, R> {
-    configSchema: z.ZodType<C>;
-    create: (config: C) => R | Promise<R>;
+export function BlueprintImplSchema<C, R>() {
+  return z.custom<{
+  configSchema: z.ZodType<C>;
+  create: (config: C) => R | Promise<R>;
+}>();
 }
+export type BlueprintImpl<C, R> = z.infer<ReturnType<typeof BlueprintImplSchema<C, R>>>;
 
-export type AgentUseFactoryResult = AgentUse | AgentUse[];
-export type AgentUseBlueprintFactory<C> = BlueprintImpl<C, AgentUseFactoryResult>;
-export type EngineBlueprintFactory<C> = BlueprintImpl<C, LLMEngine>;
-export type PersistenceBlueprintFactory<C> = BlueprintImpl<C, MiniAgentOptions>;
-export type AgentUseBlueprintImpl<C> = AgentUseBlueprintFactory<C>;
-export type EngineBlueprintImpl<C> = EngineBlueprintFactory<C>;
-export type PersistenceBlueprintImpl<C> = PersistenceBlueprintFactory<C>;
+export const AgentUseFactoryResultSchema = z.union([AgentUseSchema, z.array(AgentUseSchema)]);
+export type AgentUseFactoryResult = z.infer<typeof AgentUseFactoryResultSchema>;
+export function AgentUseBlueprintFactorySchema<C>() {
+  return z.custom<BlueprintImpl<C, AgentUseFactoryResult>>();
+}
+export type AgentUseBlueprintFactory<C> = z.infer<ReturnType<typeof AgentUseBlueprintFactorySchema<C>>>;
+export function EngineBlueprintFactorySchema<C>() {
+  return z.custom<BlueprintImpl<C, LLMEngine>>();
+}
+export type EngineBlueprintFactory<C> = z.infer<ReturnType<typeof EngineBlueprintFactorySchema<C>>>;
+export function PersistenceBlueprintFactorySchema<C>() {
+  return z.custom<BlueprintImpl<C, MiniAgentOptions>>();
+}
+export type PersistenceBlueprintFactory<C> = z.infer<ReturnType<typeof PersistenceBlueprintFactorySchema<C>>>;
+export function AgentUseBlueprintImplSchema<C>() {
+  return z.custom<AgentUseBlueprintFactory<C>>();
+}
+export type AgentUseBlueprintImpl<C> = z.infer<ReturnType<typeof AgentUseBlueprintImplSchema<C>>>;
+export function EngineBlueprintImplSchema<C>() {
+  return z.custom<EngineBlueprintFactory<C>>();
+}
+export type EngineBlueprintImpl<C> = z.infer<ReturnType<typeof EngineBlueprintImplSchema<C>>>;
+export function PersistenceBlueprintImplSchema<C>() {
+  return z.custom<PersistenceBlueprintFactory<C>>();
+}
+export type PersistenceBlueprintImpl<C> = z.infer<ReturnType<typeof PersistenceBlueprintImplSchema<C>>>;
 
 interface StoredBlueprintImpl<R> {
     configSchema: z.ZodType;
@@ -57,11 +77,16 @@ interface PresetImplMaps {
     context: Map<string, StoredBlueprintImpl<AgentUseFactoryResult>>;
 }
 
-export interface AssembleBlueprintOptions {
-    blueprint: AgentBlueprint;
-    config: AgentConfig;
-    extraUses?: AgentUse[];
-}
+export const AssembleBlueprintOptionsSchema = z.object({
+  blueprint: z.lazy(() => AgentBlueprintSchema),
+  config: z.lazy(() => AgentConfigSchema),
+  extraUses: z.array(z.lazy(() => AgentUseSchema)).optional(),
+}) as z.ZodType<{
+  blueprint: AgentBlueprint;
+  config: AgentConfig;
+  extraUses?: AgentUse[];
+}>;
+export type AssembleBlueprintOptions = z.infer<typeof AssembleBlueprintOptionsSchema>;
 
 function storeImpl<C, R>(impl: BlueprintImpl<C, R>): StoredBlueprintImpl<R> {
     return {

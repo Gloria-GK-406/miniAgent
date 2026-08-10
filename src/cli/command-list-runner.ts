@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { registerBuiltinCommands } from "./commands/builtin.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
@@ -10,21 +11,34 @@ import { createCommandRegistry } from "./runtime/command-registry.js";
 import { loadCustomCommands } from "./runtime/custom-command-service.js";
 import type { CLICommand } from "./runtime/types.js";
 
-export type CommandListOutput = "text" | "json";
-export type CommandListSource = "builtin" | "custom";
+export const CommandListOutputSchema = z.enum(["text", "json"]);
+export type CommandListOutput = z.infer<typeof CommandListOutputSchema>;
+export const CommandListSourceSchema = z.enum(["builtin", "custom"]);
+export type CommandListSource = z.infer<typeof CommandListSourceSchema>;
 
-export interface CommandListRequest {
+export const CommandListRequestSchema = z.object({
+  baseDir: z.string(),
+  output: CommandListOutputSchema.optional(),
+}) as z.ZodType<{
   baseDir: string;
   output?: CommandListOutput;
-}
+}>;
+export type CommandListRequest = z.infer<typeof CommandListRequestSchema>;
 
-export interface CommandListItem {
+export const CommandListItemSchema = z.object({
+  name: z.string(),
+  aliases: z.array(z.string()),
+  description: z.string(),
+  usage: z.string(),
+  source: CommandListSourceSchema,
+}) as z.ZodType<{
   name: string;
   aliases: string[];
   description: string;
   usage: string;
   source: CommandListSource;
-}
+}>;
+export type CommandListItem = z.infer<typeof CommandListItemSchema>;
 
 function toCommandListItem(command: CLICommand, source: CommandListSource): CommandListItem {
   return {

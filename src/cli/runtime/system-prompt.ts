@@ -1,14 +1,20 @@
-import type { CLIAgentMode, CLIConfig } from "../config.js";
+import { z } from "zod";
+import { CLIAgentModeSchema, type CLIAgentMode, type CLIConfig } from "../config.js";
 
 export function getBaseSystemPrompt(config: Pick<CLIConfig, "systemPrompt">): string {
   return config.systemPrompt ?? "You are a helpful assistant.";
 }
 
-export interface BuildEffectiveSystemPromptOptions {
+export const BuildEffectiveSystemPromptOptionsSchema = z.object({
+  baseDir: z.string(),
+  mode: z.lazy(() => CLIAgentModeSchema),
+  userSystemPrompt: z.string(),
+}) as z.ZodType<{
   baseDir: string;
   mode: CLIAgentMode;
   userSystemPrompt: string;
-}
+}>;
+export type BuildEffectiveSystemPromptOptions = z.infer<typeof BuildEffectiveSystemPromptOptionsSchema>;
 
 export function buildEffectiveSystemPrompt({
   baseDir,

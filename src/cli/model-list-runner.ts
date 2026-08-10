@@ -1,27 +1,36 @@
-import {
-  loadConfig,
-  parseModelSelector,
-  type CLIConfig,
-  type LoadConfigOptions,
-} from "./config.js";
+import { z } from "zod";
+import { LoadConfigOptionsSchema, loadConfig, parseModelSelector, type CLIConfig, type LoadConfigOptions } from "./config.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
 import type { PrintStreams } from "./print-runner.js";
 
-export type ModelListOutput = "text" | "json";
+export const ModelListOutputSchema = z.enum(["text", "json"]);
+export type ModelListOutput = z.infer<typeof ModelListOutputSchema>;
 
-export interface ModelListRequest extends LoadConfigOptions {
+export const ModelListRequestSchema = z.intersection(z.lazy(() => LoadConfigOptionsSchema), z.object({
+  baseDir: z.string(),
+  output: ModelListOutputSchema.optional(),
+})) as z.ZodType<LoadConfigOptions & {
   baseDir: string;
   output?: ModelListOutput;
-}
+}>;
+export type ModelListRequest = z.infer<typeof ModelListRequestSchema>;
 
-export interface ConfiguredModelInfo {
+export const ConfiguredModelInfoSchema = z.object({
+  selector: z.string(),
+  provider: z.string(),
+  id: z.string(),
+  name: z.string(),
+  displayName: z.string().optional(),
+  default: z.boolean(),
+}) as z.ZodType<{
   selector: string;
   provider: string;
   id: string;
   name: string;
   displayName?: string;
   default: boolean;
-}
+}>;
+export type ConfiguredModelInfo = z.infer<typeof ConfiguredModelInfoSchema>;
 
 function isDefaultModel(
   config: Pick<CLIConfig, "defaultModel">,

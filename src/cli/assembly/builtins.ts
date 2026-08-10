@@ -64,21 +64,31 @@ type StaticAutoApproveConfig = z.output<typeof StaticAutoApproveConfigSchema>;
 type SystemPromptConfig = z.output<typeof SystemPromptConfigSchema>;
 type AgentContextConfig = z.output<typeof AgentContextConfigSchema>;
 
-export interface RegisterBuiltinBlueprintImplsOptions {
-    subagentFactory: ConfiguredSubagentFactory;
-    getHITL?: () => boolean;
-    onCompressor?: (compressor: ContextCompressor) => void;
-}
+export const RegisterBuiltinBlueprintImplsOptionsSchema = z.custom<{
+  subagentFactory: ConfiguredSubagentFactory;
+  getHITL?: () => boolean;
+  onCompressor?: (compressor: ContextCompressor) => void;
+}>();
+export type RegisterBuiltinBlueprintImplsOptions = z.infer<typeof RegisterBuiltinBlueprintImplsOptionsSchema>;
 
-export interface DefaultBlueprintOptions {
-    engines: string[];
-    persistence: z.input<typeof FilePersistenceConfigSchema>;
-    mcp?: McpPluginConfigInput;
-    skill?: SkillPluginConfigInput;
-    subagent?: SubagentPluginConfigInput;
-    systemPrompt?: z.input<typeof SystemPromptConfigSchema>;
-    agentContext?: z.input<typeof AgentContextConfigSchema>;
-}
+export const DefaultBlueprintOptionsSchema = z.object({
+  engines: z.array(z.string()),
+  persistence: FilePersistenceConfigSchema,
+  mcp: McpPluginConfigSchema.optional(),
+  skill: SkillPluginConfigSchema.optional(),
+  subagent: SubagentPluginConfigSchema.optional(),
+  systemPrompt: SystemPromptConfigSchema.optional(),
+  agentContext: AgentContextConfigSchema.optional(),
+}) as z.ZodType<{
+  engines: string[];
+  persistence: z.input<typeof FilePersistenceConfigSchema>;
+  mcp?: McpPluginConfigInput;
+  skill?: SkillPluginConfigInput;
+  subagent?: SubagentPluginConfigInput;
+  systemPrompt?: z.input<typeof SystemPromptConfigSchema>;
+  agentContext?: z.input<typeof AgentContextConfigSchema>;
+}>;
+export type DefaultBlueprintOptions = z.infer<typeof DefaultBlueprintOptionsSchema>;
 
 function blueprintUse(use: string, config?: JsonValue): BlueprintUse {
     return config === undefined ? { use } : { use, config };

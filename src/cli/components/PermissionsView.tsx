@@ -1,17 +1,24 @@
+import { z } from "zod";
 import { Box, Text, useInput } from "ink";
-import type { CLIPermissionConfig, CLIPermissionDecision } from "../config.js";
+import { CLIPermissionDecisionSchema, type CLIPermissionConfig, type CLIPermissionDecision } from "../config.js";
 
-export interface PermissionRuleRow {
+export const PermissionRuleRowSchema = z.object({
+  target: z.string(),
+  decision: z.lazy(() => CLIPermissionDecisionSchema),
+  reason: z.string(),
+}) as z.ZodType<{
   target: string;
   decision: CLIPermissionDecision;
   reason: string;
-}
+}>;
+export type PermissionRuleRow = z.infer<typeof PermissionRuleRowSchema>;
 
-export interface PermissionsViewProps {
+export const PermissionsViewPropsSchema = z.custom<{
   permission: CLIPermissionConfig;
   autoApprove: boolean;
   onClose: () => void;
-}
+}>();
+export type PermissionsViewProps = z.infer<typeof PermissionsViewPropsSchema>;
 
 function isDecision(value: unknown): value is CLIPermissionDecision {
   return value === "allow" || value === "ask" || value === "deny";

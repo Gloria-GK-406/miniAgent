@@ -4,6 +4,7 @@ import type {
 import type { LLMResponse, LLMStreamChunk } from "../../core/index.js";
 import { LLMStreamChunkType, MessageType } from "../../core/index.js";
 import { createTokenCount, emptyTokenCount } from "../../core/index.js";
+import { z } from "zod";
 
 const THINKING_OPEN = "<think>";
 const THINKING_CLOSE = "</think>";
@@ -71,10 +72,18 @@ enum ParseState {
   Thinking,
 }
 
-export interface ConsumeNVIDIAStreamOptions {
-  emitChunk: (chunk: LLMStreamChunk) => void;
-  shouldBreak?: () => boolean;
-}
+export const ConsumeNVIDIAStreamOptionsSchema = z.object({
+  emitChunk: z.custom<(chunk: LLMStreamChunk) => void>(
+    (value) => typeof value === "function",
+  ),
+  shouldBreak: z.custom<() => boolean>(
+    (value) => typeof value === "function",
+  ).optional(),
+});
+
+export type ConsumeNVIDIAStreamOptions = z.infer<
+  typeof ConsumeNVIDIAStreamOptionsSchema
+>;
 
 export async function* streamNVIDIAChunks(
   stream: AsyncIterable<ChatCompletionChunk>,
