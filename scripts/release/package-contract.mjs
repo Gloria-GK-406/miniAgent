@@ -1,4 +1,4 @@
-const VERSION = "0.10.0";
+const VERSION = "0.9.2";
 const CORE_PACKAGE = "@piaoxianguo/miniagent-core";
 
 const exportTarget = (entry = "index") => ({

@@ -406,7 +406,7 @@ async function main() {
     console.log(JSON.stringify({
       candidateId: policy.manifest.candidateId,
       packages: policy.reports,
-      dependencyGraph: "engine/extensions -> core@0.10.0; no horizontal dependency",
+      dependencyGraph: "engine/extensions -> core@0.9.2; no horizontal dependency",
       zodVersion: consumer.zodVersion,
       runtimeEntries: consumer.runtimeResults,
       typeEntries: consumer.typeResults,
