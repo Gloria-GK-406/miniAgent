@@ -92,9 +92,9 @@ The core does exactly one thing — the agent loop (collect context → call LLM
 - **Auto-Detection** — Components are identified by Zod schema validation, not manual type tags. You register a tool, a provider, or a processor — the agent knows what it is.
 - **Plugin Over Framework** — No inheritance hierarchies, no abstract base classes. Just plain objects that satisfy the right schema.
 
-### 0.8 Packages
+### 0.9 Packages
 
-MiniAgent 0.8 is published as three focused packages:
+MiniAgent 0.9 is published as three focused packages:
 
 ```text
 core <- engine
@@ -105,7 +105,7 @@ core <- extensions
 - `@piaoxianguo/miniagent-engine` exposes model-provider adapters and depends on core.
 - `@piaoxianguo/miniagent-extensions` exposes concrete tools, MCP, skills, subagents, context features, and file persistence, and depends on core.
 
-Installing engine or extensions installs the compatible core package automatically. Version 0.8 does not publish the old `@piaoxianguo/miniagent` aggregate package or a CLI package; install only the split packages your application imports. Engine and extensions are siblings and never depend on each other.
+Installing engine or extensions installs the compatible core package automatically. Version 0.9 does not publish the old `@piaoxianguo/miniagent` aggregate package or a CLI package; install only the split packages your application imports. Engine and extensions are siblings and never depend on each other.
 
 Repository linting enforces layer direction, public entry points, external dependency boundaries, and zero runtime or type-only cycles.
 
@@ -291,7 +291,7 @@ from the blueprint:
 
 ```typescript
 // BlueprintManager and the built-in assembly registry are source-level CLI APIs.
-// They are not exported by the 0.8 npm packages.
+// They are not exported by the 0.9 npm packages.
 
 const manager = new BlueprintManager();
 registerBuiltinBlueprintImpls(manager, {

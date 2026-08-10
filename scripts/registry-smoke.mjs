@@ -279,7 +279,7 @@ async function registryVersion(record, getJson) {
 async function main() {
   const candidateArgument = argument("--candidate");
   const requestedVersion = argument("--version");
-  if (!candidateArgument || requestedVersion !== contract.version) fail("Exact --candidate and --version 0.8.0 are required");
+  if (!candidateArgument || requestedVersion !== contract.version) fail("Exact --candidate and --version 0.9.0 are required");
   const fixtureArgument = argument("--registry-fixture");
   const npmCommandFixtureArgument = argument("--npm-command-fixture");
   if (npmCommandFixtureArgument && !fixtureArgument) fail("--npm-command-fixture requires --registry-fixture");

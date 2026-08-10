@@ -1,4 +1,4 @@
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 const CORE_PACKAGE = "@piaoxianguo/miniagent-core";
 
 const exportTarget = (entry = "index") => ({
@@ -30,7 +30,7 @@ export const releasePackageContract = Object.freeze({
       exports: Object.freeze({ ".": exportTarget() }),
       dependencies: Object.freeze({
         eventemitter3: "^5.0.4",
-        zod: "^3.25.28",
+        zod: "^4.4.3",
       }),
     }),
     Object.freeze({
@@ -50,8 +50,7 @@ export const releasePackageContract = Object.freeze({
         [CORE_PACKAGE]: VERSION,
         "@anthropic-ai/sdk": "^0.82.0",
         openai: "^6.33.0",
-        zod: "^3.25.28",
-        "zod-to-json-schema": "^3.25.2",
+        zod: "^4.4.3",
       }),
     }),
     Object.freeze({
@@ -69,7 +68,7 @@ export const releasePackageContract = Object.freeze({
         "@modelcontextprotocol/sdk": "^1.29.0",
         json5: "^2.2.3",
         yaml: "^2.8.3",
-        zod: "^3.25.28",
+        zod: "^4.4.3",
       }),
     }),
   ]),

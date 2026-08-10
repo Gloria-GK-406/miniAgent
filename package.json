@@ -1,6 +1,6 @@
 {
   "name": "@piaoxianguo/miniagent",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "A minimal, extensible TypeScript Agent framework",
   "keywords": [

@@ -1,0 +1,8 @@
+{
+  "version": "0.9.0",
+  "packages": [
+    "@piaoxianguo/miniagent-core",
+    "@piaoxianguo/miniagent-engine",
+    "@piaoxianguo/miniagent-extensions"
+  ]
+}

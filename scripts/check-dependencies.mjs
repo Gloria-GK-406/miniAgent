@@ -14,7 +14,7 @@ const ALLOWED_LAYERS = {
 };
 const EXTERNAL_ALLOWLIST = {
     core: ["zod", "eventemitter3"],
-    engine: ["zod", "zod-to-json-schema", "openai", "@anthropic-ai/sdk"],
+    engine: ["zod", "openai", "@anthropic-ai/sdk"],
     extensions: ["zod", "json5", "yaml", "@modelcontextprotocol/sdk"],
     cli: null,
     public: [],
