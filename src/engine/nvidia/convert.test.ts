@@ -57,7 +57,7 @@ function makeTool(): Tool {
   return {
     name: "get_weather",
     description: "Get weather for a city",
-    parameters: z.object({ city: z.string().describe("City name") }),
+    parameters: z.object({ city: z.string().meta({ description: "City name" }) }),
     execute: async () => "sunny",
   };
 }

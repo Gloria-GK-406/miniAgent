@@ -14,7 +14,7 @@ const readTool: Tool = {
   name: "read",
   description: "Read a workspace file",
   parameters: z.object({
-    path: z.string().describe("File path"),
+    path: z.string().meta({ description: "File path" }),
   }),
   execute: async () => "ok",
 };

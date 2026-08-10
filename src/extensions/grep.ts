@@ -5,9 +5,9 @@ import type { Tool } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
 const GrepParamsSchema = z.object({
-  pattern: z.string().describe("Regular expression pattern to search for"),
-  path: z.string().describe("Directory or file to search in"),
-  include: z.string().optional().describe("File glob to filter (e.g. *.ts)"),
+  pattern: z.string().meta({ description: "Regular expression pattern to search for" }),
+  path: z.string().meta({ description: "Directory or file to search in" }),
+  include: z.string().optional().meta({ description: "File glob to filter (e.g. *.ts)" }),
 });
 
 function simpleGlobMatch(glob: string, name: string): boolean {

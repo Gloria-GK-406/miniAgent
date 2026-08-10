@@ -33,30 +33,30 @@ import type { JsonValue } from "../../core/index.js";
 import type { BlueprintManager } from "./manager.js";
 import type { AgentBlueprint, BlueprintUse } from "./blueprint.js";
 
-const EmptyConfigSchema = z.object({}).strict();
+const EmptyConfigSchema = z.strictObject({});
 
-const FilePersistenceConfigSchema = z.object({
+const FilePersistenceConfigSchema = z.strictObject({
     rootDir: z.string().min(1),
     fileName: z.string().min(1),
-}).strict();
+});
 
-const SummaryCompressionConfigSchema = z.object({
-    maxMessages: z.number().int().positive().default(60),
-    keepRecent: z.number().int().nonnegative().default(15),
-}).strict();
+const SummaryCompressionConfigSchema = z.strictObject({
+    maxMessages: z.int().positive().default(60),
+    keepRecent: z.int().nonnegative().default(15),
+});
 
-const StaticAutoApproveConfigSchema = z.object({
+const StaticAutoApproveConfigSchema = z.strictObject({
     autoApproveTools: z.array(z.string().min(1)).default(["read", "glob", "grep"]),
-}).strict();
+});
 
-const SystemPromptConfigSchema = z.object({
+const SystemPromptConfigSchema = z.strictObject({
     prompt: z.string(),
     baseDir: z.string().optional(),
-}).strict();
+});
 
-const AgentContextConfigSchema = z.object({
+const AgentContextConfigSchema = z.strictObject({
     baseDir: z.string().min(1),
-}).strict();
+});
 
 type FilePersistenceConfig = z.output<typeof FilePersistenceConfigSchema>;
 type SummaryCompressionConfig = z.output<typeof SummaryCompressionConfigSchema>;
@@ -103,7 +103,7 @@ function toJsonValue(value: unknown): JsonValue {
     throw new Error("Blueprint config values must be JSON serializable.");
 }
 
-function parseBlueprintConfig<T extends z.ZodTypeAny>(
+function parseBlueprintConfig<T extends z.ZodType>(
     schema: T,
     config: z.input<T>,
 ): JsonValue {

@@ -1,4 +1,4 @@
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 import type { Tool } from "../core/index.js";
 import type { PrintStreams } from "./print-runner.js";
 import { errorMessage, writeHeadlessError } from "./headless-output.js";
@@ -18,7 +18,7 @@ export function toToolListItem(
   tool: Tool,
   permission?: CLIPermissionResult,
 ): ToolListItem {
-  const { $schema: _, ...parameters } = zodToJsonSchema(tool.parameters) as Record<string, unknown>;
+  const { $schema: _, ...parameters } = z.toJSONSchema(tool.parameters);
   return {
     name: tool.name,
     description: tool.description,

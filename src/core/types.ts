@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { createFunctionSchema } from "./function-schema.js";
 import type { LLMGenerateRequest } from "./config.js";
 import {
   AssistMessageSchema,
   MessageSchema,
   ToolCallMessageSchema,
+  type Message,
 } from "./message.js";
 export {
   AssistMessageSchema,
@@ -39,9 +41,9 @@ export const LLMMessageResponseSchema = z.union([
 export type LLMMessageResponse = z.infer<typeof LLMMessageResponseSchema>;
 
 export const TokenCountSchema = z.object({
-  input: z.number().int().nonnegative(),
-  output: z.number().int().nonnegative(),
-  total: z.number().int().nonnegative(),
+  input: z.int().nonnegative(),
+  output: z.int().nonnegative(),
+  total: z.int().nonnegative(),
 });
 
 export type TokenCount = z.infer<typeof TokenCountSchema>;
@@ -74,7 +76,7 @@ export const ReasoningDeltaChunkSchema = z.object({
 
 export const ToolCallArgumentsDeltaChunkSchema = z.object({
   type: z.literal(LLMStreamChunkType.ToolCallArgumentsDelta),
-  index: z.number().int().nonnegative(),
+  index: z.int().nonnegative(),
   argsText: z.string(),
   toolCallId: z.string().optional(),
   toolName: z.string().optional(),
@@ -120,36 +122,29 @@ export const LLMRequestSchema = z.custom<LLMRequest>((value) => {
 });
 
 export const ContextProviderSchema = z.object({
-  priority: z.number().int(),
-  collect: z.function(
-    z.tuple([]),
-    z.promise(z.array(MessageSchema)),
-  ),
+  priority: z.int(),
+  collect: createFunctionSchema<() => Promise<Message[]>>(),
 });
 
 export type ContextProvider = z.infer<typeof ContextProviderSchema>;
 
 export const TurnContextSchema = z.object({
-  turn: z.number().int().positive(),
+  turn: z.int().positive(),
   context: z.array(MessageSchema),
 });
 
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 
 export const TurnContextConsumerSchema = z.object({
-  consumeTurnContext: z.function(
-    z.tuple([TurnContextSchema]),
-    z.promise(z.void()),
-  ),
+  consumeTurnContext: createFunctionSchema<(
+    context: TurnContext,
+  ) => Promise<void>>(),
 });
 
 export type TurnContextConsumer = z.infer<typeof TurnContextConsumerSchema>;
 
 export const TurnContextAppenderSchema = z.object({
-  appendTurnContext: z.function(
-    z.tuple([]),
-    z.promise(z.array(MessageSchema)),
-  ),
+  appendTurnContext: createFunctionSchema<() => Promise<Message[]>>(),
 });
 
 export type TurnContextAppender = z.infer<typeof TurnContextAppenderSchema>;
@@ -192,87 +187,62 @@ export const ActionSchema = z.union([
 export type Action = z.infer<typeof ActionSchema>;
 
 export const ContextProcessorSchema = z.object({
-  priority: z.number().int(),
-  process: z.function(
-    z.tuple([z.array(MessageSchema)]),
-    z.promise(z.array(ActionSchema)),
-  ),
+  priority: z.int(),
+  process: createFunctionSchema<(
+    messages: Message[],
+  ) => Promise<Action[]>>(),
 });
 
 export type ContextProcessor = z.infer<typeof ContextProcessorSchema>;
 
 export const MessageNotifierSchema = z.object({
-  notify: z.function(
-    z.tuple([MessageSchema]),
-    z.promise(z.void()),
-  ),
+  notify: createFunctionSchema<(message: Message) => Promise<void>>(),
 });
 
 export type MessageNotifier = z.infer<typeof MessageNotifierSchema>;
 
 export const ErrorHandlerSchema = z.object({
-  priority: z.number().int(),
-  canHandle: z.function(
-    z.tuple([z.unknown()]),
-    z.boolean(),
-  ),
-  handle: z.function(
-    z.tuple([z.unknown()]),
-    z.promise(z.void()),
-  ),
+  priority: z.int(),
+  canHandle: createFunctionSchema<(error: unknown) => boolean>(),
+  handle: createFunctionSchema<(error: unknown) => Promise<void>>(),
 });
 
 export type ErrorHandler = z.infer<typeof ErrorHandlerSchema>;
 
 export const AgentContextControlSchema = z.object({
-  getMessages: z.function(
-    z.tuple([]),
-    z.promise(z.array(MessageSchema)),
-  ),
-  getMessage: z.function(
-    z.tuple([z.string()]),
-    z.promise(MessageSchema.optional()),
-  ),
-  previewContext: z.function(
-    z.tuple([]),
-    z.promise(z.array(MessageSchema)),
-  ),
-  setDiscardBefore: z.function(
-    z.tuple([z.string()]),
-    z.promise(z.void()),
-  ),
-  clearDiscardBefore: z.function(
-    z.tuple([]),
-    z.promise(z.void()),
-  ),
+  getMessages: createFunctionSchema<() => Promise<Message[]>>(),
+  getMessage: createFunctionSchema<(
+    messageId: string,
+  ) => Promise<Message | undefined>>(),
+  previewContext: createFunctionSchema<() => Promise<Message[]>>(),
+  setDiscardBefore: createFunctionSchema<(
+    messageId: string,
+  ) => Promise<void>>(),
+  clearDiscardBefore: createFunctionSchema<() => Promise<void>>(),
 });
 
 export type AgentContextControl = z.infer<typeof AgentContextControlSchema>;
 
 export const AfterTurnProcessorSchema = z.object({
-  priority: z.number().int(),
-  process: z.function(
-    z.tuple([AgentContextControlSchema, MessageSchema]),
-    z.promise(z.void()),
-  ),
+  priority: z.int(),
+  process: createFunctionSchema<(
+    control: AgentContextControl,
+    message: Message,
+  ) => Promise<void>>(),
 });
 
 export type AfterTurnProcessor = z.infer<typeof AfterTurnProcessorSchema>;
 
 export const LLMRequireSchema = z.object({
-  setLLMRequest: z.function(
-    z.tuple([LLMRequestSchema]),
-    z.promise(z.void()),
-  ),
+  setLLMRequest: createFunctionSchema<(
+    request: LLMRequest,
+  ) => Promise<void>>(),
 });
 
 export type LLMRequire = z.infer<typeof LLMRequireSchema>;
 
 export const DestroyableSchema = z.object({
-  destroy: z.function(
-    z.tuple([]),
-    z.union([z.void(), z.promise(z.void())]),
-  ),
+  destroy: createFunctionSchema<() => void | Promise<void>>(),
 });
 
 export type Destroyable = z.infer<typeof DestroyableSchema>;

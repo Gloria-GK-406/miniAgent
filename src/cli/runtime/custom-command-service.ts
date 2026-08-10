@@ -5,14 +5,14 @@ import { z } from "zod";
 import { CLIAgentModeSchema } from "../config.js";
 import type { CLICommand } from "./types.js";
 
-const CustomCommandFrontmatterSchema = z.object({
+const CustomCommandFrontmatterSchema = z.looseObject({
   description: z.string().optional(),
   aliases: z.array(z.string()).optional(),
   usage: z.string().optional(),
   hidden: z.boolean().optional(),
   agent: CLIAgentModeSchema.optional(),
   model: z.string().optional(),
-}).passthrough();
+});
 
 interface ParsedCommandFile {
   frontmatter: z.infer<typeof CustomCommandFrontmatterSchema>;

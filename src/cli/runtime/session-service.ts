@@ -10,13 +10,13 @@ const CLI_META_FILE = "cli-meta.json";
 const ACTIVE_SESSION_FILE = "active-session.json";
 
 const EMPTY_TOKEN_USAGE: TokenCount = { input: 0, output: 0, total: 0 };
-const ActiveSessionSchema = z.object({ id: z.string() }).strict();
+const ActiveSessionSchema = z.strictObject({ id: z.string() });
 
-export const CLISessionRuntimeMetadataSchema = z.object({
+export const CLISessionRuntimeMetadataSchema = z.strictObject({
   version: z.literal(1),
   mode: CLIAgentModeSchema.optional(),
   tokenUsage: TokenCountSchema.default(EMPTY_TOKEN_USAGE),
-}).strict();
+});
 
 export type CLISessionRuntimeMetadata = z.infer<typeof CLISessionRuntimeMetadataSchema>;
 

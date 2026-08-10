@@ -4,9 +4,9 @@ import type { Tool } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
 const ReadParamsSchema = z.object({
-  path: z.string().describe("Absolute path to the file or directory"),
-  offset: z.number().int().min(1).optional().describe("Line number to start reading from (1-indexed)"),
-  limit: z.number().int().min(1).optional().describe("Maximum number of lines to read"),
+  path: z.string().meta({ description: "Absolute path to the file or directory" }),
+  offset: z.int().min(1).optional().meta({ description: "Line number to start reading from (1-indexed)" }),
+  limit: z.int().min(1).optional().meta({ description: "Maximum number of lines to read" }),
 });
 
 async function readExecute(args: Record<string, unknown>): Promise<string> {

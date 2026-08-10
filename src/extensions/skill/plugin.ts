@@ -67,7 +67,7 @@ export class SkillPlugin {
                 + "Returns the skill content and associated file paths. "
                 + "Call this when you need to apply a specific skill's expertise.",
             parameters: z.object({
-                id: z.string().describe("The skill id to load"),
+                id: z.string().meta({ description: "The skill id to load" }),
             }),
             execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                 const id = args["id"] as string;

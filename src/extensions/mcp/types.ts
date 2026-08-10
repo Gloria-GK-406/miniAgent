@@ -5,7 +5,7 @@ export const McpStdioConfigSchema = z.object({
     transport: z.literal("stdio"),
     command: z.string(),
     args: z.array(z.string()).optional(),
-    env: z.record(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
 });
 
 export type McpStdioConfig = z.infer<typeof McpStdioConfigSchema>;
@@ -40,7 +40,7 @@ export const McpCapabilitySelectorSchema = z.object({
 export type McpCapabilitySelector = z.infer<typeof McpCapabilitySelectorSchema>;
 
 export const McpPluginConfigSchema = z.object({
-    servers: z.record(McpServerConfigSchema),
+    servers: z.record(z.string(), McpServerConfigSchema),
     capabilities: McpCapabilitySelectorSchema.optional(),
 });
 

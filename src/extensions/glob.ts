@@ -5,8 +5,8 @@ import type { Tool } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
 const GlobParamsSchema = z.object({
-  pattern: z.string().describe("Glob pattern to match (e.g. **/*.ts)"),
-  path: z.string().describe("Base directory to search from"),
+  pattern: z.string().meta({ description: "Glob pattern to match (e.g. **/*.ts)" }),
+  path: z.string().meta({ description: "Base directory to search from" }),
 });
 
 function toPosixPath(filePath: string): string {

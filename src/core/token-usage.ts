@@ -1,30 +1,22 @@
 import { z } from "zod";
 import { createTokenCount, emptyTokenCount } from "./llm.js";
+import { createFunctionSchema } from "./function-schema.js";
 import { TokenCountSchema, type TokenCount } from "./types.js";
 
 export const TokenUsageReporterSchema = z.object({
-  reportTokenUsage: z.function(
-    z.tuple([TokenCountSchema]),
-    z.void(),
-  ),
+  reportTokenUsage: createFunctionSchema<(tokenCount: TokenCount) => void>(),
 });
 
 export type TokenUsageReporter = z.infer<typeof TokenUsageReporterSchema>;
 
 export const TokenUsageReaderSchema = z.object({
-  getTokenUsage: z.function(
-    z.tuple([]),
-    TokenCountSchema,
-  ),
+  getTokenUsage: createFunctionSchema<() => TokenCount>(),
 });
 
 export type TokenUsageReader = z.infer<typeof TokenUsageReaderSchema>;
 
 export const TokenUsageResetterSchema = z.object({
-  resetTokenUsage: z.function(
-    z.tuple([]),
-    z.void(),
-  ),
+  resetTokenUsage: createFunctionSchema<() => void>(),
 });
 
 export type TokenUsageResetter = z.infer<typeof TokenUsageResetterSchema>;

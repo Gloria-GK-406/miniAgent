@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join, posix, win32 } from "node:path";
 import { z } from "zod";
 import {
-  GenerationConfigSchema,
+  GenerationConfigInputSchema,
   ModelPresetSchema,
   ModelRuntimeSchema,
   normalizeGenerationConfig,
@@ -33,22 +33,21 @@ export class ConfigTemplateCreatedError extends Error {
 }
 
 export const CLIProviderSchema = z
-  .object({
+  .strictObject({
     engine: z.string().min(1),
     key: z.string().min(1),
     baseURL: z.string().optional(),
     models: z.array(ModelPresetSchema),
-  })
-  .strict();
+  });
 
 export type CLIProvider = z.infer<typeof CLIProviderSchema>;
 
-export const CLIConfiguredModelSchema = z.object({
+export const CLIConfiguredModelSchema = z.strictObject({
   provider: z.string().min(1),
   key: z.string().min(1),
   baseUrl: z.string().optional(),
   model: ModelPresetSchema,
-}).strict();
+});
 
 export type CLIConfiguredModel = z.infer<typeof CLIConfiguredModelSchema>;
 
@@ -59,7 +58,13 @@ export const CLIPermissionDecisionSchema = z.enum(["allow", "ask", "deny"]);
 export type CLIPermissionDecision = z.infer<typeof CLIPermissionDecisionSchema>;
 
 export const CLIPermissionConfigSchema = z
-  .record(z.union([CLIPermissionDecisionSchema, z.record(CLIPermissionDecisionSchema)]))
+  .record(
+    z.string(),
+    z.union([
+      CLIPermissionDecisionSchema,
+      z.record(z.string(), CLIPermissionDecisionSchema),
+    ]),
+  )
   .default({
     "*": "ask",
     read: "allow",
@@ -79,13 +84,12 @@ export const CLIPermissionConfigSchema = z
 export type CLIPermissionConfig = z.infer<typeof CLIPermissionConfigSchema>;
 
 export const CLIShellConfigSchema = z
-  .object({
+  .strictObject({
     windows: z.enum(["powershell", "git-bash", "wsl", "cmd"]).default("powershell"),
     executable: z.string().min(1).optional(),
     args: z.array(z.string()).optional(),
-    timeoutMs: z.number().int().positive().max(600000).default(120000),
+    timeoutMs: z.int().positive().max(600000).default(120000),
   })
-  .strict()
   .default({
     windows: "powershell",
     timeoutMs: 120000,
@@ -93,32 +97,29 @@ export const CLIShellConfigSchema = z
 export type CLIShellConfig = z.infer<typeof CLIShellConfigSchema>;
 
 export const CLIEditorConfigSchema = z
-  .object({
+  .strictObject({
     executable: z.string().min(1).optional(),
     args: z.array(z.string()).optional(),
     wait: z.boolean().optional(),
   })
-  .strict()
   .default({});
 export type CLIEditorConfig = z.infer<typeof CLIEditorConfigSchema>;
 
 export const CLIDiagnosticsConfigSchema = z
-  .object({
+  .strictObject({
     commands: z.array(z.string().min(1)).optional(),
-    timeoutMs: z.number().int().positive().max(600000).default(120000),
+    timeoutMs: z.int().positive().max(600000).default(120000),
   })
-  .strict()
   .default({
     timeoutMs: 120000,
   });
 export type CLIDiagnosticsConfig = z.infer<typeof CLIDiagnosticsConfigSchema>;
 
 export const CLITUIConfigSchema = z
-  .object({
+  .strictObject({
     showReasoning: z.boolean().default(false),
     showToolDetails: z.boolean().default(false),
   })
-  .strict()
   .default({
     showReasoning: false,
     showToolDetails: false,
@@ -126,7 +127,7 @@ export const CLITUIConfigSchema = z
 export type CLITUIConfig = z.infer<typeof CLITUIConfigSchema>;
 
 export const CLIConfigSchema = z
-  .object({
+  .strictObject({
     providers: z.array(CLIProviderSchema).default([]),
     defaultModel: z.string().default(""),
     defaultAgent: CLIAgentModeSchema.default("build"),
@@ -135,13 +136,12 @@ export const CLIConfigSchema = z
     editor: CLIEditorConfigSchema,
     diagnostics: CLIDiagnosticsConfigSchema,
     tui: CLITUIConfigSchema,
-    generation: GenerationConfigSchema.partial().optional(),
+    generation: GenerationConfigInputSchema.optional(),
     systemPrompt: z.string().optional(),
     mcp: McpPluginConfigSchema.optional(),
     skill: SkillPluginConfigSchema.optional(),
     subagent: SubagentPluginConfigSchema.optional(),
-  })
-  .strict();
+  });
 
 export type CLIConfig = z.infer<typeof CLIConfigSchema>;
 

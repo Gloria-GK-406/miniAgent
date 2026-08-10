@@ -19,8 +19,8 @@ export type AgentFactory = (task: string, systemPrompt: string) => Promise<MiniA
 export type ConfiguredSubagentFactory = (request: SubagentInvocation) => Promise<MiniAgent>;
 
 const SubAgentParamsSchema = z.object({
-    task: z.string().describe("The task description to delegate to the sub-agent"),
-    system_prompt: z.string().optional().describe("Custom system prompt for the sub-agent"),
+    task: z.string().meta({ description: "The task description to delegate to the sub-agent" }),
+    system_prompt: z.string().optional().meta({ description: "Custom system prompt for the sub-agent" }),
 });
 
 export const SubagentCapabilitySelectorSchema = AgentCapabilityRuleSchema;
@@ -62,9 +62,9 @@ export interface SubagentInvocation {
 }
 
 const RunSubagentParamsSchema = z.object({
-    agent: z.string().describe("The subagent id or name to run"),
-    task: z.string().describe("The task to delegate to the subagent"),
-    context: z.string().optional().describe("Additional context injected into the subagent task"),
+    agent: z.string().meta({ description: "The subagent id or name to run" }),
+    task: z.string().meta({ description: "The task to delegate to the subagent" }),
+    context: z.string().optional().meta({ description: "Additional context injected into the subagent task" }),
 });
 
 export class SubAgentProvider implements ToolProvider {

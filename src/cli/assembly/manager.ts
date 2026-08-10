@@ -24,7 +24,7 @@ export type PresetBlueprintDomain = z.infer<typeof PresetBlueprintDomainSchema>;
 type AgentUseBlueprintDomain = Exclude<PresetBlueprintDomain, "engine" | "persistence">;
 
 export interface BlueprintImpl<C, R> {
-    configSchema: z.ZodType<C, z.ZodTypeDef, unknown>;
+    configSchema: z.ZodType<C>;
     create: (config: C) => R | Promise<R>;
 }
 
@@ -37,7 +37,7 @@ export type EngineBlueprintImpl<C> = EngineBlueprintFactory<C>;
 export type PersistenceBlueprintImpl<C> = PersistenceBlueprintFactory<C>;
 
 interface StoredBlueprintImpl<R> {
-    configSchema: z.ZodTypeAny;
+    configSchema: z.ZodType;
     create: (config: unknown) => R | Promise<R>;
 }
 

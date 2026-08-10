@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { GenerationConfig, ModelRuntime } from "./config.js";
+import { createFunctionSchema } from "./function-schema.js";
 import {
   collectLLMResponse,
   createLLMStreamHandle,
@@ -66,19 +67,15 @@ export const OneShotLLMSchema = z.custom<OneShotLLM>((value) => {
 });
 
 export const OneShotLLMFactorySchema = z.object({
-  create: z.function(
-    z.tuple([]),
-    OneShotLLMSchema,
-  ),
+  create: createFunctionSchema<() => OneShotLLM>(),
 });
 
 export type OneShotLLMFactory = z.infer<typeof OneShotLLMFactorySchema>;
 
 export const OneShotLLMRequireSchema = z.object({
-  setOneShotLLMFactory: z.function(
-    z.tuple([OneShotLLMFactorySchema]),
-    z.void(),
-  ),
+  setOneShotLLMFactory: createFunctionSchema<(
+    factory: OneShotLLMFactory,
+  ) => void>(),
 });
 
 export type OneShotLLMRequire = z.infer<typeof OneShotLLMRequireSchema>;

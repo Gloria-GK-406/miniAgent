@@ -22,7 +22,7 @@ import type {
 } from "openai/resources/chat/completions/completions.js";
 import { MessageType } from "../../core/index.js";
 import { createTokenCount, emptyTokenCount } from "../../core/index.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 function extractText(content: Message["content"]): string {
   if (typeof content === "string") return content;
@@ -105,7 +105,7 @@ function convertToolResultMessage(
 export function convertTools(tools: Tool[]): ChatCompletionTool[] {
   if (tools.length === 0) return [];
   return tools.map((tool): ChatCompletionFunctionTool => {
-    const jsonSchema = zodToJsonSchema(tool.parameters);
+    const jsonSchema = z.toJSONSchema(tool.parameters);
     const { $schema: _, ...parameters } = jsonSchema as Record<string, unknown>;
     return {
       type: "function" as const,

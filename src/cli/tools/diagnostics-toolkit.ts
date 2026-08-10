@@ -3,7 +3,7 @@ import type { Tool } from "../../core/index.js";
 import type { DiagnosticResult, DiagnosticsService } from "../runtime/diagnostics-service.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 
-const EmptyParamsSchema = z.object({}).strict();
+const EmptyParamsSchema = z.strictObject({});
 
 export interface DiagnosticsToolkitOptions {
   diagnosticsService: DiagnosticsService;

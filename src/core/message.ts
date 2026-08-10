@@ -27,7 +27,7 @@ export const MessageContentSchema = z.union([
 
 export const BaseMessageSchema = z.object({
     id: z.string(),
-    type: z.nativeEnum(MessageType),
+    type: z.enum(MessageType),
     content: MessageContentSchema,
 });
 
@@ -48,7 +48,7 @@ export const ToolCallMessageSchema = BaseMessageSchema.extend({
     type: z.literal(MessageType.ToolCall),
     toolCallId: z.string(),
     toolName: z.string(),
-    arguments: z.record(z.unknown()),
+    arguments: z.record(z.string(), z.unknown()),
     reasoningContent: z.string().optional(),
 });
 

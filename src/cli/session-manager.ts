@@ -9,7 +9,7 @@ export const SessionMetaSchema = z.object({
     name: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
-    messageCount: z.number().int().nonnegative(),
+    messageCount: z.int().nonnegative(),
     model: z.string().optional(),
 });
 

@@ -5,8 +5,8 @@ import type { Tool } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
 const WriteParamsSchema = z.object({
-  path: z.string().describe("Absolute path to write the file"),
-  content: z.string().describe("Content to write to the file"),
+  path: z.string().meta({ description: "Absolute path to write the file" }),
+  content: z.string().meta({ description: "Content to write to the file" }),
 });
 
 async function writeExecute(args: Record<string, unknown>): Promise<string> {

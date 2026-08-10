@@ -34,7 +34,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                 name: "todo_create",
                 description: "Create a new todo item",
                 parameters: z.object({
-                    content: z.string().describe("Description of the todo item"),
+                    content: z.string().meta({ description: "Description of the todo item" }),
                 }),
                 execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                     const parsed = z.object({ content: z.string() }).parse(args);
@@ -51,9 +51,9 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                 name: "todo_update",
                 description: "Update a todo item's content or status",
                 parameters: z.object({
-                    id: z.string().describe("ID of the todo item"),
-                    content: z.string().optional().describe("New description"),
-                    status: z.enum(["pending", "in_progress", "completed"]).optional().describe("New status"),
+                    id: z.string().meta({ description: "ID of the todo item" }),
+                    content: z.string().optional().meta({ description: "New description" }),
+                    status: z.enum(["pending", "in_progress", "completed"]).optional().meta({ description: "New status" }),
                 }),
                 execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                     const parsed = z.object({
@@ -72,7 +72,7 @@ export class TodoManager implements ToolProvider, ContextProcessor {
                 name: "todo_delete",
                 description: "Delete a todo item by ID",
                 parameters: z.object({
-                    id: z.string().describe("ID of the todo item to delete"),
+                    id: z.string().meta({ description: "ID of the todo item to delete" }),
                 }),
                 execute: async (args: Record<string, unknown>, _signal?: AbortSignal): Promise<string> => {
                     const parsed = z.object({ id: z.string() }).parse(args);

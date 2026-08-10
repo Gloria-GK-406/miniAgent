@@ -21,7 +21,7 @@ export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
     z.union([
         JsonPrimitiveSchema,
         z.array(JsonValueSchema),
-        z.record(JsonValueSchema),
+        z.record(z.string(), JsonValueSchema),
     ]),
 );
 
@@ -33,20 +33,19 @@ export enum ThinkingLevel {
     Max = "max",
 }
 
-export const ThinkingLevelSchema = z.nativeEnum(ThinkingLevel);
+export const ThinkingLevelSchema = z.enum(ThinkingLevel);
 
 export const ModelPresetSchema = z
-    .object({
+    .strictObject({
         id: z.string().min(1),
         name: z.string().min(1),
         displayName: z.string().optional(),
-        contextSize: z.number().int().positive().optional(),
-        maxOutputTokens: z.number().int().positive().optional(),
+        contextSize: z.int().positive().optional(),
+        maxOutputTokens: z.int().positive().optional(),
         thinkingLevels: z.array(ThinkingLevelSchema).min(1).optional(),
-        capabilities: z.record(JsonValueSchema).optional(),
-        metadata: z.record(JsonValueSchema).optional(),
-    })
-    .strict();
+        capabilities: z.record(z.string(), JsonValueSchema).optional(),
+        metadata: z.record(z.string(), JsonValueSchema).optional(),
+    });
 
 export type ModelPreset = z.infer<typeof ModelPresetSchema>;
 
@@ -54,19 +53,17 @@ export const ModelSchema = ModelPresetSchema
     .omit({ id: true })
     .extend({
         thinkingLevels: z.array(ThinkingLevelSchema).min(1).default([ThinkingLevel.None]),
-    })
-    .strict();
+    });
 
 export type Model = z.infer<typeof ModelSchema>;
 
 export const ModelRuntimeSchema = z
-    .object({
+    .strictObject({
         provider: z.string().min(1),
         key: z.string().min(1),
         baseUrl: z.string().optional(),
         model: ModelSchema,
-    })
-    .strict();
+    });
 
 export type ModelRuntime = z.infer<typeof ModelRuntimeSchema>;
 
@@ -74,15 +71,26 @@ export const PublicModelRuntimeSchema = ModelRuntimeSchema.omit({ key: true });
 
 export type PublicModelRuntime = z.infer<typeof PublicModelRuntimeSchema>;
 
+const TemperatureSchema = z.number().min(0).max(2);
+const TopPSchema = z.number().min(0).max(1);
+const MaxOutputTokensSchema = z.int().positive();
+
+export const GenerationConfigInputSchema = z.object({
+    temperature: TemperatureSchema.optional(),
+    topP: TopPSchema.optional(),
+    maxOutputTokens: MaxOutputTokensSchema.optional(),
+    thinking: ThinkingLevelSchema.optional(),
+});
+
 export const GenerationConfigSchema = z.object({
-    temperature: z.number().min(0).max(2).default(0.7),
-    topP: z.number().min(0).max(1).optional(),
-    maxOutputTokens: z.number().int().positive().optional(),
+    temperature: TemperatureSchema.default(0.7),
+    topP: TopPSchema.optional(),
+    maxOutputTokens: MaxOutputTokensSchema.optional(),
     thinking: ThinkingLevelSchema.default(ThinkingLevel.Medium),
 });
 
 export type GenerationConfig = z.infer<typeof GenerationConfigSchema>;
-export type GenerationConfigInput = Partial<z.input<typeof GenerationConfigSchema>>;
+export type GenerationConfigInput = z.input<typeof GenerationConfigInputSchema>;
 
 export function normalizeGenerationConfig(
     input?: GenerationConfigInput,
@@ -106,11 +114,10 @@ export const PathConfigSchema = z.object({
 export type PathConfig = z.infer<typeof PathConfigSchema>;
 
 export const AgentConfigSchema = z
-    .object({
+    .strictObject({
         generation: GenerationConfigSchema.optional(),
         paths: PathConfigSchema,
-    })
-    .strict();
+    });
 
 export type AgentConfig = z.input<typeof AgentConfigSchema>;
 export type NormalizedAgentConfig = z.output<typeof AgentConfigSchema>;

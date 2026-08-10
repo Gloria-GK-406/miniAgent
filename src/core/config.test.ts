@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AgentConfigSchema,
-  GenerationConfigSchema,
+  GenerationConfigInputSchema,
   ModelRuntimeSchema,
   PublicModelRuntimeSchema,
   ThinkingLevel,
@@ -55,7 +55,7 @@ describe("agent config", () => {
       temperature: 0.7,
       thinking: ThinkingLevel.Medium,
     });
-    expect(GenerationConfigSchema.partial().parse({ thinking: "none" }))
+    expect(GenerationConfigInputSchema.parse({ thinking: "none" }))
       .toEqual({ thinking: ThinkingLevel.None });
   });
 });

@@ -235,7 +235,7 @@ describe("registerBuiltinBlueprintImpls", () => {
             },
         });
         manager.registerEngineImpl("test", {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => createTestEngine((request) => {
                 seenProviderKeys.push(request.runtime.key);
             }),

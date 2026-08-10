@@ -115,7 +115,7 @@ function makeTool(
     name: overrides.name ?? "get_weather",
     description: overrides.description ?? "Get weather for a city",
     parameters: z.object({
-      city: z.string().describe("City name"),
+      city: z.string().meta({ description: "City name" }),
     }),
     execute: async () => "ok",
   };

@@ -12,8 +12,8 @@ const PathParamsSchema = z.object({
 });
 
 const ReadParamsSchema = PathParamsSchema.extend({
-  offset: z.number().int().positive().optional(),
-  limit: z.number().int().positive().optional(),
+  offset: z.int().positive().optional(),
+  limit: z.int().positive().optional(),
 });
 
 const GlobParamsSchema = z.object({
@@ -55,7 +55,7 @@ const PatchParamsSchema = z.object({
 
 const ShellParamsSchema = z.object({
   command: z.string().min(1),
-  timeoutMs: z.number().int().positive().optional(),
+  timeoutMs: z.int().positive().optional(),
 });
 
 const SEARCH_IGNORED_DIRS = new Set([

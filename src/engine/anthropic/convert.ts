@@ -19,7 +19,7 @@ import type {
 } from "@anthropic-ai/sdk/resources/messages/messages.js";
 import { MessageType } from "../../core/index.js";
 import { createTokenCount } from "../../core/index.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 interface ConvertedInput {
   system?: string;
@@ -156,7 +156,7 @@ export function convertTools(tools: Tool[]): AnthropicTool[] {
   if (tools.length === 0) return [];
 
   return tools.map((tool): AnthropicTool => {
-    const jsonSchema = zodToJsonSchema(tool.parameters);
+    const jsonSchema = z.toJSONSchema(tool.parameters);
     const { $schema: _, ...schema } = jsonSchema as Record<string, unknown>;
     return {
       name: tool.name,

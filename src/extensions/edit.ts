@@ -4,10 +4,10 @@ import type { Tool } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
 const EditParamsSchema = z.object({
-  path: z.string().describe("Absolute path to the file to edit"),
-  oldString: z.string().describe("Exact text to find and replace"),
-  newString: z.string().describe("Text to replace with"),
-  replaceAll: z.boolean().optional().describe("Replace all occurrences instead of just the first"),
+  path: z.string().meta({ description: "Absolute path to the file to edit" }),
+  oldString: z.string().meta({ description: "Exact text to find and replace" }),
+  newString: z.string().meta({ description: "Text to replace with" }),
+  replaceAll: z.boolean().optional().meta({ description: "Replace all occurrences instead of just the first" }),
 });
 
 async function editExecute(args: Record<string, unknown>): Promise<string> {

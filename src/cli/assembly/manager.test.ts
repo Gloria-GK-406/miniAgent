@@ -77,11 +77,11 @@ describe("BlueprintManager", () => {
         const manager = new BlueprintManager();
 
         manager.registerEngineImpl("test", {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => createEngine(),
         });
         manager.registerToolImpl("echo", {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => ({
                 name: "echo",
                 description: "Echoes text",
@@ -99,7 +99,7 @@ describe("BlueprintManager", () => {
     it("rejects duplicate preset implementations", () => {
         const manager = new BlueprintManager();
         const impl = {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => createEngine(),
         };
 
@@ -129,7 +129,7 @@ describe("BlueprintManager", () => {
         const manager = new BlueprintManager();
 
         expect(() => manager.registerCustomImpl("memory", "local", {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => [],
         })).toThrow("Unknown custom blueprint type: memory.");
     });
@@ -162,17 +162,17 @@ describe("BlueprintManager", () => {
         const seenMessages: Message[][] = [];
 
         manager.registerEngineImpl("test", {
-            configSchema: z.object({
+            configSchema: z.strictObject({
                 response: z.string(),
-            }).strict(),
+            }),
             create: (_config) => createEngine((messages) => {
                 seenMessages.push(messages);
             }),
         });
         manager.registerToolImpl("echo", {
-            configSchema: z.object({
+            configSchema: z.strictObject({
                 suffix: z.string(),
-            }).strict(),
+            }),
             create: (config) => ({
                 name: "echo",
                 description: "Echoes text",
@@ -184,9 +184,9 @@ describe("BlueprintManager", () => {
             }),
         });
         manager.registerContextImpl("system", {
-            configSchema: z.object({
+            configSchema: z.strictObject({
                 content: z.string(),
-            }).strict(),
+            }),
             create: (config) => ({
                 priority: 0,
                 collect: async (): Promise<Message[]> => [{
@@ -239,9 +239,9 @@ describe("BlueprintManager", () => {
         const manager = new BlueprintManager();
 
         manager.registerEngineImpl("test", {
-            configSchema: z.object({
+            configSchema: z.strictObject({
                 enabled: z.boolean(),
-            }).strict(),
+            }),
             create: () => createEngine(),
         });
 
@@ -258,7 +258,7 @@ describe("BlueprintManager", () => {
         const destroyed: string[] = [];
 
         manager.registerToolImpl("destroyable", {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => ({
                 name: "destroyable",
                 description: "A destroyable test tool",
@@ -270,7 +270,7 @@ describe("BlueprintManager", () => {
             }),
         });
         manager.registerToolImpl("failing", {
-            configSchema: z.object({}).strict(),
+            configSchema: z.strictObject({}),
             create: () => {
                 throw new Error("later implementation failed");
             },

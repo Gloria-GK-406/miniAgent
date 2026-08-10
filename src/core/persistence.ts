@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createFunctionSchema } from "./function-schema.js";
 import type { Message } from "./message.js";
 
 export interface Store {
@@ -19,10 +20,7 @@ export interface MessageSource {
 }
 
 export const PersistRequireSchema = z.object({
-    setStore: z.function(
-        z.tuple([z.custom<Store>()]),
-        z.promise(z.void()),
-    ),
+    setStore: createFunctionSchema<(store: Store) => Promise<void>>(),
 });
 
 export type PersistRequire = z.infer<typeof PersistRequireSchema>;

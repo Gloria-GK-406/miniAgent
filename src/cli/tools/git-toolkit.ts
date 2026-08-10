@@ -3,20 +3,20 @@ import type { Tool } from "../../core/index.js";
 import type { GitService } from "../runtime/git-service.js";
 import type { PermissionService } from "../runtime/permission-service.js";
 
-const EmptyParamsSchema = z.object({}).strict();
+const EmptyParamsSchema = z.strictObject({});
 
-const GitDiffParamsSchema = z.object({
+const GitDiffParamsSchema = z.strictObject({
   staged: z.boolean().optional(),
   path: z.string().min(1).optional(),
-}).strict();
+});
 
-const GitLogParamsSchema = z.object({
-  limit: z.number().int().positive().max(100).optional(),
-}).strict();
+const GitLogParamsSchema = z.strictObject({
+  limit: z.int().positive().max(100).optional(),
+});
 
-const GitCommitParamsSchema = z.object({
+const GitCommitParamsSchema = z.strictObject({
   message: z.string().min(1),
-}).strict();
+});
 
 export interface GitToolkitOptions {
   gitService: GitService;

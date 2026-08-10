@@ -5,9 +5,9 @@ import type { Tool } from "../core/index.js";
 import { isCapabilityEnabled, type AgentCapabilitySelector } from "../core/index.js";
 
 const BashParamsSchema = z.object({
-    command: z.string().describe("The bash command to execute"),
-    timeout: z.number().int().min(1).max(600000).optional().describe("Timeout in milliseconds (max 600000)"),
-    workdir: z.string().optional().describe("Working directory for command execution"),
+    command: z.string().meta({ description: "The bash command to execute" }),
+    timeout: z.int().min(1).max(600000).optional().meta({ description: "Timeout in milliseconds (max 600000)" }),
+    workdir: z.string().optional().meta({ description: "Working directory for command execution" }),
 });
 
 function bashExecute(args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {

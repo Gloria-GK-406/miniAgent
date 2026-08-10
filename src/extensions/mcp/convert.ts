@@ -25,7 +25,7 @@ export function parsePrefixedName(prefixed: string): McpToolInfo | null {
     };
 }
 
-const passthroughSchema = z.record(z.unknown());
+const passthroughSchema = z.record(z.string(), z.unknown());
 
 export function convertMcpTool(
     serverName: string,
